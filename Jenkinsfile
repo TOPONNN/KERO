@@ -1,23 +1,19 @@
 pipeline {
     agent any
     
-    environment {
-        PROJECT_DIR = '/home/ubuntu/project'
-    }
-    
     stages {
         stage('Pull Latest Code') {
             steps {
                 sh '''
-                    git config --global --add safe.directory /home/ubuntu/project
+                    sudo git config --global --add safe.directory /home/ubuntu/project
                     cd /home/ubuntu/project
-                    git fetch origin
-                    git reset --hard origin/main
+                    sudo git fetch origin
+                    sudo git reset --hard origin/main
                 '''
             }
         }
         
-        stage('Build & Deploy') {
+        stage('Build and Deploy') {
             steps {
                 sh '''
                     cd /home/ubuntu/project
@@ -30,7 +26,7 @@ pipeline {
         stage('Health Check') {
             steps {
                 sh '''
-                    sleep 15
+                    sleep 20
                     curl -f -k https://plyst.info || exit 1
                     echo "Health check passed!"
                 '''
@@ -46,7 +42,7 @@ pipeline {
     
     post {
         success {
-            echo '✅ Deployment completed successfully!'
+            echo '✅ Deployment successful!'
         }
         failure {
             echo '❌ Deployment failed!'
