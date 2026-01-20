@@ -33,7 +33,7 @@ const modes = [
 
 export default function HeroSection() {
   const [activeMode, setActiveMode] = useState(0);
-  const [isInView, setIsInView] = useState(true);
+  const [hasExitedHero, setHasExitedHero] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const lastScrollTime = useRef(0);
   
@@ -46,44 +46,42 @@ export default function HeroSection() {
   const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
   const scale = useTransform(scrollYProgress, [0, 1], [1, 1.2]);
 
-  // Check if section is in view
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => setIsInView(entry.isIntersecting && entry.intersectionRatio > 0.5),
-      { threshold: 0.5 }
-    );
-    if (containerRef.current) observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    const handleScroll = () => {
+      if (window.scrollY > 100) {
+        setHasExitedHero(true);
+      } else if (window.scrollY === 0) {
+        setHasExitedHero(false);
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const handleWheel = useCallback((e: WheelEvent) => {
-    if (!isInView) return;
-    
-    const heroHeight = containerRef.current?.offsetHeight || window.innerHeight;
-    const mouseYRatio = e.clientY / heroHeight;
-    
-    if (mouseYRatio > 0.65) return;
+    if (hasExitedHero || window.scrollY > 10) return;
     
     const now = Date.now();
-    if (now - lastScrollTime.current < 500) return;
+    if (now - lastScrollTime.current < 400) return;
     
-    if (e.deltaY > 0 && activeMode < modes.length - 1) {
-      setActiveMode(prev => prev + 1);
-      lastScrollTime.current = now;
-      e.preventDefault();
-    } else if (e.deltaY < 0 && activeMode > 0) {
-      setActiveMode(prev => prev - 1);
-      lastScrollTime.current = now;
-      e.preventDefault();
+    if (e.deltaY > 0) {
+      if (activeMode < modes.length - 1) {
+        setActiveMode(prev => prev + 1);
+        lastScrollTime.current = now;
+        e.preventDefault();
+      }
+    } else if (e.deltaY < 0) {
+      if (activeMode > 0) {
+        setActiveMode(prev => prev - 1);
+        lastScrollTime.current = now;
+        e.preventDefault();
+      }
     }
-  }, [isInView, activeMode]);
+  }, [hasExitedHero, activeMode]);
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (container) {
-      container.addEventListener('wheel', handleWheel, { passive: false });
-      return () => container.removeEventListener('wheel', handleWheel);
-    }
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    return () => window.removeEventListener('wheel', handleWheel);
   }, [handleWheel]);
 
   const currentMode = modes[activeMode];
