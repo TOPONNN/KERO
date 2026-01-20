@@ -9,7 +9,7 @@ export default function SpecsTable() {
   ];
 
   return (
-    <section className="relative w-full py-32 bg-black text-white px-6 md:px-20">
+    <section id="features" className="relative w-full py-32 bg-black text-white px-6 md:px-20">
       <div className="max-w-7xl mx-auto">
         <h2 className="mb-16 text-xs font-bold tracking-[0.2em] text-white/50 uppercase">
           Technical Specification
