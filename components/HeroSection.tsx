@@ -52,11 +52,17 @@ export default function HeroSection() {
         setHasExitedHero(true);
       } else if (window.scrollY === 0) {
         setHasExitedHero(false);
+        setActiveMode(0);
       }
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const scrollToContent = () => {
+    const heroHeight = containerRef.current?.offsetHeight || window.innerHeight;
+    window.scrollTo({ top: heroHeight, behavior: 'smooth' });
+  };
 
   const handleWheel = useCallback((e: WheelEvent) => {
     if (hasExitedHero || window.scrollY > 10) return;
@@ -221,14 +227,15 @@ export default function HeroSection() {
           />
         </div>
 
-        <motion.div 
+        <motion.button
+          onClick={scrollToContent}
           animate={{ y: [0, 10, 0] }}
           transition={{ repeat: Infinity, duration: 2 }}
-          className="self-center flex flex-col items-center gap-2 text-white/50"
+          className="self-center flex flex-col items-center gap-2 text-white/50 hover:text-white transition-colors cursor-pointer"
         >
-          <span className="text-xs tracking-widest uppercase">Scroll</span>
+          <span className="text-xs tracking-widest uppercase">Skip to Content</span>
           <ChevronDown className="h-5 w-5" />
-        </motion.div>
+        </motion.button>
       </div>
     </section>
   );
