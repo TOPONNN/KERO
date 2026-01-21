@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function HighlightCTA() {
   return (
     <section className="flex flex-col md:flex-row h-screen w-full bg-[#0A0A0A]">
@@ -13,9 +15,11 @@ export default function HighlightCTA() {
           지연 없는 WebRTC 기술로
           <br />마치 같은 공간에 있는 듯한 경험을 제공합니다.
         </p>
-        <button className="mt-12 w-fit rounded-full bg-white px-8 py-4 text-black font-bold transition-transform hover:scale-105">
-          지금 참여하기
-        </button>
+        <Link href="/login">
+          <button className="mt-12 w-fit rounded-full bg-white px-8 py-4 text-black font-bold transition-transform hover:scale-105">
+            지금 참여하기
+          </button>
+        </Link>
       </div>
       <div className="relative flex-1 bg-black overflow-hidden">
         <video

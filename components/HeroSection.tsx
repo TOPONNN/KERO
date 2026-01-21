@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
 import { ChevronDown, Music, Target, MessageSquareText } from "lucide-react";
+import Link from "next/link";
 
 const modes = [
   {
@@ -176,17 +177,19 @@ export default function HeroSection() {
             transition={{ delay: 0.8, duration: 0.6 }}
             className="flex gap-4 mt-8"
           >
-            <motion.button 
-              className="rounded-full border px-8 py-3 text-sm font-medium text-white transition-all hover:text-black"
-              style={{ borderColor: `${currentMode.accent}50` }}
-              whileHover={{ 
-                backgroundColor: currentMode.accent,
-                scale: 1.05 
-              }}
-              whileTap={{ scale: 0.95 }}
-            >
-              지금 참여하기
-            </motion.button>
+            <Link href="/login">
+              <motion.button 
+                className="rounded-full border px-8 py-3 text-sm font-medium text-white transition-all hover:text-black"
+                style={{ borderColor: `${currentMode.accent}50` }}
+                whileHover={{ 
+                  backgroundColor: currentMode.accent,
+                  scale: 1.05 
+                }}
+                whileTap={{ scale: 0.95 }}
+              >
+                지금 참여하기
+              </motion.button>
+            </Link>
             <motion.button 
               className="rounded-full px-8 py-3 text-sm font-medium text-black transition-all"
               style={{ backgroundColor: currentMode.accent }}
