@@ -1,0 +1,76 @@
+"use client";
+
+import { motion } from "framer-motion";
+import Link from "next/link";
+import { Music, ArrowLeft, Play, Users, Mic } from "lucide-react";
+
+export default function NormalModePage() {
+  return (
+    <div className="min-h-screen bg-black text-white">
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-[#C0C0C0]/20 rounded-full blur-3xl" />
+      </div>
+
+      <header className="relative z-10 flex items-center justify-between p-6 md:p-8">
+        <Link href="/" className="flex items-center gap-2 text-white/60 hover:text-white transition-colors">
+          <ArrowLeft className="w-5 h-5" />
+          <span>홈으로</span>
+        </Link>
+        <div className="flex items-center gap-3">
+          <Music className="w-6 h-6 text-[#C0C0C0]" />
+          <span className="text-xl font-bold">KERO</span>
+        </div>
+      </header>
+
+      <main className="relative z-10 flex flex-col items-center justify-center min-h-[80vh] px-6">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="text-center max-w-2xl"
+        >
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#C0C0C0]/20 text-[#C0C0C0] mb-6">
+            <Music className="w-5 h-5" />
+            <span className="text-sm font-medium">MODE 01</span>
+          </div>
+
+          <h1 className="text-5xl md:text-7xl font-bold mb-6">
+            <span className="text-[#C0C0C0]">일반</span> 모드
+          </h1>
+
+          <p className="text-xl text-gray-400 mb-12 leading-relaxed">
+            점수나 제한 없이 자유롭게 노래를 즐기세요.
+            <br />
+            편안한 분위기에서 마음껏 부르세요.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            <div className="p-6 rounded-2xl bg-white/5 border border-white/10">
+              <Play className="w-8 h-8 text-[#C0C0C0] mb-4" />
+              <h3 className="font-bold mb-2">자유로운 선곡</h3>
+              <p className="text-sm text-gray-400">원하는 노래를 업로드하고 바로 시작</p>
+            </div>
+            <div className="p-6 rounded-2xl bg-white/5 border border-white/10">
+              <Users className="w-8 h-8 text-[#C0C0C0] mb-4" />
+              <h3 className="font-bold mb-2">함께 부르기</h3>
+              <p className="text-sm text-gray-400">친구들과 실시간으로 함께 노래</p>
+            </div>
+            <div className="p-6 rounded-2xl bg-white/5 border border-white/10">
+              <Mic className="w-8 h-8 text-[#C0C0C0] mb-4" />
+              <h3 className="font-bold mb-2">녹음 & 공유</h3>
+              <p className="text-sm text-gray-400">내 노래를 녹음하고 공유하세요</p>
+            </div>
+          </div>
+
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="px-12 py-4 rounded-full bg-[#C0C0C0] text-black font-bold text-lg"
+          >
+            지금 시작하기
+          </motion.button>
+        </motion.div>
+      </main>
+    </div>
+  );
+}

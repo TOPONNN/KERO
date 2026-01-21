@@ -13,6 +13,7 @@ const modes = [
     description: ["점수나 제한 없이 자유롭게 노래를 즐기세요.", "편안한 분위기에서 마음껏 부르세요."],
     icon: Music,
     accent: "#C0C0C0",
+    href: "/mode/normal",
   },
   {
     id: "02", 
@@ -21,6 +22,7 @@ const modes = [
     description: ["AI 음정 분석으로 실시간 점수를 확인하세요.", "100점에 도전해보세요!"],
     icon: Target,
     accent: "#FFD700",
+    href: "/mode/perfect-score",
   },
   {
     id: "03",
@@ -29,6 +31,7 @@ const modes = [
     description: ["빈칸으로 가려진 가사를 맞춰보세요.", "얼마나 많은 노래 가사를 알고 있나요?"],
     icon: MessageSquareText,
     accent: "#FF6B6B",
+    href: "/mode/lyrics-quiz",
   },
 ];
 
@@ -177,7 +180,7 @@ export default function HeroSection() {
             transition={{ delay: 0.8, duration: 0.6 }}
             className="flex gap-4 mt-8"
           >
-            <Link href="/login">
+            <Link href={currentMode.href}>
               <motion.button 
                 className="rounded-full border px-8 py-3 text-sm font-medium text-white transition-all hover:text-black"
                 style={{ borderColor: `${currentMode.accent}50` }}
@@ -190,17 +193,19 @@ export default function HeroSection() {
                 지금 참여하기
               </motion.button>
             </Link>
-            <motion.button 
-              className="rounded-full px-8 py-3 text-sm font-medium text-black transition-all"
-              style={{ backgroundColor: currentMode.accent }}
-              whileHover={{ 
-                backgroundColor: "#fff",
-                scale: 1.05 
-              }}
-              whileTap={{ scale: 0.95 }}
-            >
-              기능 둘러보기
-            </motion.button>
+            <Link href={currentMode.href}>
+              <motion.button 
+                className="rounded-full px-8 py-3 text-sm font-medium text-black transition-all"
+                style={{ backgroundColor: currentMode.accent }}
+                whileHover={{ 
+                  backgroundColor: "#fff",
+                  scale: 1.05 
+                }}
+                whileTap={{ scale: 0.95 }}
+              >
+                기능 둘러보기
+              </motion.button>
+            </Link>
           </motion.div>
         </div>
 
