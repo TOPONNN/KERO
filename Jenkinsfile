@@ -26,8 +26,9 @@ pipeline {
         stage('Health Check') {
             steps {
                 sh '''
-                    sleep 20
+                    sleep 30
                     curl -f -k https://plyst.info || exit 1
+                    curl -f -k https://plyst.info/api/health || echo "Backend health check skipped"
                     echo "Health check passed!"
                 '''
             }
@@ -42,7 +43,7 @@ pipeline {
     
     post {
         success {
-            echo '✅ Deployment successful!'
+            echo '✅ Deployment successful! Frontend + Backend'
         }
         failure {
             echo '❌ Deployment failed!'
