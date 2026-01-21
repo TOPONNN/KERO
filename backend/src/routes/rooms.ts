@@ -23,7 +23,7 @@ router.post("/", async (req: Request, res: Response) => {
 
 router.get("/", async (req: Request, res: Response) => {
   try {
-    const { gameMode } = req.query;
+    const gameMode = req.query.gameMode as string | undefined;
     const rooms = await roomService.getPublicRooms(gameMode as GameMode | undefined);
     res.json({ success: true, data: rooms });
   } catch (error: any) {
@@ -33,7 +33,8 @@ router.get("/", async (req: Request, res: Response) => {
 
 router.get("/:code", async (req: Request, res: Response) => {
   try {
-    const room = await roomService.getRoomByCode(req.params.code);
+    const code = req.params.code as string;
+    const room = await roomService.getRoomByCode(code);
     if (!room) {
       return res.status(404).json({ success: false, message: "방을 찾을 수 없습니다." });
     }

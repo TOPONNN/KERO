@@ -62,13 +62,15 @@ export default function PerfectScoreModePage() {
             </div>
           </div>
 
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="px-12 py-4 rounded-full bg-[#FFD700] text-black font-bold text-lg"
-          >
-            도전하기
-          </motion.button>
+          <Link href="/login?redirect=/mode/perfect-score">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-12 py-4 rounded-full bg-[#FFD700] text-black font-bold text-lg"
+            >
+              도전하기
+            </motion.button>
+          </Link>
         </motion.div>
       </main>
     </div>

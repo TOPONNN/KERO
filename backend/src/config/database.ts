@@ -11,7 +11,7 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USERNAME || "root",
   password: process.env.DB_PASSWORD || "",
   database: process.env.DB_DATABASE || "kero",
-  synchronize: process.env.NODE_ENV === "development",
+  synchronize: true, // Auto-create tables (OK for demo project)
   logging: process.env.NODE_ENV === "development",
   entities: [User, Song, LyricsLine, Room, RoomParticipant, Score, LyricsQuizQuestion],
   migrations: ["src/migrations/**/*.ts"],

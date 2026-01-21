@@ -29,7 +29,7 @@ router.post("/upload", upload.single("audio"), async (req: Request, res: Respons
 
 router.post("/:id/processing-callback", async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { vocalsUrl, instrumentalUrl, lyrics, duration, status } = req.body;
 
     await songService.updateProcessingResult(id, {
@@ -57,7 +57,8 @@ router.get("/", async (req: Request, res: Response) => {
 
 router.get("/:id", async (req: Request, res: Response) => {
   try {
-    const song = await songService.getSongById(req.params.id);
+    const id = req.params.id as string;
+    const song = await songService.getSongById(id);
     if (!song) {
       return res.status(404).json({ success: false, message: "곡을 찾을 수 없습니다." });
     }
@@ -69,7 +70,8 @@ router.get("/:id", async (req: Request, res: Response) => {
 
 router.get("/:id/quiz", async (req: Request, res: Response) => {
   try {
-    const data = await songService.getSongWithQuiz(req.params.id);
+    const id = req.params.id as string;
+    const data = await songService.getSongWithQuiz(id);
     if (!data) {
       return res.status(404).json({ success: false, message: "곡을 찾을 수 없습니다." });
     }

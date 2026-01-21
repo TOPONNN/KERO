@@ -62,13 +62,15 @@ export default function NormalModePage() {
             </div>
           </div>
 
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="px-12 py-4 rounded-full bg-[#C0C0C0] text-black font-bold text-lg"
-          >
-            지금 시작하기
-          </motion.button>
+          <Link href="/login?redirect=/mode/normal">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-12 py-4 rounded-full bg-[#C0C0C0] text-black font-bold text-lg"
+            >
+              지금 시작하기
+            </motion.button>
+          </Link>
         </motion.div>
       </main>
     </div>

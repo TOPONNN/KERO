@@ -62,13 +62,15 @@ export default function LyricsQuizModePage() {
             </div>
           </div>
 
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="px-12 py-4 rounded-full bg-[#FF6B6B] text-black font-bold text-lg"
-          >
-            퀴즈 시작하기
-          </motion.button>
+          <Link href="/login?redirect=/mode/lyrics-quiz">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-12 py-4 rounded-full bg-[#FF6B6B] text-black font-bold text-lg"
+            >
+              퀴즈 시작하기
+            </motion.button>
+          </Link>
         </motion.div>
       </main>
     </div>
