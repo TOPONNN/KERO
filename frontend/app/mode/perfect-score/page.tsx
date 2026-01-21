@@ -1,10 +1,30 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Target, ArrowLeft, Trophy, BarChart3, Zap } from "lucide-react";
 
 export default function PerfectScoreModePage() {
+  const router = useRouter();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const token = localStorage.getItem("token");
+    setIsLoggedIn(!!token);
+  }, []);
+
+  const handleStart = () => {
+    if (isLoggedIn) {
+      alert("방 만들기 기능은 준비 중입니다!");
+    } else {
+      router.push("/login?redirect=/mode/perfect-score");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-black text-white">
       <div className="absolute inset-0 overflow-hidden">
@@ -62,15 +82,16 @@ export default function PerfectScoreModePage() {
             </div>
           </div>
 
-          <Link href="/login?redirect=/mode/perfect-score">
+          {mounted && (
             <motion.button
+              onClick={handleStart}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               className="px-12 py-4 rounded-full bg-[#FFD700] text-black font-bold text-lg"
             >
-              도전하기
+              {isLoggedIn ? "도전하기" : "로그인하고 도전하기"}
             </motion.button>
-          </Link>
+          )}
         </motion.div>
       </main>
     </div>

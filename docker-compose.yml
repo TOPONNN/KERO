@@ -2,7 +2,7 @@ services:
   # Frontend (Next.js)
   frontend:
     build:
-      context: .
+      context: ./frontend
       dockerfile: Dockerfile
     restart: unless-stopped
     networks:
