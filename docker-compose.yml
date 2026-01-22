@@ -49,6 +49,8 @@ services:
     restart: unless-stopped
     networks:
       - kero-network
+    ports:
+      - "6379:6379"
     volumes:
       - redis_data:/data
 
@@ -58,32 +60,14 @@ services:
     restart: unless-stopped
     networks:
       - kero-network
+    ports:
+      - "5672:5672"
+      - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: kero
       RABBITMQ_DEFAULT_PASS: ***REDACTED***
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
-
-  # AI Worker (GPU - runs on separate GPU instance)
-  ai-worker:
-    build:
-      context: ./ai-worker
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    networks:
-      - kero-network
-    env_file:
-      - ./ai-worker/.env
-    depends_on:
-      - redis
-      - rabbitmq
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
 
   # Nginx Reverse Proxy
   nginx:
