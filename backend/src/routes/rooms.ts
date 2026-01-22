@@ -47,7 +47,7 @@ router.get("/:code", async (req: Request, res: Response) => {
 router.delete("/:code", async (req: Request, res: Response) => {
   try {
     const code = req.params.code as string;
-    const userId = req.body.userId || req.query.userId as string;
+    const userId = (req.body?.userId || req.query.userId) as string;
     
     if (!userId) {
       return res.status(400).json({ success: false, message: "userId가 필요합니다." });

@@ -53,8 +53,10 @@ export class RoomService {
       throw new Error("이미 종료된 방입니다.");
     }
 
+    const participants = room.participants || [];
+
     if (userId) {
-      const existingParticipant = room.participants.find(
+      const existingParticipant = participants.find(
         (p) => p.userId === userId
       );
       if (existingParticipant) {
@@ -64,7 +66,7 @@ export class RoomService {
       }
     }
 
-    const activeParticipants = room.participants.filter((p) => p.isConnected);
+    const activeParticipants = participants.filter((p) => p.isConnected);
     if (activeParticipants.length >= room.maxParticipants) {
       throw new Error("방이 가득 찼습니다.");
     }
