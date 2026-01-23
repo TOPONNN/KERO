@@ -243,9 +243,14 @@ export default function RoomPage() {
         instrumentalUrl: song.instrumentalUrl,
         vocalUrl: song.vocalsUrl,
         lyrics: song.lyrics?.map((l: any) => ({
-          startTime: l.startTime,
-          endTime: l.endTime,
+          startTime: l.startTime ?? l.start_time,
+          endTime: l.endTime ?? l.end_time,
           text: l.text,
+          words: l.words?.map((w: any) => ({
+            startTime: w.startTime ?? w.start_time,
+            endTime: w.endTime ?? w.end_time,
+            text: w.text,
+          })),
         })) || [],
       }));
       

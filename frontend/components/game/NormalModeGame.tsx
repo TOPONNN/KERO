@@ -7,10 +7,17 @@ import { Play, Pause, SkipForward, Volume2, VolumeX, Mic, MicOff, RotateCcw, Ale
 import type { RootState } from "@/store";
 import { updateCurrentTime, setGameStatus } from "@/store/slices/gameSlice";
 
+interface LyricsWord {
+  startTime: number;
+  endTime: number;
+  text: string;
+}
+
 interface LyricsLine {
   startTime: number;
   endTime: number;
   text: string;
+  words?: LyricsWord[];
 }
 
 export default function NormalModeGame() {
@@ -29,23 +36,13 @@ export default function NormalModeGame() {
   const lyrics: LyricsLine[] = currentSong?.lyrics || [];
   const audioUrl = currentSong?.instrumentalUrl || currentSong?.audioUrl;
 
+  const animationFrameRef = useRef<number | null>(null);
+
   useEffect(() => {
     if (!audioRef.current) return;
 
     const audio = audioRef.current;
     audio.volume = volume;
-
-    const handleTimeUpdate = () => {
-      const time = audio.currentTime;
-      setLocalTime(time);
-      dispatch(updateCurrentTime(time));
-
-      const index = lyrics.findIndex((line, i) => {
-        const nextLine = lyrics[i + 1];
-        return time >= line.startTime && (nextLine ? time < nextLine.startTime : time <= line.endTime);
-      });
-      setCurrentLyricIndex(index);
-    };
 
     const handleEnded = () => {
       setIsPlaying(false);
@@ -62,18 +59,55 @@ export default function NormalModeGame() {
       setAudioLoaded(false);
     };
 
-    audio.addEventListener("timeupdate", handleTimeUpdate);
     audio.addEventListener("ended", handleEnded);
     audio.addEventListener("canplay", handleCanPlay);
     audio.addEventListener("error", handleError);
 
     return () => {
-      audio.removeEventListener("timeupdate", handleTimeUpdate);
       audio.removeEventListener("ended", handleEnded);
       audio.removeEventListener("canplay", handleCanPlay);
       audio.removeEventListener("error", handleError);
     };
-  }, [lyrics, dispatch, volume]);
+  }, [dispatch, volume]);
+
+  useEffect(() => {
+    if (!isPlaying || !audioRef.current) {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      return;
+    }
+
+    const updateTime = () => {
+      if (!audioRef.current || !isPlaying) return;
+      
+      const time = audioRef.current.currentTime;
+      setLocalTime(time);
+      dispatch(updateCurrentTime(time));
+
+      const index = lyrics.findIndex((line, i) => {
+        const nextLine = lyrics[i + 1];
+        return time >= line.startTime && (nextLine ? time < nextLine.startTime : time <= line.endTime);
+      });
+      setCurrentLyricIndex(index);
+
+      animationFrameRef.current = requestAnimationFrame(updateTime);
+    };
+
+    animationFrameRef.current = requestAnimationFrame(updateTime);
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [isPlaying, lyrics, dispatch]);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
+  }, [volume]);
 
   useEffect(() => {
     if (status === "playing" && audioRef.current && !isPlaying && audioLoaded) {
@@ -184,13 +218,37 @@ export default function NormalModeGame() {
                     >
                       {isActive ? (
                         <div className="relative inline-block">
-                          <span className="text-3xl font-bold text-white/30">{line.text}</span>
-                          <motion.span
-                            className="absolute inset-0 text-3xl font-bold text-[#C0C0C0] overflow-hidden whitespace-nowrap"
-                            style={{ clipPath: `inset(0 ${100 - getLyricProgress(line)}% 0 0)` }}
-                          >
-                            {line.text}
-                          </motion.span>
+                          <span className="text-3xl font-bold text-white/30">
+                            {line.words?.map((w, i) => (
+                              <span key={i}>{w.text}{i < (line.words?.length || 0) - 1 ? " " : ""}</span>
+                            )) || line.text}
+                          </span>
+                          <span className="absolute inset-0 text-3xl font-bold overflow-hidden whitespace-nowrap">
+                            {line.words?.map((word, i) => {
+                              const wordProgress = Math.max(0, Math.min(1, 
+                                (localTime - word.startTime) / (word.endTime - word.startTime)
+                              ));
+                              return (
+                                <span 
+                                  key={i} 
+                                  className="relative inline-block"
+                                  style={{ 
+                                    color: wordProgress > 0 ? "#C0C0C0" : "transparent",
+                                    clipPath: `inset(0 ${100 - wordProgress * 100}% 0 0)`,
+                                  }}
+                                >
+                                  {word.text}{i < (line.words?.length || 0) - 1 ? " " : ""}
+                                </span>
+                              );
+                            }) || (
+                              <span 
+                                className="text-[#C0C0C0]"
+                                style={{ clipPath: `inset(0 ${100 - getLyricProgress(line)}% 0 0)` }}
+                              >
+                                {line.text}
+                              </span>
+                            )}
+                          </span>
                         </div>
                       ) : (
                         <span className={`text-2xl font-medium ${isPast ? "text-gray-600" : "text-gray-400"}`}>

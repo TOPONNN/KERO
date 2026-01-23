@@ -3,10 +3,17 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 export type GameMode = "normal" | "perfect_score" | "lyrics_quiz";
 export type GameStatus = "waiting" | "playing" | "paused" | "finished";
 
+interface LyricsWord {
+  startTime: number;
+  endTime: number;
+  text: string;
+}
+
 interface LyricsLine {
   startTime: number;
   endTime: number;
   text: string;
+  words?: LyricsWord[];
   isBlank?: boolean;
   pitchData?: { time: number; frequency: number; note: string; midi: number }[];
 }
