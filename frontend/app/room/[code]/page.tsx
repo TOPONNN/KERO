@@ -130,6 +130,22 @@ export default function RoomPage() {
     }
   }, []);
 
+  // Auto-play next song when current song finishes
+  useEffect(() => {
+    if (gameStatus === "finished") {
+      const nextReady = songQueue.find(s => s.status === "ready");
+      if (nextReady) {
+        const timer = setTimeout(() => {
+          playSong(nextReady);
+        }, 2000);
+        return () => clearTimeout(timer);
+      } else {
+        dispatch(setGameStatus("waiting"));
+        dispatch(setCurrentSong(null));
+      }
+    }
+  }, [gameStatus, songQueue]);
+
   const addSongToQueue = async (song: TJSong) => {
     const queueId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
