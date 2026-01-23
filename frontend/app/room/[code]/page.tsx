@@ -419,72 +419,83 @@ export default function RoomPage() {
         </button>
       </header>
 
-      <main className="relative z-10 flex gap-6 px-4 md:px-6 pb-6 h-[calc(100vh-80px)]">
-        {/* 왼쪽: 대기열 */}
-        <div className="w-80 flex flex-col bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+      <main className="relative z-10 flex gap-4 px-4 md:px-6 pb-6 h-[calc(100vh-80px)]">
+        {/* 메인: 대기열 & 곡 추가 */}
+        <div className="flex-1 flex flex-col bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
           <div className="flex items-center justify-between p-4 border-b border-white/10">
-            <div className="flex items-center gap-2">
-              <ListMusic className="w-5 h-5" style={{ color: config.color }} />
-              <span className="font-bold">대기열</span>
-              <span className="text-sm text-white/60">({songQueue.length}곡)</span>
+            <div className="flex items-center gap-3">
+              <ListMusic className="w-6 h-6" style={{ color: config.color }} />
+              <span className="text-lg font-bold">대기열</span>
+              <span className="text-sm text-white/60 bg-white/10 px-2 py-0.5 rounded-full">{songQueue.length}곡</span>
             </div>
             <button
               onClick={() => setShowAddSong(true)}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium text-black"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-black hover:opacity-90 transition-opacity"
               style={{ backgroundColor: config.color }}
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-5 h-5" />
               곡 추가
             </button>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-2">
+          <div className="flex-1 overflow-y-auto p-4">
             {songQueue.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center p-4">
-                <Music className="w-12 h-12 text-white/20 mb-3" />
-                <p className="text-white/40 text-sm">대기열이 비어있습니다</p>
-                <p className="text-white/30 text-xs mt-1">곡을 추가해주세요</p>
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center mb-4">
+                  <Music className="w-12 h-12 text-white/20" />
+                </div>
+                <p className="text-white/60 text-lg mb-2">대기열이 비어있습니다</p>
+                <p className="text-white/40 text-sm mb-6">노래를 추가하고 함께 즐겨보세요!</p>
+                <button
+                  onClick={() => setShowAddSong(true)}
+                  className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium text-black"
+                  style={{ backgroundColor: config.color }}
+                >
+                  <Plus className="w-5 h-5" />
+                  첫 곡 추가하기
+                </button>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="grid gap-3">
                 {songQueue.map((song, idx) => (
                   <motion.div
                     key={song.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="flex items-center gap-3 p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-colors group"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    className="flex items-center gap-4 p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-colors group"
                   >
                     <div 
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold"
-                      style={{ backgroundColor: `${config.color}30`, color: config.color }}
+                      className="w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold shrink-0"
+                      style={{ backgroundColor: `${config.color}20`, color: config.color }}
                     >
                       {idx + 1}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{song.title}</p>
-                      <p className="text-sm text-white/60 truncate">{song.artist}</p>
-                      <p className="text-xs text-white/40">{song.addedBy}</p>
+                      <p className="font-semibold text-lg truncate">{song.title}</p>
+                      <p className="text-white/60 truncate">{song.artist}</p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3 shrink-0">
                       {song.status === "processing" && (
-                        <div className="flex items-center gap-1 text-yellow-400">
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-yellow-500/20 text-yellow-400">
                           <Loader2 className="w-4 h-4 animate-spin" />
-                          <span className="text-xs">처리중</span>
+                          <span className="text-sm">처리중</span>
                         </div>
                       )}
                       {song.status === "ready" && (
                         <button
                           onClick={() => playSong(song)}
-                          className="p-2 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30"
+                          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 font-medium"
                         >
-                          <Play className="w-4 h-4" />
+                          <Play className="w-5 h-5" />
+                          재생
                         </button>
                       )}
                       <button
                         onClick={() => dispatch(removeFromQueue(song.id))}
                         className="p-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 opacity-0 group-hover:opacity-100 transition-opacity"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-5 h-5" />
                       </button>
                     </div>
                   </motion.div>
@@ -494,20 +505,20 @@ export default function RoomPage() {
           </div>
         </div>
 
-        {/* 오른쪽: 참가자 & 비디오 */}
-        <div className="flex-1 flex flex-col gap-4">
+        {/* 오른쪽: 참가자 카메라 (컴팩트) */}
+        <div className="w-72 flex flex-col gap-3">
           {/* 참가자 목록 */}
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Users className="w-5 h-5" style={{ color: config.color }} />
-              <span className="font-bold">참가자</span>
-              <span className="text-sm text-white/60">({participants.length}/{room.maxParticipants})</span>
+          <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Users className="w-4 h-4" style={{ color: config.color }} />
+              <span className="text-sm font-medium">참가자</span>
+              <span className="text-xs text-white/50">({participants.length}/8)</span>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {participants.map((p) => (
                 <div
                   key={p.id}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
+                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs ${
                     p.isHost ? "bg-yellow-500/20 text-yellow-400" : "bg-white/10"
                   }`}
                 >
@@ -518,12 +529,9 @@ export default function RoomPage() {
             </div>
           </div>
 
-          {/* 비디오 영역 */}
-          <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-            <div className="p-3 border-b border-white/10">
-              <h3 className="text-sm font-medium text-white/80">참가자 화면</h3>
-            </div>
-            <div className="h-[calc(100%-48px)]">
+          {/* 카메라 그리드 */}
+          <div className="flex-1 bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+            <div className="h-full">
               <VideoRoom
                 roomCode={code}
                 participantName={userName}
