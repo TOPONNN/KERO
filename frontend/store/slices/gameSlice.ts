@@ -29,6 +29,7 @@ interface PlayerScore {
 
 interface QueuedSong {
   id: string;
+  songId?: string;
   title: string;
   artist: string;
   addedBy: string;

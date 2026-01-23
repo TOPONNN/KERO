@@ -191,7 +191,7 @@ export default function RoomPage() {
       const songId = data.data.id;
       dispatch(updateQueueItem({ 
         id: queueId, 
-        updates: { id: songId, videoId: video.videoId } 
+        updates: { songId, videoId: video.videoId } 
       }));
       
       pollSongStatus(queueId, songId);
@@ -225,10 +225,10 @@ export default function RoomPage() {
   }, [dispatch]);
 
   const playSong = async (queueItem: typeof songQueue[0]) => {
-    if (queueItem.status !== "ready") return;
+    if (queueItem.status !== "ready" || !queueItem.songId) return;
     
     try {
-      const res = await fetch(`/api/songs/${queueItem.id}`);
+      const res = await fetch(`/api/songs/${queueItem.songId}`);
       const data = await res.json();
       
       if (!data.success) return;
@@ -250,7 +250,7 @@ export default function RoomPage() {
       }));
       
       if (room?.gameMode === "lyrics_quiz") {
-        const quizRes = await fetch(`/api/songs/${queueItem.id}/quiz`);
+        const quizRes = await fetch(`/api/songs/${queueItem.songId}/quiz`);
         const quizData = await quizRes.json();
         if (quizData.success && quizData.data.questions) {
           dispatch(setQuizQuestions(quizData.data.questions.map((q: any) => ({
@@ -265,7 +265,7 @@ export default function RoomPage() {
       
       dispatch(removeFromQueue(queueItem.id));
       dispatch(setGameStatus("playing"));
-      emitEvent("game:start", { roomCode: code, songId: queueItem.id });
+      emitEvent("game:start", { roomCode: code, songId: queueItem.songId });
     } catch (e) {
       console.error("Error playing song:", e);
     }
