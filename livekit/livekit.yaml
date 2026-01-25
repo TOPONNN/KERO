@@ -6,7 +6,7 @@ rtc:
   node_ip: ***REDACTED_SERVER_IP***
 
 keys:
-  ***REDACTED_LIVEKIT_KEY***: ***REDACTED_LIVEKIT_SECRET***-plyst-info-secure
+  ***REDACTED_LIVEKIT_KEY***: ***REDACTED_LIVEKIT_SECRET***
 
 logging:
   level: info
