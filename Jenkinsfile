@@ -40,34 +40,28 @@ pipeline {
         stage('Deploy GPU Server (AI Worker)') {
             steps {
                 sh '''
+                    # Sync ai-worker code to GPU server (excluding .env)
+                    rsync -avz --exclude=".env" -e "ssh -i ${GPU_SSH_KEY} -o StrictHostKeyChecking=no" \
+                        /home/ubuntu/project/ai-worker/ ubuntu@${GPU_SERVER}:/data/kero/ai-worker/
+                    
+                    # Restart AI Worker on GPU server
                     ssh -i ${GPU_SSH_KEY} -o StrictHostKeyChecking=no ubuntu@${GPU_SERVER} '
-                        cd /home/ubuntu/project
+                        cd /data/kero/ai-worker
                         
-                        if [ -f ai-worker/.env ]; then
-                            cp ai-worker/.env /tmp/ai-worker.env.backup
-                        fi
+                        # Rebuild and restart with Docker
+                        sudo docker compose down || true
+                        sudo docker compose up -d --build
                         
-                        git fetch origin
-                        git reset --hard origin/main
-                        
-                        if [ -f /tmp/ai-worker.env.backup ]; then
-                            cp /tmp/ai-worker.env.backup ai-worker/.env
-                        fi
-                        
-                        sudo systemctl restart kero-ai-worker
-                        
-                        # Wait for AI Worker to connect to RabbitMQ (may need retries)
                         echo "Waiting for AI Worker to start..."
-                        sleep 30
+                        sleep 20
                         
-                        # Check if service is running (may still be restarting due to RabbitMQ timing)
-                        if sudo systemctl is-active --quiet kero-ai-worker; then
+                        # Check if container is running
+                        if sudo docker compose ps | grep -q "Up"; then
                             echo "AI Worker is running"
-                            sudo systemctl status kero-ai-worker --no-pager
+                            sudo docker compose ps
                         else
-                            echo "AI Worker is restarting (normal during RabbitMQ reconnection)"
-                            sudo journalctl -u kero-ai-worker --no-pager -n 10
-                            # Don't fail - it will auto-restart and connect
+                            echo "AI Worker startup logs:"
+                            sudo docker compose logs --tail=20
                         fi
                     '
                 '''
@@ -78,8 +72,8 @@ pipeline {
             steps {
                 sh '''
                     sleep 30
-                    curl -f -k https://plyst.info || exit 1
-                    curl -f -k https://plyst.info/api/health || echo "Backend health check skipped"
+                    curl -f -k https://kero.ooo || exit 1
+                    curl -f -k https://kero.ooo/api/health || echo "Backend health check skipped"
                     echo "Main server health check passed!"
                 '''
             }
