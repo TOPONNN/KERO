@@ -160,16 +160,33 @@ export class SongService {
     });
   }
 
+  async findByVideoId(videoId: string): Promise<Song | null> {
+    return songRepository.findOne({
+      where: { videoId },
+      relations: ["lyrics"],
+    });
+  }
+
   async createFromYouTube(
     songId: string,
     videoId: string,
     title: string,
     artist: string
   ): Promise<Song> {
+    const existingSong = await this.findByVideoId(videoId);
+    if (existingSong && existingSong.processingStatus === ProcessingStatus.COMPLETED) {
+      return existingSong;
+    }
+
+    if (existingSong && existingSong.processingStatus === ProcessingStatus.PROCESSING) {
+      return existingSong;
+    }
+
     const song = songRepository.create({
       id: songId,
       title,
       artist,
+      videoId,
       processingStatus: ProcessingStatus.PENDING,
     });
 

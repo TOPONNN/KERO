@@ -21,6 +21,9 @@ export class Song {
   artist!: string;
 
   @Column({ nullable: true })
+  videoId?: string;
+
+  @Column({ nullable: true })
   originalUrl?: string;
 
   @Column({ nullable: true })
