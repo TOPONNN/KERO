@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from faster_whisper import WhisperModel
 from typing import List, Dict, Callable, Optional
 from src.config import TEMP_DIR
@@ -12,7 +13,6 @@ class WhisperProcessor:
 
     def _load_model(self):
         if self.model is None:
-            # large-v3: 가장 정확한 모델
             self.model = WhisperModel(
                 "large-v3",
                 device="cuda",
@@ -20,41 +20,61 @@ class WhisperProcessor:
                 download_root="/tmp/whisper_models"
             )
 
+    def _get_initial_prompt(self, language: str) -> str:
+        prompts = {
+            "ko": "이것은 한국어 노래 가사입니다. 가사를 정확하게 받아적으세요.",
+            "ja": "これは日本語の歌詞です。歌詞を正確に書き起こしてください。",
+            "en": "These are song lyrics in English. Transcribe the lyrics accurately.",
+            "zh": "这是中文歌词。请准确转录歌词。",
+        }
+        return prompts.get(language, prompts["en"])
+
     def extract_lyrics(self, audio_path: str, song_id: str, language: str = "ko", folder_name: str = None, progress_callback: Optional[Callable[[int], None]] = None) -> Dict:
         if folder_name is None:
             folder_name = song_id
             
         self._load_model()
 
-        # 최적화된 transcribe 파라미터
+        initial_prompt = self._get_initial_prompt(language)
+
         segments, info = self.model.transcribe(
             audio_path,
             language=language,
             word_timestamps=True,
             
-            # VAD 설정 (음성 구간 정확히 감지)
+            initial_prompt=initial_prompt,
+            
             vad_filter=True,
             vad_parameters=dict(
-                min_silence_duration_ms=500,  # 무음 최소 지속 시간
-                speech_pad_ms=400,            # 음성 패딩
-                threshold=0.5,                # VAD 임계값
+                min_silence_duration_ms=300,
+                speech_pad_ms=200,
+                threshold=0.35,
+                min_speech_duration_ms=100,
+                max_speech_duration_s=float("inf"),
             ),
             
-            # 정확도 향상 파라미터
-            beam_size=10,                     # 빔 서치 크기 (기본 5)
-            best_of=5,                        # 최적 후보 수
-            patience=2.0,                     # 탐색 인내심
-            condition_on_previous_text=True,  # 이전 컨텍스트 활용
+            beam_size=5,
+            best_of=5,
+            patience=1.5,
             
-            # 노이즈/반복 필터링
-            no_speech_threshold=0.6,
+            condition_on_previous_text=True,
+            prompt_reset_on_temperature=0.5,
+            
+            no_speech_threshold=0.5,
             compression_ratio_threshold=2.4,
+            log_prob_threshold=-1.0,
             
-            # 온도 설정 (0이면 greedy, 높으면 다양성)
-            temperature=0.0,
+            temperature=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+            
+            hallucination_silence_threshold=0.5,
+            
+            repetition_penalty=1.1,
+            no_repeat_ngram_size=3,
+            
+            prepend_punctuations="\"'"¿([{-「『",
+            append_punctuations="\"'.。,，!!?:：;；」』)]}、♪~…",
         )
 
-        # segment 단위로 진행률 보고
         segments_list = []
         total_duration = info.duration if info.duration else 1
         
@@ -64,9 +84,9 @@ class WhisperProcessor:
                 progress = int((segment.end / total_duration) * 100)
                 progress_callback(min(progress, 100))
         
-        # 세그먼트 처리 및 후처리
         lyrics_lines = self._process_segments(segments_list)
         lyrics_lines = self._postprocess_segments(lyrics_lines)
+        lyrics_lines = self._clean_lyrics(lyrics_lines)
 
         output_dir = os.path.join(TEMP_DIR, song_id)
         os.makedirs(output_dir, exist_ok=True)
@@ -82,7 +102,7 @@ class WhisperProcessor:
         try:
             os.rmdir(output_dir)
         except OSError:
-            pass  # 디렉토리가 비어있지 않으면 무시
+            pass
 
         full_text = " ".join([line["text"] for line in lyrics_lines])
 
@@ -95,31 +115,36 @@ class WhisperProcessor:
         }
 
     def _process_segments(self, segments: List) -> List[Dict]:
-        """세그먼트를 딕셔너리로 변환"""
         lyrics_lines = []
 
         for segment in segments:
+            text = segment.text.strip()
+            if not text:
+                continue
+                
             line = {
                 "start_time": round(segment.start, 3),
                 "end_time": round(segment.end, 3),
-                "text": segment.text.strip(),
+                "text": text,
                 "words": [],
             }
 
             if segment.words:
                 for word in segment.words:
-                    line["words"].append({
-                        "start_time": round(word.start, 3),
-                        "end_time": round(word.end, 3),
-                        "text": word.word.strip(),
-                    })
+                    word_text = word.word.strip()
+                    if word_text:
+                        line["words"].append({
+                            "start_time": round(word.start, 3),
+                            "end_time": round(word.end, 3),
+                            "text": word_text,
+                        })
 
-            lyrics_lines.append(line)
+            if line["words"] or line["text"]:
+                lyrics_lines.append(line)
 
         return lyrics_lines
 
     def _postprocess_segments(self, segments: List[Dict]) -> List[Dict]:
-        """후처리: 긴 세그먼트 분할, 짧은 세그먼트 병합"""
         if not segments:
             return segments
 
@@ -128,11 +153,9 @@ class WhisperProcessor:
         for segment in segments:
             duration = segment["end_time"] - segment["start_time"]
 
-            # 긴 세그먼트 분할 (8초 초과)
             if duration > 8.0 and segment.get("words"):
                 chunks = self._split_long_segment(segment)
                 processed.extend(chunks)
-            # 짧은 세그먼트 병합 (0.3초 미만)
             elif duration < 0.3 and processed:
                 prev = processed[-1]
                 gap = segment["start_time"] - prev["end_time"]
@@ -148,8 +171,39 @@ class WhisperProcessor:
 
         return processed
 
+    def _clean_lyrics(self, segments: List[Dict]) -> List[Dict]:
+        cleaned = []
+        
+        for segment in segments:
+            text = segment["text"]
+            
+            text = re.sub(r'\[.*?\]', '', text)
+            text = re.sub(r'\(.*?\)', '', text)
+            text = re.sub(r'(.)\1{4,}', r'\1\1\1', text)
+            text = re.sub(r'\s+', ' ', text).strip()
+            
+            if not text or len(text) < 2:
+                continue
+            
+            if re.match(r'^[♪~\s\.\,]+$', text):
+                continue
+                
+            segment["text"] = text
+            
+            if segment.get("words"):
+                cleaned_words = []
+                for word in segment["words"]:
+                    word_text = word["text"].strip()
+                    if word_text and len(word_text) >= 1:
+                        word["text"] = word_text
+                        cleaned_words.append(word)
+                segment["words"] = cleaned_words
+            
+            cleaned.append(segment)
+        
+        return cleaned
+
     def _split_long_segment(self, segment: Dict) -> List[Dict]:
-        """긴 세그먼트를 5초 단위로 분할"""
         words = segment.get("words", [])
         if not words:
             return [segment]
@@ -162,7 +216,6 @@ class WhisperProcessor:
             current_words.append(word)
             duration = word["end_time"] - current_start
 
-            # 5초마다 또는 문장 끝에서 분할
             text = word["text"]
             is_sentence_end = any(text.endswith(p) for p in ['.', '?', '!', '。', '？', '！', '~', '♪'])
 
@@ -177,7 +230,6 @@ class WhisperProcessor:
                 if i < len(words) - 1:
                     current_start = words[i + 1]["start_time"]
 
-        # 남은 단어 처리
         if current_words:
             chunks.append({
                 "start_time": round(current_start, 3),
