@@ -97,13 +97,29 @@ export default function NormalModeGame() {
       setLocalTime(time);
       dispatch(updateCurrentTime(time));
 
-      const index = lyrics.findIndex((line, i) => {
+      let newIndex = -1;
+      for (let i = 0; i < lyrics.length; i++) {
+        const line = lyrics[i];
         const nextLine = lyrics[i + 1];
-        return time >= line.startTime && (nextLine ? time < nextLine.startTime : time <= line.endTime + 5);
-      });
+        
+        if (time >= line.startTime) {
+          if (time <= line.endTime) {
+            newIndex = i;
+            break;
+          } else if (nextLine && time < nextLine.startTime && time - line.endTime < 1.0) {
+            newIndex = i;
+            break;
+          } else if (!nextLine && time <= line.endTime + 2.0) {
+            newIndex = i;
+            break;
+          }
+        }
+      }
       
-      if (index !== -1) {
-        setCurrentLyricIndex(index);
+      if (newIndex !== -1) {
+        if (newIndex !== currentLyricIndex) {
+          setCurrentLyricIndex(newIndex);
+        }
       } else if (lyrics.length > 0 && time > lyrics[lyrics.length - 1].endTime) {
          setCurrentLyricIndex(lyrics.length - 1);
       } else if (time < lyrics[0]?.startTime) {
@@ -251,8 +267,9 @@ export default function NormalModeGame() {
               <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 leading-snug">
                  {currentLine.words ? (
                    currentLine.words.map((word, i) => {
-                     const wordDuration = word.endTime - word.startTime;
-                     const wordProgress = Math.max(0, Math.min(1, (localTime - word.startTime) / wordDuration));
+      const adjustedStart = word.startTime - 0.05;
+                     const wordDuration = word.endTime - adjustedStart;
+                     const wordProgress = Math.max(0, Math.min(1, (localTime - adjustedStart) / wordDuration));
                      
                      return (
                        <span key={i} className="relative text-4xl md:text-5xl lg:text-6xl font-black tracking-wide">
