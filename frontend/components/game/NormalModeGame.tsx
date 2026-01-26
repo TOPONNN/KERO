@@ -20,6 +20,14 @@ interface LyricsLine {
   words?: LyricsWord[];
 }
 
+// 노래방 싱크 설정 상수
+const SYNC_CONFIG = {
+  LYRICS_LEAD_TIME: 0.15,      // 가사가 미리 표시되는 시간 (초)
+  WORD_LEAD_TIME: 0.08,        // 단어 하이라이트가 미리 시작하는 시간 (초)
+  NEXT_LINE_PREVIEW: 0.5,      // 다음 가사 미리보기 시간 (초)
+  LINE_HOLD_AFTER_END: 0.3,    // 가사가 끝난 후 유지 시간 (초)
+};
+
 export default function NormalModeGame() {
   const dispatch = useDispatch();
   const { currentSong, status, songQueue } = useSelector((state: RootState) => state.game);
@@ -39,8 +47,56 @@ export default function NormalModeGame() {
   const videoId = currentSong?.videoId;
 
   const animationFrameRef = useRef<number | null>(null);
+  const lastTimeRef = useRef<number>(0);
   
   const duration = audioDuration || currentSong?.duration || 0;
+
+  // 정확한 가사 인덱스 계산 함수 (노래방 스타일)
+  const findCurrentLyricIndex = useCallback((time: number): number => {
+    if (!lyrics.length) return -1;
+    
+    const adjustedTime = time + SYNC_CONFIG.LYRICS_LEAD_TIME;
+    
+    // 이진 탐색으로 현재 가사 찾기
+    let left = 0;
+    let right = lyrics.length - 1;
+    let result = -1;
+    
+    while (left <= right) {
+      const mid = Math.floor((left + right) / 2);
+      const line = lyrics[mid];
+      
+      if (adjustedTime >= line.startTime) {
+        result = mid;
+        left = mid + 1;
+      } else {
+        right = mid - 1;
+      }
+    }
+    
+    // 결과 검증: 현재 시간이 가사의 유효 범위 내인지 확인
+    if (result !== -1) {
+      const line = lyrics[result];
+      const holdTime = line.endTime + SYNC_CONFIG.LINE_HOLD_AFTER_END;
+      
+      // 다음 가사가 있으면 다음 가사 시작 전까지, 없으면 holdTime까지
+      const nextLine = lyrics[result + 1];
+      const effectiveEnd = nextLine 
+        ? Math.min(holdTime, nextLine.startTime - SYNC_CONFIG.LYRICS_LEAD_TIME)
+        : holdTime;
+      
+      if (adjustedTime > effectiveEnd) {
+        // 다음 가사로 전환할 시간인지 확인
+        if (nextLine && adjustedTime >= nextLine.startTime - SYNC_CONFIG.LYRICS_LEAD_TIME) {
+          return result + 1;
+        }
+        // 가사 사이 빈 구간
+        return result;
+      }
+    }
+    
+    return result;
+  }, [lyrics]);
 
   useEffect(() => {
     if (!audioRef.current) return;
@@ -82,10 +138,12 @@ export default function NormalModeGame() {
     };
   }, [dispatch, volume]);
 
+  // 고성능 시간 업데이트 루프
   useEffect(() => {
     if (!isPlaying || !audioRef.current) {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
       return;
     }
@@ -94,36 +152,22 @@ export default function NormalModeGame() {
       if (!audioRef.current || !isPlaying) return;
       
       const time = audioRef.current.currentTime;
-      setLocalTime(time);
-      dispatch(updateCurrentTime(time));
-
-      let newIndex = -1;
-      for (let i = 0; i < lyrics.length; i++) {
-        const line = lyrics[i];
-        const nextLine = lyrics[i + 1];
-        
-        if (time >= line.startTime) {
-          if (time <= line.endTime) {
-            newIndex = i;
-            break;
-          } else if (nextLine && time < nextLine.startTime && time - line.endTime < 1.0) {
-            newIndex = i;
-            break;
-          } else if (!nextLine && time <= line.endTime + 2.0) {
-            newIndex = i;
-            break;
-          }
-        }
-      }
       
-      if (newIndex !== -1) {
+      // 시간이 변했을 때만 업데이트 (성능 최적화)
+      if (Math.abs(time - lastTimeRef.current) > 0.016) { // ~60fps
+        lastTimeRef.current = time;
+        setLocalTime(time);
+        
+        // 가사 인덱스 업데이트
+        const newIndex = findCurrentLyricIndex(time);
         if (newIndex !== currentLyricIndex) {
           setCurrentLyricIndex(newIndex);
         }
-      } else if (lyrics.length > 0 && time > lyrics[lyrics.length - 1].endTime) {
-         setCurrentLyricIndex(lyrics.length - 1);
-      } else if (time < lyrics[0]?.startTime) {
-        setCurrentLyricIndex(-1);
+        
+        // Redux 업데이트는 덜 자주 (성능)
+        if (Math.floor(time * 10) !== Math.floor(lastTimeRef.current * 10)) {
+          dispatch(updateCurrentTime(time));
+        }
       }
 
       animationFrameRef.current = requestAnimationFrame(updateTime);
@@ -134,9 +178,10 @@ export default function NormalModeGame() {
     return () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
     };
-  }, [isPlaying, lyrics, dispatch]);
+  }, [isPlaying, findCurrentLyricIndex, currentLyricIndex, dispatch]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -185,11 +230,26 @@ export default function NormalModeGame() {
 
   const progress = duration ? (localTime / duration) * 100 : 0;
 
-  const getLineProgress = (line: LyricsLine) => {
-    if (localTime < line.startTime) return 0;
-    if (localTime > line.endTime) return 100;
-    return ((localTime - line.startTime) / (line.endTime - line.startTime)) * 100;
-  };
+  // 단어별 하이라이트 진행률 계산 (노래방 스타일)
+  const getWordProgress = useCallback((word: LyricsWord): number => {
+    const adjustedStart = word.startTime - SYNC_CONFIG.WORD_LEAD_TIME;
+    const wordDuration = word.endTime - adjustedStart;
+    
+    if (localTime < adjustedStart) return 0;
+    if (localTime >= word.endTime) return 100;
+    
+    return Math.min(100, Math.max(0, ((localTime - adjustedStart) / wordDuration) * 100));
+  }, [localTime]);
+
+  // 라인 전체 진행률 (단어가 없을 때 사용)
+  const getLineProgress = useCallback((line: LyricsLine): number => {
+    const adjustedStart = line.startTime - SYNC_CONFIG.LYRICS_LEAD_TIME;
+    
+    if (localTime < adjustedStart) return 0;
+    if (localTime >= line.endTime) return 100;
+    
+    return ((localTime - adjustedStart) / (line.endTime - adjustedStart)) * 100;
+  }, [localTime]);
 
   if (!currentSong) {
     return (
@@ -260,60 +320,95 @@ export default function NormalModeGame() {
         </div>
       )}
 
-      <div className="absolute bottom-[140px] left-0 right-0 z-20 px-4 md:px-12 text-center flex flex-col items-center justify-end min-h-[200px]">
-        <div className="mb-6 w-full max-w-5xl">
-          {currentLine ? (
-            <div className="relative">
-              <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 leading-snug">
-                 {currentLine.words ? (
-                   currentLine.words.map((word, i) => {
-      const adjustedStart = word.startTime - 0.05;
-                     const wordDuration = word.endTime - adjustedStart;
-                     const wordProgress = Math.max(0, Math.min(1, (localTime - adjustedStart) / wordDuration));
-                     
-                     return (
-                       <span key={i} className="relative text-4xl md:text-5xl lg:text-6xl font-black tracking-wide">
-                         <span className="text-white drop-shadow-lg opacity-90">
-                           {word.text}
-                         </span>
-                         
-                         <span 
-                           className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent"
-                           style={{ 
-                             clipPath: `inset(0 ${100 - wordProgress * 100}% 0 0)`,
-                             WebkitBackgroundClip: "text",
-                             WebkitTextFillColor: "transparent",
-                           }}
-                         >
-                           {word.text}
-                         </span>
-                       </span>
-                     );
-                   })
-                 ) : (
-                   <span className="relative text-4xl md:text-5xl lg:text-6xl font-black tracking-wide">
-                      <span className="text-white drop-shadow-lg opacity-90">{currentLine.text}</span>
+      <div className="absolute bottom-[140px] left-0 right-0 z-20 px-4 md:px-12 text-center flex flex-col items-center justify-end min-h-[220px]">
+        {/* 현재 가사 */}
+        <div className="mb-4 w-full max-w-5xl">
+          <AnimatePresence mode="wait">
+            {currentLine ? (
+              <motion.div
+                key={`line-${currentLyricIndex}`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="relative"
+              >
+                <div className="flex flex-wrap justify-center gap-x-2 gap-y-1 leading-relaxed">
+                  {currentLine.words && currentLine.words.length > 0 ? (
+                    currentLine.words.map((word, i) => {
+                      const progress = getWordProgress(word);
+                      const isActive = progress > 0 && progress < 100;
+                      const isComplete = progress >= 100;
+                      
+                      return (
+                        <span 
+                          key={`${currentLyricIndex}-${i}`} 
+                          className={`relative text-4xl md:text-5xl lg:text-6xl font-black tracking-wide transition-transform duration-100 ${
+                            isActive ? "scale-105" : ""
+                          }`}
+                        >
+                          {/* 배경 텍스트 (흰색) */}
+                          <span className={`${isComplete ? "text-transparent" : "text-white/80"} drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)]`}>
+                            {word.text}
+                          </span>
+                          
+                          {/* 하이라이트 오버레이 (그라디언트) */}
+                          <span 
+                            className="absolute inset-0 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(59,130,246,0.8)]"
+                            style={{ 
+                              clipPath: `inset(0 ${100 - progress}% 0 0)`,
+                            }}
+                          >
+                            {word.text}
+                          </span>
+                        </span>
+                      );
+                    })
+                  ) : (
+                    <span className="relative text-4xl md:text-5xl lg:text-6xl font-black tracking-wide">
+                      <span className="text-white/80 drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)]">
+                        {currentLine.text}
+                      </span>
                       <span 
-                        className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent"
+                        className="absolute inset-0 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent"
                         style={{ clipPath: `inset(0 ${100 - getLineProgress(currentLine)}% 0 0)` }}
                       >
                         {currentLine.text}
                       </span>
-                   </span>
-                 )}
-              </div>
-            </div>
-          ) : (
-             <p className="text-white/40 text-3xl font-bold animate-pulse">...</p>
-          )}
+                    </span>
+                  )}
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex justify-center gap-2"
+              >
+                <span className="w-3 h-3 bg-white/30 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                <span className="w-3 h-3 bg-white/30 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                <span className="w-3 h-3 bg-white/30 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        <div className="h-12 w-full max-w-4xl">
-          {nextLine && (
-             <p className="text-xl md:text-2xl text-gray-400 font-medium tracking-wide line-clamp-1 drop-shadow-md">
-               {nextLine.text}
-             </p>
-          )}
+        {/* 다음 가사 미리보기 */}
+        <div className="h-14 w-full max-w-4xl flex items-center justify-center">
+          <AnimatePresence mode="wait">
+            {nextLine && (
+              <motion.p 
+                key={`next-${currentLyricIndex + 1}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 0.6, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="text-xl md:text-2xl text-gray-300 font-semibold tracking-wide line-clamp-1 drop-shadow-lg"
+              >
+                {nextLine.text}
+              </motion.p>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
