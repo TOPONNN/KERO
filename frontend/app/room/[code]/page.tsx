@@ -71,6 +71,18 @@ export default function RoomPage() {
   
   const [userName, setUserName] = useState<string>("Guest");
   const [visitorId, setVisitorId] = useState<string>("");
+  
+  const backgroundVideos = [
+    "CKZvWhCqx1s", // BLACKPINK - Shut Down
+    "gdZLi9oWNZg", // BTS - Dynamite
+    "ArmDp-zijuc", // aespa - Supernova
+    "pC6tPEaAiYU", // NewJeans - Super Shy
+    "dZs_cLHfnNA", // LE SSERAFIM - EASY
+    "os_hS_gY7p8", // IU - Shopper
+    "MjCZfZfucEc", // IVE - Baddie
+  ];
+
+  const [bgVideoId] = useState(() => backgroundVideos[Math.floor(Math.random() * backgroundVideos.length)]);
 
   const [room, setRoomData] = useState<{
     id: string;
@@ -386,15 +398,20 @@ export default function RoomPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="absolute inset-0 overflow-hidden">
-        <div 
-          className="absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full blur-3xl opacity-20"
-          style={{ backgroundColor: config.color }}
+    <div className="min-h-screen bg-black text-white overflow-hidden relative">
+      {/* 배경 뮤비 (YouTube Embed) */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <iframe
+          src={`https://www.youtube.com/embed/${bgVideoId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&loop=1&playlist=${bgVideoId}&modestbranding=1&enablejsapi=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
+          className="absolute top-1/2 left-1/2 w-[150%] h-[150%] -translate-x-1/2 -translate-y-1/2 opacity-60"
+          allow="autoplay; encrypted-media"
+          title="Background Video"
         />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/90" />
       </div>
 
-      <header className="relative z-10 flex items-center justify-between p-4 md:p-6">
+      {/* 상단 헤더 */}
+      <header className="relative z-20 flex items-center justify-between p-4 bg-black/30 backdrop-blur-md border-b border-white/5">
         <Link href="/lobby" className="flex items-center gap-2 text-white/60 hover:text-white transition-colors">
           <ArrowLeft className="w-5 h-5" />
           <span>로비</span>
@@ -403,27 +420,33 @@ export default function RoomPage() {
           <Icon className="w-6 h-6" style={{ color: config.color }} />
           <span className="text-xl font-bold">{room.name}</span>
         </div>
-        <button
-          onClick={copyCode}
-          className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
-        >
-          {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
-          <span className="font-mono font-bold text-sm">{code}</span>
-        </button>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/5">
+            <Users className="w-4 h-4 text-white/70" />
+            <span className="text-sm font-medium">{participants.length}명</span>
+          </div>
+          <button
+            onClick={copyCode}
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors border border-white/5"
+          >
+            {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+            <span className="font-mono font-bold text-sm">{code}</span>
+          </button>
+        </div>
       </header>
 
-      <main className="relative z-10 flex gap-4 px-4 md:px-6 pb-6 h-[calc(100vh-80px)]">
-        {/* 메인: 대기열 & 곡 추가 */}
-        <div className="flex-1 flex flex-col bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-          <div className="flex items-center justify-between p-4 border-b border-white/10">
+      {/* 메인: 중앙 대기열 카드 */}
+      <main className="relative z-10 flex items-center justify-center min-h-[calc(100vh-80px)] p-4">
+        <div className="w-full max-w-2xl bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl ring-1 ring-white/5">
+          <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <ListMusic className="w-6 h-6" style={{ color: config.color }} />
-              <span className="text-lg font-bold">대기열</span>
+              <h2 className="text-xl font-bold">대기열</h2>
               <span className="text-sm text-white/60 bg-white/10 px-2 py-0.5 rounded-full">{songQueue.length}곡</span>
             </div>
             <button
               onClick={() => setShowAddSong(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-black hover:opacity-90 transition-opacity"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-black hover:opacity-90 transition-opacity shadow-lg shadow-white/5"
               style={{ backgroundColor: config.color }}
             >
               <Plus className="w-5 h-5" />
@@ -431,111 +454,73 @@ export default function RoomPage() {
             </button>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-4">
-            {songQueue.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center">
-                <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center mb-4">
-                  <Music className="w-12 h-12 text-white/20" />
-                </div>
-                <p className="text-white/60 text-lg mb-2">대기열이 비어있습니다</p>
-                <p className="text-white/40 text-sm mb-6">노래를 추가하고 함께 즐겨보세요!</p>
-                <button
-                  onClick={() => setShowAddSong(true)}
-                  className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium text-black"
-                  style={{ backgroundColor: config.color }}
-                >
-                  <Plus className="w-5 h-5" />
-                  첫 곡 추가하기
-                </button>
+          {songQueue.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-4 ring-1 ring-white/5">
+                <Music className="w-10 h-10 text-white/20" />
               </div>
-            ) : (
-              <div className="grid gap-3">
-                {songQueue.map((song, idx) => (
-                  <motion.div
-                    key={song.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.05 }}
-                    className="flex items-center gap-4 p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-colors group"
-                  >
-                    <div 
-                      className="w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold shrink-0"
-                      style={{ backgroundColor: `${config.color}20`, color: config.color }}
-                    >
-                      {idx + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-lg truncate">{song.title}</p>
-                      <p className="text-white/60 truncate">{song.artist}</p>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      {song.status === "processing" && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-yellow-500/20 text-yellow-400">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span className="text-sm">처리중</span>
-                        </div>
-                      )}
-                      {song.status === "ready" && (
-                        <button
-                          onClick={() => playSong(song)}
-                          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 font-medium"
-                        >
-                          <Play className="w-5 h-5" />
-                          재생
-                        </button>
-                      )}
-                      <button
-                        onClick={() => dispatch(removeFromQueue(song.id))}
-                        className="p-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 오른쪽: 참가자 카메라 (컴팩트) */}
-        <div className="w-72 flex flex-col gap-3">
-          {/* 참가자 목록 */}
-          <div className="bg-white/5 border border-white/10 rounded-xl p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <Users className="w-4 h-4" style={{ color: config.color }} />
-              <span className="text-sm font-medium">참가자</span>
-              <span className="text-xs text-white/50">({participants.length}/8)</span>
+              <p className="text-white/60 text-lg mb-2">대기열이 비어있습니다</p>
+              <p className="text-white/40 text-sm mb-6">좋아하는 노래를 예약해보세요!</p>
+              <button
+                onClick={() => setShowAddSong(true)}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium text-black hover:opacity-90 transition-opacity shadow-lg"
+                style={{ backgroundColor: config.color }}
+              >
+                <Plus className="w-5 h-5" />
+                첫 곡 추가하기
+              </button>
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {participants.map((p) => (
-                <div
-                  key={p.id}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs ${
-                    p.isHost ? "bg-yellow-500/20 text-yellow-400" : "bg-white/10"
-                  }`}
+          ) : (
+            <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
+              {songQueue.map((song, idx) => (
+                <motion.div
+                  key={song.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className="flex items-center gap-4 p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-colors group border border-white/5 ring-1 ring-white/5"
                 >
-                  <span>{p.nickname}</span>
-                  {p.isHost && <span>👑</span>}
-                </div>
+                  <div 
+                    className="w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold shrink-0"
+                    style={{ backgroundColor: `${config.color}20`, color: config.color }}
+                  >
+                    {idx + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-lg truncate text-white/90">{song.title}</p>
+                    <p className="text-sm text-white/50 truncate">{song.artist}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {song.status === "processing" && (
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-yellow-500/20 text-yellow-400">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="text-xs hidden sm:inline">처리중</span>
+                      </div>
+                    )}
+                    {song.status === "ready" && (
+                      <button
+                        onClick={() => playSong(song)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 font-medium transition-colors"
+                      >
+                        <Play className="w-4 h-4" />
+                        <span className="text-sm hidden sm:inline">재생</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => dispatch(removeFromQueue(song.id))}
+                      className="p-2 rounded-lg bg-white/5 text-white/40 hover:bg-red-500/20 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </motion.div>
               ))}
             </div>
-          </div>
-
-          {/* 카메라 그리드 */}
-          <div className="flex-1 bg-white/5 border border-white/10 rounded-xl overflow-hidden">
-            <div className="h-full">
-              <VideoRoom
-                roomCode={code}
-                participantName={userName}
-                participantId={visitorId}
-              />
-            </div>
-          </div>
+          )}
         </div>
       </main>
 
-      {/* 곡 추가 모달 */}
+      {/* 곡 추가 모달 (기존 유지) */}
       <AnimatePresence>
         {showAddSong && (
           <motion.div
@@ -549,14 +534,16 @@ export default function RoomPage() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="w-full max-w-2xl bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden"
+              className="w-full max-w-2xl bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between p-4 border-b border-white/10">
-                <h2 className="text-xl font-bold">🎤 곡 추가</h2>
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <span className="text-2xl">🎤</span> 곡 검색
+                </h2>
                 <button 
                   onClick={() => setShowAddSong(false)}
-                  className="p-2 rounded-full hover:bg-white/10"
+                  className="p-2 rounded-full hover:bg-white/10 transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
