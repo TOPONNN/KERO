@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Pause, SkipForward, Volume2, VolumeX, Mic, MicOff, RotateCcw, AlertCircle } from "lucide-react";
+import { Play, Pause, SkipForward, Volume2, VolumeX, Mic, MicOff, RotateCcw, AlertCircle, Music2 } from "lucide-react";
 import type { RootState } from "@/store";
 import { updateCurrentTime, setGameStatus } from "@/store/slices/gameSlice";
 
@@ -22,7 +22,7 @@ interface LyricsLine {
 
 export default function NormalModeGame() {
   const dispatch = useDispatch();
-  const { currentSong, status } = useSelector((state: RootState) => state.game);
+  const { currentSong, status, songQueue } = useSelector((state: RootState) => state.game);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -36,6 +36,7 @@ export default function NormalModeGame() {
 
   const lyrics: LyricsLine[] = currentSong?.lyrics || [];
   const audioUrl = currentSong?.instrumentalUrl || currentSong?.audioUrl;
+  const videoId = currentSong?.videoId;
 
   const animationFrameRef = useRef<number | null>(null);
   
@@ -98,9 +99,16 @@ export default function NormalModeGame() {
 
       const index = lyrics.findIndex((line, i) => {
         const nextLine = lyrics[i + 1];
-        return time >= line.startTime && (nextLine ? time < nextLine.startTime : time <= line.endTime);
+        return time >= line.startTime && (nextLine ? time < nextLine.startTime : time <= line.endTime + 5);
       });
-      setCurrentLyricIndex(index);
+      
+      if (index !== -1) {
+        setCurrentLyricIndex(index);
+      } else if (lyrics.length > 0 && time > lyrics[lyrics.length - 1].endTime) {
+         setCurrentLyricIndex(lyrics.length - 1);
+      } else if (time < lyrics[0]?.startTime) {
+        setCurrentLyricIndex(-1);
+      }
 
       animationFrameRef.current = requestAnimationFrame(updateTime);
     };
@@ -161,7 +169,7 @@ export default function NormalModeGame() {
 
   const progress = duration ? (localTime / duration) * 100 : 0;
 
-  const getLyricProgress = (line: LyricsLine) => {
+  const getLineProgress = (line: LyricsLine) => {
     if (localTime < line.startTime) return 0;
     if (localTime > line.endTime) return 100;
     return ((localTime - line.startTime) / (line.endTime - line.startTime)) * 100;
@@ -176,8 +184,15 @@ export default function NormalModeGame() {
     );
   }
 
+  const youtubeEmbedUrl = videoId 
+    ? `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&loop=1&playlist=${videoId}&modestbranding=1&start=${Math.floor(localTime)}&enablejsapi=1`
+    : null;
+
+  const currentLine = lyrics[currentLyricIndex];
+  const nextLine = lyrics[currentLyricIndex + 1];
+
   return (
-    <div className="flex flex-col h-full bg-gradient-to-b from-black via-gray-900 to-black">
+    <div className="relative w-full h-full bg-black overflow-hidden select-none">
       {audioUrl && (
         <audio
           ref={audioRef}
@@ -187,167 +202,184 @@ export default function NormalModeGame() {
         />
       )}
 
-      <div className="flex-1 flex flex-col items-center justify-center p-8 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-[#C0C0C0]/5 via-transparent to-transparent" />
-        
-        <div className="text-center mb-8 z-10">
-          <h2 className="text-2xl font-bold text-white mb-2">{currentSong.title}</h2>
-          <p className="text-gray-400">{currentSong.artist}</p>
-        </div>
-
-        {audioError && (
-          <div className="z-10 mb-4 p-4 bg-red-500/20 border border-red-500/30 rounded-xl flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-red-400" />
-            <span className="text-red-400">{audioError}</span>
+      <div className="absolute inset-0 z-0 bg-black">
+        {youtubeEmbedUrl ? (
+          <div className="relative w-full h-full">
+             <iframe
+              src={youtubeEmbedUrl}
+              className="absolute top-1/2 left-1/2 w-[150%] h-[150%] -translate-x-1/2 -translate-y-1/2 object-cover opacity-60 pointer-events-none"
+              allow="autoplay; encrypted-media"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/90" />
+          </div>
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gray-900">
+            <Music2 className="w-32 h-32 text-white/10" />
           </div>
         )}
+      </div>
 
-        <div className="w-full max-w-4xl z-10">
-          <div className="relative h-[350px] overflow-hidden rounded-3xl bg-black/50 backdrop-blur-xl border border-white/10">
-            <div className="absolute inset-0 flex flex-col items-center justify-center px-8">
-              <AnimatePresence mode="popLayout">
-                {lyrics.length > 0 ? lyrics.map((line, index) => {
-                  const isActive = index === currentLyricIndex;
-                  const isPast = index < currentLyricIndex;
-                  const distance = index - currentLyricIndex;
-
-                  if (Math.abs(distance) > 3) return null;
-
-                  return (
-                    <motion.div
-                      key={`${index}-${line.text}`}
-                      initial={{ opacity: 0, y: 80, scale: 0.8 }}
-                      animate={{
-                        opacity: isActive ? 1 : isPast ? 0.3 : 0.5,
-                        y: distance * 70,
-                        scale: isActive ? 1.15 : 1,
-                        filter: isActive ? "blur(0px)" : "blur(1px)",
-                      }}
-                      exit={{ opacity: 0, y: -80, scale: 0.8 }}
-                      transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                      className="absolute text-center w-full px-4"
-                    >
-                      {isActive ? (
-                        <div className="relative inline-block">
-                          <span className="text-3xl font-bold text-white/30">
-                            {line.words?.map((w, i) => (
-                              <span key={i}>{w.text}{i < (line.words?.length || 0) - 1 ? " " : ""}</span>
-                            )) || line.text}
-                          </span>
-                          <span className="absolute inset-0 text-3xl font-bold overflow-hidden whitespace-nowrap">
-                            {line.words?.map((word, i) => {
-                              const wordProgress = Math.max(0, Math.min(1, 
-                                (localTime - word.startTime) / (word.endTime - word.startTime)
-                              ));
-                              return (
-                                <span 
-                                  key={i} 
-                                  className="relative inline-block"
-                                  style={{ 
-                                    color: wordProgress > 0 ? "#C0C0C0" : "transparent",
-                                    clipPath: `inset(0 ${100 - wordProgress * 100}% 0 0)`,
-                                  }}
-                                >
-                                  {word.text}{i < (line.words?.length || 0) - 1 ? " " : ""}
-                                </span>
-                              );
-                            }) || (
-                              <span 
-                                className="text-[#C0C0C0]"
-                                style={{ clipPath: `inset(0 ${100 - getLyricProgress(line)}% 0 0)` }}
-                              >
-                                {line.text}
-                              </span>
-                            )}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className={`text-2xl font-medium ${isPast ? "text-gray-600" : "text-gray-400"}`}>
-                          {line.text}
-                        </span>
-                      )}
-                    </motion.div>
-                  );
-                }) : (
-                  <p className="text-gray-500 text-xl">가사를 불러오는 중...</p>
-                )}
-              </AnimatePresence>
-            </div>
+      <div className="absolute top-0 left-0 right-0 z-20 flex justify-between items-start p-6 bg-gradient-to-b from-black/80 to-transparent">
+        <div>
+          <h1 className="text-3xl font-bold text-white drop-shadow-lg tracking-tight">
+            {currentSong.title}
+          </h1>
+          <p className="text-xl text-white/80 font-medium drop-shadow-md mt-1">
+            {currentSong.artist}
+          </p>
+        </div>
+        
+        {songQueue.length > 0 && (
+          <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/10">
+            <span className="text-white/80 text-sm font-medium">
+              예약곡 <span className="text-blue-400 font-bold">{songQueue.length}</span>
+            </span>
           </div>
+        )}
+      </div>
+
+      {audioError && (
+        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-30 p-4 bg-red-500/80 backdrop-blur-md text-white rounded-xl shadow-xl flex items-center gap-3">
+          <AlertCircle className="w-5 h-5" />
+          <span>{audioError}</span>
+        </div>
+      )}
+
+      <div className="absolute bottom-[140px] left-0 right-0 z-20 px-4 md:px-12 text-center flex flex-col items-center justify-end min-h-[200px]">
+        <div className="mb-6 w-full max-w-5xl">
+          {currentLine ? (
+            <div className="relative">
+              <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 leading-snug">
+                 {currentLine.words ? (
+                   currentLine.words.map((word, i) => {
+                     const wordDuration = word.endTime - word.startTime;
+                     const wordProgress = Math.max(0, Math.min(1, (localTime - word.startTime) / wordDuration));
+                     
+                     return (
+                       <span key={i} className="relative text-4xl md:text-5xl lg:text-6xl font-black tracking-wide">
+                         <span className="text-white drop-shadow-lg opacity-90">
+                           {word.text}
+                         </span>
+                         
+                         <span 
+                           className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent"
+                           style={{ 
+                             clipPath: `inset(0 ${100 - wordProgress * 100}% 0 0)`,
+                             WebkitBackgroundClip: "text",
+                             WebkitTextFillColor: "transparent",
+                           }}
+                         >
+                           {word.text}
+                         </span>
+                       </span>
+                     );
+                   })
+                 ) : (
+                   <span className="relative text-4xl md:text-5xl lg:text-6xl font-black tracking-wide">
+                      <span className="text-white drop-shadow-lg opacity-90">{currentLine.text}</span>
+                      <span 
+                        className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent"
+                        style={{ clipPath: `inset(0 ${100 - getLineProgress(currentLine)}% 0 0)` }}
+                      >
+                        {currentLine.text}
+                      </span>
+                   </span>
+                 )}
+              </div>
+            </div>
+          ) : (
+             <p className="text-white/40 text-3xl font-bold animate-pulse">...</p>
+          )}
+        </div>
+
+        <div className="h-12 w-full max-w-4xl">
+          {nextLine && (
+             <p className="text-xl md:text-2xl text-gray-400 font-medium tracking-wide line-clamp-1 drop-shadow-md">
+               {nextLine.text}
+             </p>
+          )}
         </div>
       </div>
 
-      <div className="p-6 bg-gradient-to-t from-black via-black/95 to-transparent">
+      <div className="absolute bottom-0 left-0 right-0 z-30 px-6 py-6 pb-8 bg-gradient-to-t from-black via-black/80 to-transparent">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-4 mb-4">
-            <span className="text-sm text-gray-400 w-12 text-right font-mono">{formatTime(localTime)}</span>
+            <span className="text-xs text-gray-400 font-mono w-10 text-right">{formatTime(localTime)}</span>
             <div
-              className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden cursor-pointer group"
+              className="flex-1 h-1.5 bg-white/20 rounded-full cursor-pointer group hover:h-2 transition-all"
               onClick={handleSeek}
             >
-              <motion.div
-                className="h-full bg-gradient-to-r from-[#C0C0C0] to-white relative"
+              <div
+                className="h-full bg-blue-500 rounded-full relative"
                 style={{ width: `${progress}%` }}
               >
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity" />
-              </motion.div>
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity scale-0 group-hover:scale-100" />
+              </div>
             </div>
-            <span className="text-sm text-gray-400 w-12 font-mono">{formatTime(duration)}</span>
+            <span className="text-xs text-gray-400 font-mono w-10">{formatTime(duration)}</span>
           </div>
 
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setIsMuted(!isMuted)}
-                className="p-3 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
-              >
-                {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-              </button>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={volume}
-                onChange={(e) => {
-                  const newVolume = parseFloat(e.target.value);
-                  setVolume(newVolume);
-                  if (audioRef.current) audioRef.current.volume = newVolume;
-                }}
-                className="w-24 accent-[#C0C0C0]"
-              />
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 group">
+                 <button
+                  onClick={() => setIsMuted(!isMuted)}
+                  className="p-2 text-gray-400 hover:text-white transition-colors"
+                >
+                  {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                </button>
+                <div className="w-0 overflow-hidden group-hover:w-24 transition-all duration-300">
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={volume}
+                    onChange={(e) => {
+                      const newVolume = parseFloat(e.target.value);
+                      setVolume(newVolume);
+                      if (audioRef.current) audioRef.current.volume = newVolume;
+                    }}
+                    className="w-20 h-1 accent-blue-500"
+                  />
+                </div>
+              </div>
+              
               <button
                 onClick={() => setIsMicOn(!isMicOn)}
-                className={`p-3 rounded-full transition-colors ${
-                  isMicOn ? "bg-green-500/20 text-green-400" : "bg-white/10 hover:bg-white/20"
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
+                  isMicOn 
+                  ? "bg-green-500/20 text-green-400 border border-green-500/50" 
+                  : "bg-white/10 text-gray-400 border border-transparent hover:bg-white/20"
                 }`}
               >
-                {isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+                {isMicOn ? <Mic className="w-3 h-3" /> : <MicOff className="w-3 h-3" />}
+                <span>{isMicOn ? "Mic On" : "Mic Off"}</span>
               </button>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-6">
               <button
                 onClick={handleRestart}
-                className="p-3 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+                className="p-2 text-white/60 hover:text-white transition-colors hover:rotate-[-30deg]"
               >
-                <RotateCcw className="w-5 h-5" />
+                <RotateCcw className="w-6 h-6" />
               </button>
-              <motion.button
+              
+              <button
                 onClick={togglePlay}
                 disabled={!audioLoaded}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                className="p-5 rounded-full bg-gradient-to-r from-[#C0C0C0] to-white text-black shadow-lg shadow-white/20 disabled:opacity-50"
+                className="w-14 h-14 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-white/10 disabled:opacity-50 disabled:scale-100"
               >
-                {isPlaying ? <Pause className="w-7 h-7" /> : <Play className="w-7 h-7 ml-1" />}
-              </motion.button>
-              <button className="p-3 rounded-full bg-white/10 hover:bg-white/20 transition-colors">
-                <SkipForward className="w-5 h-5" />
+                {isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current ml-1" />}
+              </button>
+              
+              <button className="p-2 text-white/60 hover:text-white transition-colors">
+                <SkipForward className="w-6 h-6" />
               </button>
             </div>
 
-            <div className="w-[140px]" />
+            <div className="w-[140px] hidden md:block" /> 
           </div>
         </div>
       </div>

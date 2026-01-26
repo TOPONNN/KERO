@@ -242,6 +242,7 @@ export default function RoomPage() {
         audioUrl: song.originalUrl,
         instrumentalUrl: song.instrumentalUrl,
         vocalUrl: song.vocalsUrl,
+        videoId: queueItem.videoId,
         lyrics: song.lyrics?.map((l: any) => ({
           startTime: l.startTime ?? l.start_time,
           endTime: l.endTime ?? l.end_time,

@@ -59,6 +59,7 @@ interface GameState {
     instrumentalUrl?: string;
     lyrics: LyricsLine[];
     pitchData?: { time: number; frequency: number; note: string; midi: number }[];
+    videoId?: string;
   } | null;
   currentTime: number;
   currentLyricIndex: number;
