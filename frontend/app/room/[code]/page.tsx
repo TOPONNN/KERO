@@ -203,12 +203,32 @@ export default function RoomPage() {
       }
       
       const songId = data.data.id;
-      dispatch(updateQueueItem({ 
-        id: queueId, 
-        updates: { songId, videoId: video.videoId } 
-      }));
+      const songStatus = data.data.status;
       
-      pollSongStatus(queueId, songId);
+      // If song is already completed, set ready immediately without polling
+      if (songStatus === "completed") {
+        dispatch(updateQueueItem({ 
+          id: queueId, 
+          updates: { songId, videoId: video.videoId, status: "ready" } 
+        }));
+      } else if (songStatus === "failed") {
+        dispatch(updateQueueItem({ 
+          id: queueId, 
+          updates: { 
+            songId, 
+            videoId: video.videoId, 
+            status: "failed",
+            errorMessage: data.data.message || "처리 중 오류가 발생했습니다"
+          } 
+        }));
+      } else {
+        // Song is still processing, start polling
+        dispatch(updateQueueItem({ 
+          id: queueId, 
+          updates: { songId, videoId: video.videoId } 
+        }));
+        pollSongStatus(queueId, songId);
+      }
     } catch (e) {
       console.error("Error adding song:", e);
       dispatch(updateQueueItem({ id: queueId, updates: { status: "waiting" } }));
