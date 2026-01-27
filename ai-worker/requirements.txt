@@ -4,7 +4,10 @@
 torch~=2.8.0
 torchaudio~=2.8.0
 
-# WhisperX and dependencies
+# Stage 1: faster-whisper for pure text extraction (accuracy focus)
+faster-whisper>=1.0.0
+
+# Stage 2: WhisperX for word-level alignment only
 whisperx==3.7.4
 
 # AI 모델 (Demucs, torchcrepe)

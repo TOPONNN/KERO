@@ -15,7 +15,33 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xz-utils \
     libsndfile1 \
     libgomp1 \
+    wget \
+    bzip2 \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Miniforge (conda-forge only, no Anaconda ToS issues)
+ENV CONDA_DIR=/opt/conda
+RUN wget -q https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O /tmp/miniforge.sh && \
+    bash /tmp/miniforge.sh -b -p $CONDA_DIR && \
+    rm /tmp/miniforge.sh
+ENV PATH="${CONDA_DIR}/bin:${PATH}"
+
+# Install MFA in separate environment with Python 3.11
+RUN conda create -n mfa python=3.11 montreal-forced-aligner -y && \
+    conda clean -afy
+ENV PATH="${CONDA_DIR}/envs/mfa/bin:${PATH}"
+
+# Install Korean/Japanese tokenizer support for MFA
+RUN pip install python-mecab-ko jamo fugashi unidic-lite
+
+# Download MFA acoustic models and dictionaries
+RUN mfa model download acoustic english_us_arpa && \
+    mfa model download dictionary english_us_arpa && \
+    mfa model download acoustic korean_mfa && \
+    mfa model download dictionary korean_mfa && \
+    mfa model download acoustic japanese_mfa && \
+    mfa model download dictionary japanese_mfa
 
 # Install FFmpeg 6 (static build for av compatibility)
 RUN curl -L https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz | tar -xJ && \
