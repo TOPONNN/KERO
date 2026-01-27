@@ -1,16 +1,26 @@
+# WhisperX 3.7.4 compatible versions
+# PyTorch 2.8 with CUDA 12.8 support
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch~=2.8.0
+torchaudio~=2.8.0
+
+# WhisperX and dependencies
+whisperx==3.7.4
+
+# AI 모델 (Demucs, torchcrepe)
 demucs==4.0.1
-openai-whisper==20231117
-crepe==0.0.16
-torch>=2.0.0
-torchaudio>=2.0.0
-numpy>=1.24.0
-scipy>=1.10.0
-librosa>=0.10.0
-pika>=1.3.0
-redis>=5.0.0
-boto3>=1.28.0
-python-dotenv>=1.0.0
-pydub>=0.25.0
-soundfile>=0.12.0
-requests>=2.31.0
-yt-dlp>=2024.1.0
+torchcrepe
+
+# 유틸리티
+numpy
+scipy
+librosa
+pika
+redis
+boto3
+python-dotenv
+pydub
+soundfile
+requests
+yt-dlp
+matplotlib

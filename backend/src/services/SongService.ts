@@ -173,15 +173,23 @@ export class SongService {
     title: string,
     artist: string
   ): Promise<Song> {
+    console.log(`[createFromYouTube] Request: videoId=${videoId}, title=${title}, artist=${artist}`);
+    
     const existingSong = await this.findByVideoId(videoId);
+    console.log(`[createFromYouTube] existingSong:`, existingSong ? `id=${existingSong.id}, status=${existingSong.processingStatus}` : 'null');
+    
     if (existingSong && existingSong.processingStatus === ProcessingStatus.COMPLETED) {
+      console.log(`[createFromYouTube] Returning existing COMPLETED song: ${existingSong.id}`);
       return existingSong;
     }
 
     if (existingSong && existingSong.processingStatus === ProcessingStatus.PROCESSING) {
+      console.log(`[createFromYouTube] Returning existing PROCESSING song: ${existingSong.id}`);
       return existingSong;
     }
 
+    console.log(`[createFromYouTube] Creating NEW song with id=${songId}`);
+    
     const song = songRepository.create({
       id: songId,
       title,
@@ -191,6 +199,7 @@ export class SongService {
     });
 
     const savedSong = await songRepository.save(song);
+    console.log(`[createFromYouTube] Saved new song, publishing to RabbitMQ...`);
 
     await publishMessage(QUEUES.AUDIO_PROCESSING, {
       songId: savedSong.id,

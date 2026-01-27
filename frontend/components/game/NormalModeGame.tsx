@@ -22,10 +22,9 @@ interface LyricsLine {
 
 // 노래방 싱크 설정 상수
 const SYNC_CONFIG = {
-  LYRICS_LEAD_TIME: 0.15,      // 가사가 미리 표시되는 시간 (초)
-  WORD_LEAD_TIME: 0.08,        // 단어 하이라이트가 미리 시작하는 시간 (초)
+  WORD_LEAD_TIME: 0.03,        // 단어 하이라이트가 미리 시작하는 시간 (초)
   NEXT_LINE_PREVIEW: 0.5,      // 다음 가사 미리보기 시간 (초)
-  LINE_HOLD_AFTER_END: 0.3,    // 가사가 끝난 후 유지 시간 (초)
+  LINE_HOLD_AFTER_END: 0.5,    // 가사가 끝난 후 유지 시간 (초)
 };
 
 export default function NormalModeGame() {
@@ -53,49 +52,34 @@ export default function NormalModeGame() {
 
   // 정확한 가사 인덱스 계산 함수 (노래방 스타일)
   const findCurrentLyricIndex = useCallback((time: number): number => {
-    if (!lyrics.length) return -1;
-    
-    const adjustedTime = time + SYNC_CONFIG.LYRICS_LEAD_TIME;
-    
-    // 이진 탐색으로 현재 가사 찾기
-    let left = 0;
-    let right = lyrics.length - 1;
-    let result = -1;
-    
-    while (left <= right) {
-      const mid = Math.floor((left + right) / 2);
-      const line = lyrics[mid];
+    let newIndex = -1;
+    for (let i = 0; i < lyrics.length; i++) {
+      const line = lyrics[i];
+      const nextLine = lyrics[i + 1];
       
-      if (adjustedTime >= line.startTime) {
-        result = mid;
-        left = mid + 1;
-      } else {
-        right = mid - 1;
-      }
-    }
-    
-    // 결과 검증: 현재 시간이 가사의 유효 범위 내인지 확인
-    if (result !== -1) {
-      const line = lyrics[result];
-      const holdTime = line.endTime + SYNC_CONFIG.LINE_HOLD_AFTER_END;
-      
-      // 다음 가사가 있으면 다음 가사 시작 전까지, 없으면 holdTime까지
-      const nextLine = lyrics[result + 1];
-      const effectiveEnd = nextLine 
-        ? Math.min(holdTime, nextLine.startTime - SYNC_CONFIG.LYRICS_LEAD_TIME)
-        : holdTime;
-      
-      if (adjustedTime > effectiveEnd) {
-        // 다음 가사로 전환할 시간인지 확인
-        if (nextLine && adjustedTime >= nextLine.startTime - SYNC_CONFIG.LYRICS_LEAD_TIME) {
-          return result + 1;
+      if (time >= line.startTime) {
+        if (time <= line.endTime) {
+          newIndex = i;
+          break;
+        } else if (nextLine && time < nextLine.startTime && time - line.endTime < 1.0) {
+          newIndex = i;
+          break;
+        } else if (!nextLine && time <= line.endTime + 2.0) {
+          newIndex = i;
+          break;
         }
-        // 가사 사이 빈 구간
-        return result;
       }
     }
+
+    if (newIndex !== -1) {
+      return newIndex;
+    } else if (lyrics.length > 0 && time > lyrics[lyrics.length - 1].endTime) {
+      return lyrics.length - 1;
+    } else if (lyrics.length > 0 && time < lyrics[0]?.startTime) {
+      return -1;
+    }
     
-    return result;
+    return -1;
   }, [lyrics]);
 
   useEffect(() => {
@@ -243,7 +227,7 @@ export default function NormalModeGame() {
 
   // 라인 전체 진행률 (단어가 없을 때 사용)
   const getLineProgress = useCallback((line: LyricsLine): number => {
-    const adjustedStart = line.startTime - SYNC_CONFIG.LYRICS_LEAD_TIME;
+    const adjustedStart = line.startTime;
     
     if (localTime < adjustedStart) return 0;
     if (localTime >= line.endTime) return 100;

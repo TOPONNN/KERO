@@ -1,7 +1,47 @@
 import os
 import json
 import re
-from faster_whisper import WhisperModel
+import torch
+
+# PyTorch 2.6+ weights_only 보안 정책 우회 (pyannote/omegaconf 호환성)
+# 방법 1: torch.load 패치 - 모든 torch.load 호출에 weights_only=False 적용
+_original_torch_load = torch.load
+def _patched_torch_load(*args, **kwargs):
+    kwargs['weights_only'] = False  # 강제로 False 설정
+    return _original_torch_load(*args, **kwargs)
+torch.load = _patched_torch_load
+
+# 방법 2: torch.hub.load도 패치 (silero-vad 로딩용)
+_original_hub_load = torch.hub.load
+def _patched_hub_load(*args, **kwargs):
+    kwargs.setdefault('trust_repo', True)
+    return _original_hub_load(*args, **kwargs)
+torch.hub.load = _patched_hub_load
+
+# 방법 3: omegaconf 모든 클래스들을 safe globals로 등록
+try:
+    import omegaconf
+    from omegaconf import DictConfig, ListConfig, OmegaConf
+    from omegaconf.base import ContainerMetadata, Metadata
+    from omegaconf.listconfig import ListConfig as LC
+    from omegaconf.dictconfig import DictConfig as DC
+    
+    safe_classes = [
+        DictConfig, ListConfig, OmegaConf, 
+        ContainerMetadata, Metadata, LC, DC
+    ]
+    # omegaconf 모듈의 모든 클래스 추가
+    for name in dir(omegaconf):
+        obj = getattr(omegaconf, name)
+        if isinstance(obj, type):
+            safe_classes.append(obj)
+    
+    torch.serialization.add_safe_globals(safe_classes)
+except (ImportError, AttributeError) as e:
+    print(f"[WhisperX] Warning: Could not add omegaconf safe globals: {e}")
+
+import whisperx
+import gc
 from typing import List, Dict, Callable, Optional
 from src.config import TEMP_DIR
 from src.services.s3_service import s3_service
@@ -9,15 +49,18 @@ from src.services.s3_service import s3_service
 
 class WhisperProcessor:
     def __init__(self):
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.compute_type = "float16" if self.device == "cuda" else "int8"
         self.model = None
 
     def _load_model(self):
         if self.model is None:
-            self.model = WhisperModel(
+            print("[WhisperX] Loading model...")
+            # WhisperX 3.3.1은 기본적으로 silero VAD 사용 (pyannote 불필요)
+            self.model = whisperx.load_model(
                 "large-v3",
-                device="cuda",
-                compute_type="float16",
-                download_root="/tmp/whisper_models"
+                self.device,
+                compute_type=self.compute_type,
             )
 
     def _get_initial_prompt(self, language: str) -> str:
@@ -29,64 +72,53 @@ class WhisperProcessor:
         }
         return prompts.get(language, prompts["en"])
 
-    def extract_lyrics(self, audio_path: str, song_id: str, language: str = "ko", folder_name: str = None, progress_callback: Optional[Callable[[int], None]] = None) -> Dict:
+    def extract_lyrics(self, audio_path: str, song_id: str, language: str = "ko", folder_name: Optional[str] = None, progress_callback: Optional[Callable[[int], None]] = None) -> Dict:
         if folder_name is None:
             folder_name = song_id
-            
+
+        if progress_callback:
+            progress_callback(5)
+
         self._load_model()
 
-        initial_prompt = self._get_initial_prompt(language)
+        if progress_callback:
+            progress_callback(10)
 
-        segments, info = self.model.transcribe(
-            audio_path,
-            language=language,
-            word_timestamps=True,
-            
-            initial_prompt=initial_prompt,
-            
-            vad_filter=True,
-            vad_parameters=dict(
-                min_silence_duration_ms=300,
-                speech_pad_ms=200,
-                threshold=0.35,
-                min_speech_duration_ms=100,
-                max_speech_duration_s=float("inf"),
-            ),
-            
-            beam_size=5,
-            best_of=5,
-            patience=1.5,
-            
-            condition_on_previous_text=True,
-            prompt_reset_on_temperature=0.5,
-            
-            no_speech_threshold=0.5,
-            compression_ratio_threshold=2.4,
-            log_prob_threshold=-1.0,
-            
-            temperature=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
-            
-            hallucination_silence_threshold=0.5,
-            
-            repetition_penalty=1.1,
-            no_repeat_ngram_size=3,
-            
-            prepend_punctuations="\"'([{-",
-            append_punctuations="\"'.!?:;,)]}-~",
+        # 오디오 로드
+        print(f"[WhisperX] Loading audio: {audio_path}")
+        audio = whisperx.load_audio(audio_path)
+
+        if progress_callback:
+            progress_callback(15)
+
+        # Transcribe (word_timestamps 포함)
+        print("[WhisperX] Transcribing...")
+        result = self.model.transcribe(
+            audio,
+            batch_size=16,
+            language=language
         )
 
-        segments_list = []
-        total_duration = info.duration if info.duration else 1
-        
-        for segment in segments:
-            segments_list.append(segment)
-            if progress_callback and info.duration:
-                progress = int((segment.end / total_duration) * 100)
-                progress_callback(min(progress, 100))
-        
-        lyrics_lines = self._process_segments(segments_list)
+        if progress_callback:
+            progress_callback(70)
+
+        # pyannote alignment 없이 기본 word timestamps 사용
+        # WhisperX transcribe 결과에 이미 word-level timestamps가 포함됨
+
+        if progress_callback:
+            progress_callback(80)
+
+        # 결과에서 duration 추출
+        duration = len(audio) / 16000  # whisperx는 16kHz로 로드
+
+        # 세그먼트 처리
+        segments = result.get("segments", [])
+        lyrics_lines = self._process_segments(segments)
         lyrics_lines = self._postprocess_segments(lyrics_lines)
         lyrics_lines = self._clean_lyrics(lyrics_lines)
+
+        if progress_callback:
+            progress_callback(90)
 
         output_dir = os.path.join(TEMP_DIR, song_id)
         os.makedirs(output_dir, exist_ok=True)
@@ -104,40 +136,55 @@ class WhisperProcessor:
         except OSError:
             pass
 
+        if progress_callback:
+            progress_callback(100)
+
         full_text = " ".join([line["text"] for line in lyrics_lines])
+
+        # 메모리 정리
+        gc.collect()
+        if self.device == "cuda":
+            torch.cuda.empty_cache()
 
         return {
             "lyrics_url": lyrics_url,
             "lyrics": lyrics_lines,
             "full_text": full_text,
-            "language": info.language,
-            "duration": info.duration,
+            "language": language,
+            "duration": duration,
         }
 
-    def _process_segments(self, segments: List) -> List[Dict]:
+    def _process_segments(self, segments: List[Dict]) -> List[Dict]:
         lyrics_lines = []
 
         for segment in segments:
-            text = segment.text.strip()
+            text = segment.get("text", "").strip()
             if not text:
                 continue
-                
+
+            start_time = segment.get("start", 0)
+            end_time = segment.get("end", 0)
+
             line = {
-                "start_time": round(segment.start, 3),
-                "end_time": round(segment.end, 3),
+                "start_time": round(start_time, 3),
+                "end_time": round(end_time, 3),
                 "text": text,
                 "words": [],
             }
 
-            if segment.words:
-                for word in segment.words:
-                    word_text = word.word.strip()
-                    if word_text:
-                        line["words"].append({
-                            "start_time": round(word.start, 3),
-                            "end_time": round(word.end, 3),
-                            "text": word_text,
-                        })
+            # WhisperX의 word-level timestamps
+            words = segment.get("words", [])
+            for word in words:
+                word_text = word.get("word", "").strip()
+                word_start = word.get("start")
+                word_end = word.get("end")
+                
+                if word_text and word_start is not None and word_end is not None:
+                    line["words"].append({
+                        "start_time": round(word_start, 3),
+                        "end_time": round(word_end, 3),
+                        "text": word_text,
+                    })
 
             if line["words"] or line["text"]:
                 lyrics_lines.append(line)
@@ -223,7 +270,7 @@ class WhisperProcessor:
                 chunks.append({
                     "start_time": round(current_start, 3),
                     "end_time": round(word["end_time"], 3),
-                    "text": "".join(w["text"] for w in current_words).strip(),
+                    "text": " ".join(w["text"] for w in current_words).strip(),
                     "words": current_words.copy()
                 })
                 current_words = []
@@ -234,7 +281,7 @@ class WhisperProcessor:
             chunks.append({
                 "start_time": round(current_start, 3),
                 "end_time": round(current_words[-1]["end_time"], 3),
-                "text": "".join(w["text"] for w in current_words).strip(),
+                "text": " ".join(w["text"] for w in current_words).strip(),
                 "words": current_words
             })
 
