@@ -1,0 +1,36 @@
+version: "3.8"
+
+services:
+  ai-worker:
+    build:
+      context: .
+      args:
+        GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    image: ai-worker:latest
+    container_name: ai-worker
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - ./cookies:/app/cookies
+    environment:
+      - RABBITMQ_HOST=${RABBITMQ_HOST:-***REDACTED_SERVER_IP***}
+      - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
+      - RABBITMQ_USER=${RABBITMQ_USER:-kero}
+      - RABBITMQ_PASS=${RABBITMQ_PASS:-***REDACTED***}
+      - REDIS_HOST=${REDIS_HOST:-***REDACTED_SERVER_IP***}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-ap-northeast-2}
+      - S3_BUCKET=${S3_BUCKET:-kero-audio-bucket}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
