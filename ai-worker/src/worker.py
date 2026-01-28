@@ -140,6 +140,8 @@ class AIWorker:
                     song_id,
                     language=message.get("language"),  # None = auto-detect
                     folder_name=folder_name,
+                    title=title,
+                    artist=artist,
                     progress_callback=lambda p: self._update_status(song_id, "processing", f"가사 추출 중... {p}%", step="whisper", progress=p)
                 )
                 results["lyrics"] = lyrics_result

@@ -112,14 +112,31 @@ class WhisperProcessor:
         
         return filtered
 
+    def _detect_korean_metadata(self, title: Optional[str], artist: Optional[str]) -> bool:
+        """Check if title or artist contains Korean characters"""
+        korean_pattern = re.compile(r'[\uac00-\ud7af]')
+        
+        if title and korean_pattern.search(title):
+            return True
+        if artist and korean_pattern.search(artist):
+            return True
+        return False
+
     def extract_lyrics(self, audio_path: str, song_id: str, language: Optional[str] = None, 
                        folder_name: Optional[str] = None, 
+                       title: Optional[str] = None,
+                       artist: Optional[str] = None,
                        progress_callback: Optional[Callable[[int], None]] = None) -> Dict:
         if folder_name is None:
             folder_name = song_id
 
         if progress_callback:
             progress_callback(5)
+
+        # Auto-detect Korean from metadata (title/artist)
+        if language is None and self._detect_korean_metadata(title, artist):
+            print(f"[WhisperX] Korean detected in metadata (title='{title}', artist='{artist}'), forcing language to 'ko'")
+            language = "ko"
 
         print("=" * 60)
         print("[Stage 1: WhisperX] Loading and transcribing...")
