@@ -35,14 +35,24 @@ ENV PATH="${CONDA_DIR}/envs/mfa/bin:${PATH}"
 # Install Korean/Japanese tokenizer support for MFA
 RUN pip install python-mecab-ko jamo fugashi unidic-lite
 
-# Download MFA acoustic models and dictionaries (with GitHub token to avoid rate limit)
-ARG GITHUB_TOKEN
-RUN mfa model download acoustic english_us_arpa --github_token ${GITHUB_TOKEN} && \
-    mfa model download dictionary english_us_arpa --github_token ${GITHUB_TOKEN} && \
-    mfa model download acoustic korean_mfa --github_token ${GITHUB_TOKEN} && \
-    mfa model download dictionary korean_mfa --github_token ${GITHUB_TOKEN} && \
-    mfa model download acoustic japanese_mfa --github_token ${GITHUB_TOKEN} && \
-    mfa model download dictionary japanese_mfa --github_token ${GITHUB_TOKEN}
+# Download MFA acoustic models and dictionaries
+# Note: GitHub token is optional, downloads work without it (may hit rate limits)
+ARG GITHUB_TOKEN=""
+RUN if [ -n "${GITHUB_TOKEN}" ]; then \
+        mfa model download acoustic english_us_arpa --github_token ${GITHUB_TOKEN} && \
+        mfa model download dictionary english_us_arpa --github_token ${GITHUB_TOKEN} && \
+        mfa model download acoustic korean_mfa --github_token ${GITHUB_TOKEN} && \
+        mfa model download dictionary korean_mfa --github_token ${GITHUB_TOKEN} && \
+        mfa model download acoustic japanese_mfa --github_token ${GITHUB_TOKEN} && \
+        mfa model download dictionary japanese_mfa --github_token ${GITHUB_TOKEN}; \
+    else \
+        mfa model download acoustic english_us_arpa && \
+        mfa model download dictionary english_us_arpa && \
+        mfa model download acoustic korean_mfa && \
+        mfa model download dictionary korean_mfa && \
+        mfa model download acoustic japanese_mfa && \
+        mfa model download dictionary japanese_mfa; \
+    fi
 
 # Install FFmpeg 6 (static build for av compatibility)
 RUN curl -L https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz | tar -xJ && \
