@@ -5,6 +5,7 @@ torchaudio==2.8.0+cu126
 whisperx>=3.7.0
 faster-whisper>=1.0.0
 silero-vad>=5.1
+omegaconf>=2.3.0
 
 demucs-infer==4.1.2
 torchcrepe==0.0.24

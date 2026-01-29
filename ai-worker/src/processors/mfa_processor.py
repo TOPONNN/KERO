@@ -31,9 +31,19 @@ class MFAProcessor:
         "ja": ("japanese_mfa", "japanese_mfa"),
     }
     
+    # Absolute path to MFA binary
+    MFA_BIN = "/opt/conda/envs/mfa/bin/mfa"
+    
     def __init__(self):
         self.temp_base = os.path.join(TEMP_DIR, "mfa")
         os.makedirs(self.temp_base, exist_ok=True)
+    
+    def _get_mfa_env(self):
+        """Get environment with MFA conda paths."""
+        env = os.environ.copy()
+        conda_paths = "/opt/conda/envs/mfa/bin:/opt/conda/bin"
+        env["PATH"] = conda_paths + ":" + env.get("PATH", "")
+        return env
     
     def align_lyrics(
         self,
@@ -181,7 +191,7 @@ class MFAProcessor:
         Command: mfa align <corpus_dir> <dictionary> <acoustic_model> <output_dir>
         """
         cmd = [
-            "mfa", "align",
+            self.MFA_BIN, "align",
             corpus_dir,
             dictionary,
             acoustic_model,
@@ -197,7 +207,8 @@ class MFAProcessor:
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=300  # 5 minute timeout
+                timeout=300,  # 5 minute timeout
+                env=self._get_mfa_env()
             )
             
             if result.returncode != 0:
@@ -320,16 +331,19 @@ class MFAProcessor:
         """Check if MFA is available on the system."""
         try:
             result = subprocess.run(
-                ["mfa", "version"],
+                [self.MFA_BIN, "version"],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=30,
+                env=self._get_mfa_env()
             )
             if result.returncode == 0:
                 print(f"[MFA] Available: {result.stdout.strip()}")
                 return True
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pass
+        except Exception as e:
+            print(f"[MFA] Error checking availability: {e}")
         
         print("[MFA] Not available on this system")
         return False
