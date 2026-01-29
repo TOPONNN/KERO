@@ -85,16 +85,16 @@ export class YouTubeService {
     });
   }
 
-  async downloadAudio(videoId: string, songId: string): Promise<DownloadResult> {
-    const outputPath = path.join(this.tempDir, `${songId}.opus`);
+   async downloadAudio(videoId: string, songId: string): Promise<DownloadResult> {
+     const outputPath = path.join(this.tempDir, `${songId}.flac`);
     const cookiesArgs = await this.getCookiesArgs();
 
     await new Promise<void>((resolve, reject) => {
-      const args = [
-        ...cookiesArgs,
-        `https://www.youtube.com/watch?v=${videoId}`,
-        "-x",
-        "--audio-format", "opus",
+       const args = [
+         ...cookiesArgs,
+         `https://www.youtube.com/watch?v=${videoId}`,
+         "-x",
+         "--audio-format", "flac",
         "-o", outputPath,
         "--no-playlist",
         "--no-warnings",
@@ -117,9 +117,9 @@ export class YouTubeService {
     const stats = await fs.stat(outputPath);
     const duration = await this.getAudioDuration(outputPath);
 
-    const fileBuffer = await fs.readFile(outputPath);
-    const s3Key = `songs/${songId}/original.opus`;
-    const s3Url = await uploadFile(s3Key, fileBuffer, "audio/ogg");
+     const fileBuffer = await fs.readFile(outputPath);
+     const s3Key = `songs/${songId}/original.flac`;
+     const s3Url = await uploadFile(s3Key, fileBuffer, "audio/flac");
 
     await fs.unlink(outputPath).catch(() => {});
 
