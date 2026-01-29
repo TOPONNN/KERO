@@ -2,8 +2,6 @@
 torch==2.8.0+cu126
 torchaudio==2.8.0+cu126
 
-faster-whisper==1.2.1
-whisperx==3.7.6
 
 demucs-infer==4.1.2
 torchcrepe==0.0.24
