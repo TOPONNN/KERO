@@ -14,27 +14,27 @@ export default function SpecsTable() {
   ];
 
   return (
-    <section id="features" className="relative w-full py-32 bg-black text-white px-6 md:px-20">
+    <section id="features" className="relative w-full py-16 sm:py-24 md:py-32 bg-black text-white px-6 md:px-20">
       <div className="max-w-7xl mx-auto">
-        <h2 className="mb-16 text-xs font-bold tracking-[0.2em] text-white/50 uppercase">
+        <h2 className="mb-8 sm:mb-12 md:mb-16 text-xs font-bold tracking-[0.2em] text-white/50 uppercase">
           Technical Specification
         </h2>
         
         <div className="w-full overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full min-w-[600px] text-left border-collapse">
             <thead>
               <tr className="border-b border-white/20">
-                <th className="py-6 text-sm font-medium text-white/60">Component</th>
-                <th className="py-6 text-sm font-medium text-white/60">Technology</th>
-                <th className="py-6 text-sm font-medium text-white/60">Description</th>
+                <th className="py-4 sm:py-6 text-sm font-medium text-white/60">Component</th>
+                <th className="py-4 sm:py-6 text-sm font-medium text-white/60">Technology</th>
+                <th className="py-4 sm:py-6 text-sm font-medium text-white/60">Description</th>
               </tr>
             </thead>
             <tbody>
               {specs.map((row, i) => (
                 <tr key={i} className="border-b border-white/10 transition-colors hover:bg-white/5">
-                  <td className="py-6 pr-8 font-medium text-white">{row.component}</td>
-                  <td className="py-6 pr-8 font-mono text-[#C0C0C0]">{row.tech}</td>
-                  <td className="py-6 text-gray-400">{row.desc}</td>
+                  <td className="py-4 pr-4 sm:py-6 sm:pr-8 font-medium text-white">{row.component}</td>
+                  <td className="py-4 pr-4 sm:py-6 sm:pr-8 font-mono text-[#C0C0C0]">{row.tech}</td>
+                  <td className="py-4 sm:py-6 text-gray-400">{row.desc}</td>
                 </tr>
               ))}
             </tbody>

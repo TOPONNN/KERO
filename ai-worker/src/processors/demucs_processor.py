@@ -15,7 +15,7 @@ class DemucsProcessor:
 
     def _load_model(self):
         if self.model is None:
-            self.model = get_model("htdemucs")
+            self.model = get_model("htdemucs_ft")
             self.model.to(self.device)
 
     def separate(self, audio_path: str, song_id: str, folder_name: str = None, progress_callback: Optional[Callable[[int], None]] = None) -> dict:
@@ -42,7 +42,7 @@ class DemucsProcessor:
         waveform = waveform.unsqueeze(0).to(self.device)
 
         with torch.no_grad():
-            sources = apply_model(self.model, waveform, device=self.device)
+            sources = apply_model(self.model, waveform, device=self.device, overlap=0.25, segment=None)
 
         sources = sources.squeeze(0)
         source_names = self.model.sources

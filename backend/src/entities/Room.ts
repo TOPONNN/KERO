@@ -5,7 +5,9 @@ import { Song } from "./Song";
 export enum GameMode {
   NORMAL = "normal",
   PERFECT_SCORE = "perfect_score",
-  LYRICS_QUIZ = "lyrics_quiz"
+  LYRICS_QUIZ = "lyrics_quiz",
+  BATTLE = "battle",
+  DUET = "duet"
 }
 
 export enum RoomStatus {

@@ -142,6 +142,12 @@ export function initializeSocket(httpServer: HttpServer): Server {
         case "lyrics_quiz":
           await lyricsQuizHandler.startGame(roomCode, data.songId);
           break;
+        case "battle":
+          await normalModeHandler.startGame(roomCode, data.songId);
+          break;
+        case "duet":
+          await normalModeHandler.startGame(roomCode, data.songId);
+          break;
       }
     });
 

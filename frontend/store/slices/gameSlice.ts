@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
-export type GameMode = "normal" | "perfect_score" | "lyrics_quiz";
+export type GameMode = "normal" | "perfect_score" | "lyrics_quiz" | "battle" | "duet";
 export type GameStatus = "waiting" | "playing" | "paused" | "finished";
 
 interface LyricsWord {

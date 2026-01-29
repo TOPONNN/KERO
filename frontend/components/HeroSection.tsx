@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback } from "react";
 import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
-import { ChevronDown, Music, Target, MessageSquareText } from "lucide-react";
+import { ChevronDown, Music, Target, MessageSquareText, Swords, Users } from "lucide-react";
 import Link from "next/link";
 
 const modes = [
@@ -32,6 +32,24 @@ const modes = [
     icon: MessageSquareText,
     accent: "#FF6B6B",
     href: "/lobby?mode=lyrics_quiz",
+  },
+  {
+    id: "04",
+    title: "배틀",
+    subtitle: "실력을 겨루는 대결",
+    description: ["같은 노래를 부르고 점수로 승부하세요.", "누가 더 잘 부르는지 겨뤄보세요!"],
+    icon: Swords,
+    accent: "#FF4500",
+    href: "/lobby?mode=battle",
+  },
+  {
+    id: "05",
+    title: "듀엣",
+    subtitle: "함께 부르는 하모니",
+    description: ["파트를 나눠 함께 노래하세요.", "완벽한 듀엣을 만들어보세요!"],
+    icon: Users,
+    accent: "#9B59B6",
+    href: "/lobby?mode=duet",
   },
 ];
 
@@ -123,14 +141,14 @@ export default function HeroSection() {
         />
       </motion.div>
 
-      <div className="relative z-10 flex h-full w-full flex-col justify-between p-8 md:p-20">
-        <div className="flex flex-col gap-6 mt-20">
+      <div className="relative z-10 flex h-full w-full flex-col justify-between p-4 sm:p-6 md:p-12 lg:p-20">
+        <div className="flex flex-col gap-6 mt-12 sm:mt-16 md:mt-20">
           <div className="flex items-end gap-6">
             <motion.h1 
               initial={{ opacity: 0, x: -50 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8 }}
-              className="text-8xl font-bold tracking-tighter text-white md:text-[10rem]"
+              className="text-5xl sm:text-7xl font-bold tracking-tighter text-white md:text-[10rem]"
             >
               KERO
             </motion.h1>
@@ -141,11 +159,11 @@ export default function HeroSection() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
-                className="hidden md:flex items-center gap-3 mb-6"
+                className="flex items-center gap-2 mb-4 md:gap-3 md:mb-6"
               >
-                <Icon className="w-8 h-8" style={{ color: currentMode.accent }} />
+                <Icon className="w-6 h-6 sm:w-8 sm:h-8" style={{ color: currentMode.accent }} />
                 <span 
-                  className="text-3xl font-bold tracking-wider"
+                  className="text-xl sm:text-2xl md:text-3xl font-bold tracking-wider"
                   style={{ color: currentMode.accent }}
                 >
                   {currentMode.title}
@@ -163,7 +181,7 @@ export default function HeroSection() {
               transition={{ duration: 0.3 }}
               className="space-y-4"
             >
-              <p className="text-xl font-medium tracking-wide text-gray-300 md:text-2xl">
+              <p className="text-base sm:text-xl font-medium tracking-wide text-gray-300 md:text-2xl">
                 {currentMode.subtitle}
               </p>
               <div className="max-w-md text-gray-400 space-y-1">
@@ -182,7 +200,7 @@ export default function HeroSection() {
           >
             <Link href={currentMode.href}>
               <motion.button 
-                className="rounded-full px-8 py-3 text-sm font-medium text-black transition-all"
+                className="rounded-full px-5 py-2.5 sm:px-8 sm:py-3 text-sm font-medium text-black transition-all"
                 style={{ backgroundColor: currentMode.accent }}
                 whileHover={{ 
                   backgroundColor: "#fff",
@@ -195,7 +213,7 @@ export default function HeroSection() {
             </Link>
             <motion.button 
               onClick={scrollToContent}
-              className="rounded-full border px-8 py-3 text-sm font-medium text-white transition-all hover:text-black"
+              className="rounded-full border px-5 py-2.5 sm:px-8 sm:py-3 text-sm font-medium text-white transition-all hover:text-black"
               style={{ borderColor: `${currentMode.accent}50` }}
               whileHover={{ 
                 backgroundColor: currentMode.accent,

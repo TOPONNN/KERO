@@ -18,9 +18,9 @@ export default function FAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <section id="faq" className="w-full py-32 bg-black px-6 md:px-20">
+    <section id="faq" className="w-full py-16 sm:py-24 md:py-32 bg-black px-6 md:px-20">
       <div className="max-w-4xl mx-auto">
-        <h2 className="mb-20 text-4xl font-bold text-white">FAQ</h2>
+        <h2 className="mb-8 sm:mb-12 md:mb-20 text-2xl sm:text-3xl md:text-4xl font-bold text-white">FAQ</h2>
         <div className="flex flex-col divide-y divide-white/10">
           {FAQS.map((faq, i) => (
             <div key={i} className="py-6">
@@ -28,7 +28,7 @@ export default function FAQ() {
                 onClick={() => setOpenIndex(openIndex === i ? null : i)}
                 className="flex w-full items-center justify-between py-4 text-left"
               >
-                <span className="text-xl font-medium text-white">{faq.q}</span>
+                <span className="text-base sm:text-lg md:text-xl font-medium text-white">{faq.q}</span>
                 <motion.div
                   animate={{ rotate: openIndex === i ? 45 : 0 }}
                   transition={{ duration: 0.2 }}

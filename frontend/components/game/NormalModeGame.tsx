@@ -202,6 +202,11 @@ export default function NormalModeGame() {
       
       // 시간이 변했을 때만 업데이트 (성능 최적화)
       if (Math.abs(time - lastTimeRef.current) > 0.016) { // ~60fps
+        // Redux 업데이트는 덜 자주 (성능) - must check BEFORE updating lastTimeRef
+        if (Math.floor(time * 10) !== Math.floor(lastTimeRef.current * 10)) {
+          dispatch(updateCurrentTime(time));
+        }
+        
         lastTimeRef.current = time;
         setLocalTime(time);
         
@@ -211,21 +216,42 @@ export default function NormalModeGame() {
           setCurrentLyricIndex(newIndex);
         }
         
-        // Score: check current word and award points
+        // Score: award points for active lyrics
         const lineIdx = newIndex >= 0 ? newIndex : currentLyricIndex;
         if (lineIdx >= 0) {
           const line = lyrics[lineIdx];
-          if (line?.words) {
-            const wordIdx = line.words.findIndex(w => time >= w.startTime && time <= w.endTime);
-            if (wordIdx >= 0) {
-              const wordKey = `${lineIdx}-${wordIdx}`;
-              if (!scoredWordsRef.current.has(wordKey)) {
-                scoredWordsRef.current.add(wordKey);
+          if (line) {
+            // Word-level scoring (if words available)
+            if (line.words && line.words.length > 0) {
+              const wordIdx = line.words.findIndex(w => time >= w.startTime && time <= w.endTime);
+              if (wordIdx >= 0) {
+                const wordKey = `${lineIdx}-${wordIdx}`;
+                if (!scoredWordsRef.current.has(wordKey)) {
+                  scoredWordsRef.current.add(wordKey);
+                  if (isMicOnRef.current) {
+                    const word = line.words[wordIdx];
+                    const energy = word.energy ?? 0.5;
+                    const comboMult = Math.min(2, 1 + comboRef.current * 0.1);
+                    const points = Math.round(10 * energy * comboMult);
+                    comboRef.current += 1;
+                    scoreRef.current += points;
+                    setScore(scoreRef.current);
+                    setCombo(comboRef.current);
+                    setLastScorePopup({ points, key: Date.now() });
+                  } else {
+                    comboRef.current = 0;
+                    setCombo(0);
+                  }
+                }
+              }
+            } else {
+              // Line-level fallback: score once per line when time is within line range
+              const lineKey = `line-${lineIdx}`;
+              if (time >= line.startTime && time <= line.endTime && !scoredWordsRef.current.has(lineKey)) {
+                scoredWordsRef.current.add(lineKey);
                 if (isMicOnRef.current) {
-                  const word = line.words[wordIdx];
-                  const energy = word.energy ?? 0.5;
                   const comboMult = Math.min(2, 1 + comboRef.current * 0.1);
-                  const points = Math.round(10 * energy * comboMult);
+                  const points = Math.round(50 * comboMult); // 50 base points per line
                   comboRef.current += 1;
                   scoreRef.current += points;
                   setScore(scoreRef.current);
@@ -238,11 +264,6 @@ export default function NormalModeGame() {
               }
             }
           }
-        }
-        
-        // Redux 업데이트는 덜 자주 (성능)
-        if (Math.floor(time * 10) !== Math.floor(lastTimeRef.current * 10)) {
-          dispatch(updateCurrentTime(time));
         }
       }
 
@@ -386,10 +407,7 @@ export default function NormalModeGame() {
     );
   }
 
-  const youtubeEmbedUrl = useMemo(() => {
-    if (!videoId) return null;
-    return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&loop=1&playlist=${videoId}&modestbranding=1&enablejsapi=1`;
-  }, [videoId]);
+
 
   const currentLine = currentLyricIndex >= 0 ? lyrics[currentLyricIndex] : undefined;
   const nextLine = useMemo(() => {
@@ -412,20 +430,48 @@ export default function NormalModeGame() {
       )}
 
       {/* 1. Background Layer */}
-      <div className="absolute inset-0 z-0 bg-black">
-        {youtubeEmbedUrl ? (
-          <div className="relative w-full h-full">
-             <iframe
-              src={youtubeEmbedUrl}
-              className="absolute top-1/2 left-1/2 w-[150%] h-[150%] -translate-x-1/2 -translate-y-1/2 object-cover opacity-60 pointer-events-none"
+      <div className="absolute inset-0 z-0">
+        {videoId ? (
+          <>
+            <iframe
+              src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&loop=1&playlist=${videoId}&modestbranding=1&playsinline=1`}
+              className="absolute top-1/2 left-1/2 w-[180%] h-[180%] -translate-x-1/2 -translate-y-1/2"
               allow="autoplay; encrypted-media"
+              title="Background MV"
+              style={{ pointerEvents: 'none' }}
             />
-            {/* Dim overlay for legibility */}
-            <div className="absolute inset-0 bg-black/50" />
-          </div>
+            <div className="absolute inset-0 bg-black/40" />
+          </>
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gray-900">
-            <Music2 className="w-32 h-32 text-white/10" />
+          <div className="absolute inset-0 overflow-hidden">
+            {/* Animated gradient orbs */}
+            <div 
+              className="absolute w-[600px] h-[600px] rounded-full blur-[120px] opacity-20"
+              style={{
+                background: 'radial-gradient(circle, #C25E8C 0%, transparent 70%)',
+                top: '10%',
+                left: '20%',
+                animation: 'float1 20s ease-in-out infinite',
+              }}
+            />
+            <div 
+              className="absolute w-[500px] h-[500px] rounded-full blur-[100px] opacity-15"
+              style={{
+                background: 'radial-gradient(circle, #4F46E5 0%, transparent 70%)',
+                bottom: '10%',
+                right: '15%',
+                animation: 'float2 25s ease-in-out infinite',
+              }}
+            />
+            <div 
+              className="absolute w-[400px] h-[400px] rounded-full blur-[80px] opacity-10"
+              style={{
+                background: 'radial-gradient(circle, #06B6D4 0%, transparent 70%)',
+                top: '50%',
+                left: '60%',
+                animation: 'float3 18s ease-in-out infinite',
+              }}
+            />
           </div>
         )}
       </div>
@@ -737,6 +783,23 @@ export default function NormalModeGame() {
           <span>{audioError}</span>
         </div>
        )}
+
+      <style>{`
+        @keyframes float1 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(30px, -50px) scale(1.1); }
+          66% { transform: translate(-20px, 30px) scale(0.9); }
+        }
+        @keyframes float2 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(-40px, 30px) scale(1.05); }
+          66% { transform: translate(20px, -40px) scale(0.95); }
+        }
+        @keyframes float3 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(50px, 20px) scale(1.1); }
+        }
+      `}</style>
     </div>
   );
 }

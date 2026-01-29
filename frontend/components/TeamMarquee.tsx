@@ -6,7 +6,7 @@ const TEAM = ["윤희준", "정훈호", "김관익", "김성민", "박찬진", "
 
 export default function TeamMarquee() {
   return (
-    <section className="relative w-full py-24 overflow-hidden bg-black/90">
+    <section className="relative w-full py-12 sm:py-16 md:py-24 overflow-hidden bg-black/90">
       <div className="absolute inset-0 bg-white/5 backdrop-blur-xl" />
       
       <div className="relative z-10 flex flex-col items-center gap-8">
@@ -16,7 +16,7 @@ export default function TeamMarquee() {
           <motion.div
             animate={{ x: [0, -1000] }}
             transition={{ repeat: Infinity, duration: 30, ease: "linear" }}
-            className="flex gap-12 text-4xl font-light tracking-widest text-white/80 md:text-6xl"
+            className="flex gap-12 text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-light tracking-widest text-white/80"
           >
             {[...TEAM, ...TEAM, ...TEAM, ...TEAM].map((member, i) => (
               <div key={i} className="flex items-center gap-12">

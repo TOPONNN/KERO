@@ -86,8 +86,8 @@ ENV PATH="/app/venv/bin:${PATH}"
 ENV PYTHONPATH="/app/venv/lib/python3.12/site-packages"
 ENV LD_LIBRARY_PATH="/app/venv/lib/python3.12/site-packages/nvidia/cudnn/lib:/app/venv/lib/python3.12/site-packages/nvidia/cublas/lib:/app/venv/lib/python3.12/site-packages/nvidia/cufft/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 
-# Pre-download demucs model (htdemucs ~80MB) so it's baked into the image
-RUN python -c "from demucs_infer.pretrained import get_model; get_model('htdemucs')"
+# Pre-download demucs model (htdemucs_ft ~80MB) so it's baked into the image
+RUN python -c "from demucs_infer.pretrained import get_model; get_model('htdemucs_ft')"
 
 COPY src/ ./src/
 
