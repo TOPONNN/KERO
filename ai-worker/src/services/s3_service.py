@@ -45,6 +45,7 @@ class S3Service:
         ext = os.path.splitext(filepath)[1].lower()
         content_types = {
             ".mp3": "audio/mpeg",
+            ".opus": "audio/ogg",
             ".wav": "audio/wav",
             ".flac": "audio/flac",
             ".json": "application/json",

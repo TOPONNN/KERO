@@ -32,19 +32,17 @@ class AIWorker:
             self.redis_client = None
 
     def _download_from_youtube(self, video_id: str, song_id: str, folder_name: str) -> Optional[str]:
-        output_path = os.path.join(TEMP_DIR, f"{song_id}_original.mp3")
+        output_path = os.path.join(TEMP_DIR, f"{song_id}_original.opus")
         
         try:
             cmd = [
                 "yt-dlp",
                 f"https://www.youtube.com/watch?v={video_id}",
                 "-x",
-                "--audio-format", "mp3",
-                "--audio-quality", "0",
+                "--audio-format", "opus",
                 "-o", output_path,
                 "--no-playlist",
                 "--no-warnings",
-                "--remote-components", "ejs:github",
             ]
             
             cookies_paths = [
@@ -66,7 +64,7 @@ class AIWorker:
                 return None
             
             if os.path.exists(output_path):
-                s3_key = f"songs/{folder_name}/original.mp3"
+                s3_key = f"songs/{folder_name}/original.opus"
                 s3_service.upload_file(output_path, s3_key)
                 return output_path
             
