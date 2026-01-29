@@ -43,6 +43,8 @@ class AIWorker:
                 "-o", output_path,
                 "--no-playlist",
                 "--no-warnings",
+                "--js-runtimes", "deno",
+                "--remote-components", "ejs:github",
             ]
             
             cookies_paths = [
