@@ -8,7 +8,7 @@ from src.config import REDIS_HOST, REDIS_PORT, QUEUE_NAMES, TEMP_DIR, BACKEND_AP
 from src.services.rabbitmq_service import rabbitmq_service
 from src.services.s3_service import s3_service
 from src.processors.demucs_processor import demucs_processor
-from src.processors.whisper_processor import whisper_processor
+from src.processors.whisper_processor import lyrics_processor as whisper_processor
 from src.processors.crepe_processor import crepe_processor
 
 

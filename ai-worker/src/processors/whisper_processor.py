@@ -6,132 +6,24 @@ import torch
 import numpy as np
 import librosa
 import torchcrepe
+import requests
+import soundfile as sf
 
-_original_torch_load = torch.load
-def _patched_torch_load(*args, **kwargs):
-    kwargs['weights_only'] = False
-    return _original_torch_load(*args, **kwargs)
-torch.load = _patched_torch_load
-
-_original_hub_load = torch.hub.load
-def _patched_hub_load(*args, **kwargs):
-    kwargs.setdefault('trust_repo', True)
-    return _original_hub_load(*args, **kwargs)
-torch.hub.load = _patched_hub_load
-
-try:
-    import omegaconf
-    from omegaconf import DictConfig, ListConfig, OmegaConf
-    from omegaconf.base import ContainerMetadata, Metadata
-    torch.serialization.add_safe_globals([DictConfig, ListConfig, OmegaConf, ContainerMetadata, Metadata])
-except (ImportError, AttributeError):
-    pass
-
-import whisperx
 from typing import List, Dict, Callable, Optional
-from src.config import TEMP_DIR
+from src.config import TEMP_DIR, LYRICS_API_URL
 from src.services.s3_service import s3_service
 from src.processors.mfa_processor import mfa_processor
 
 
-class WhisperProcessor:
+class LyricsProcessor:
     def __init__(self):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.compute_type = "float16" if self.device == "cuda" else "int8"
-        self.whisperx_model = None
-        self.align_model = None
-        self.align_metadata = None
-        self.align_language = None
-        self.diarize_model = None
-
-    def _load_whisperx_model(self):
-        if self.whisperx_model is None:
-            print("[WhisperX] Loading large-v3 model...")
-            self.whisperx_model = whisperx.load_model(
-                "large-v3",
-                self.device,
-                compute_type=self.compute_type,
-                language=None,
-                asr_options={
-                    "beam_size": 5,
-                    "best_of": 5,
-                    "temperatures": [0.0],
-                    "condition_on_previous_text": False,
-                    "initial_prompt": None,
-                    "suppress_numerals": False,
-                }
-            )
-            print("[WhisperX] Model loaded successfully")
-
-    def _detect_music_start(self, audio: np.ndarray, sr: int = 16000) -> float:
-        frame_length = int(0.5 * sr)
-        hop_length = int(0.1 * sr)
-        
-        energy = []
-        for i in range(0, len(audio) - frame_length, hop_length):
-            frame = audio[i:i + frame_length]
-            energy.append(np.sqrt(np.mean(frame ** 2)))
-        
-        if not energy:
-            return 0.0
-        
-        energy = np.array(energy)
-        threshold = np.percentile(energy, 30)
-        
-        for i, e in enumerate(energy):
-            if e > threshold * 2:
-                start_time = max(0, (i * hop_length / sr) - 0.5)
-                print(f"[WhisperX] Detected music start at {start_time:.2f}s")
-                return start_time
-        
-        return 0.0
-
-    def _filter_speech_segments(self, segments: List[Dict], audio: np.ndarray, sr: int = 16000) -> List[Dict]:
-        if not segments:
-            return segments
-        
-        filtered = []
-        min_segment_duration = 0.5
-        
-        for seg in segments:
-            duration = seg.get("end", 0) - seg.get("start", 0)
-            if duration < min_segment_duration:
-                continue
-            
-            text = seg.get("text", "").strip()
-            if len(text) < 3:
-                continue
-            
-            words = seg.get("words", [])
-            if words:
-                valid_words = [w for w in words if w.get("end", 0) - w.get("start", 0) < 10]
-                if len(valid_words) < len(words) * 0.5:
-                    print(f"[WhisperX] Filtered segment with bad word timings: {text[:50]}")
-                    continue
-                seg["words"] = valid_words
-            
-            filtered.append(seg)
-        
-        return filtered
-
-    def _detect_korean_metadata(self, title: Optional[str], artist: Optional[str]) -> bool:
-        """Check if title or artist contains Korean characters"""
-        korean_pattern = re.compile(r'[\uac00-\ud7af]')
-        
-        if title and korean_pattern.search(title):
-            return True
-        if artist and korean_pattern.search(artist):
-            return True
-        return False
 
     def _fetch_lyrics_from_api(self, title: Optional[str], artist: Optional[str]) -> Optional[str]:
         if not title:
             return None
 
         try:
-            from src.config import LYRICS_API_URL
-            import requests
-
             params = {"title": title}
             if artist:
                 params["artist"] = artist
@@ -160,330 +52,117 @@ class WhisperProcessor:
             print(f"[Lyrics API] Failed: {e}")
             return None
 
-    def extract_lyrics(self, audio_path: str, song_id: str, language: Optional[str] = None, 
-                       folder_name: Optional[str] = None, 
-                       title: Optional[str] = None,
-                       artist: Optional[str] = None,
-                       progress_callback: Optional[Callable[[int], None]] = None) -> Dict:
-        if folder_name is None:
-            folder_name = song_id
+    def _detect_language(self, text: str, language: Optional[str], title: Optional[str], artist: Optional[str]) -> str:
+        """Detect language from lyrics text and metadata"""
+        if language:
+            return language
 
-        if progress_callback:
-            progress_callback(5)
+        # Check metadata for Korean
+        korean_pattern = re.compile(r'[\uac00-\ud7af]')
+        if title and korean_pattern.search(title):
+            return "ko"
+        if artist and korean_pattern.search(artist):
+            return "ko"
 
-        # Auto-detect Korean from metadata (title/artist)
-        if language is None and self._detect_korean_metadata(title, artist):
-            print(f"[WhisperX] Korean detected in metadata (title='{title}', artist='{artist}'), forcing language to 'ko'")
-            language = "ko"
+        # Check text content
+        korean_chars = len(re.findall(r'[\uac00-\ud7af]', text))
+        japanese_chars = len(re.findall(r'[\u3040-\u30ff]', text))
+        total_chars = len(re.sub(r'\s', '', text))
 
-        print("=" * 60)
-        print("[Stage 1: WhisperX] Loading and transcribing...")
-        print("=" * 60)
-        
-        self._load_whisperx_model()
-        
-        audio = whisperx.load_audio(audio_path)
-        duration = len(audio) / 16000
-        
-        music_start = self._detect_music_start(audio)
-        
-        if progress_callback:
-            progress_callback(10)
-
-        result = self.whisperx_model.transcribe(
-            audio,
-            batch_size=16,
-            language=language,
-        )
-        
-        detected_language = result.get("language", language or "en")
-        segments = result.get("segments", [])
-        
-        # Check if text contains significant Korean characters
-        # If detected as English but contains Korean, force Korean language
-        full_text_check = " ".join([seg.get("text", "") for seg in segments])
-        korean_chars = len(re.findall(r'[\uac00-\ud7af]', full_text_check))
-        total_chars = len(re.sub(r'\s', '', full_text_check))
-        
         if total_chars > 0:
-            korean_ratio = korean_chars / total_chars
-            if detected_language == "en" and korean_ratio > 0.2:
-                print(f"[WhisperX] Detected Korean text ({korean_ratio:.1%}), forcing language to 'ko'")
-                detected_language = "ko"
-            elif korean_ratio > 0.5:
-                print(f"[WhisperX] High Korean ratio ({korean_ratio:.1%}), forcing language to 'ko'")
-                detected_language = "ko"
-        
-        print(f"[WhisperX] Detected language: {detected_language}")
-        print(f"[WhisperX] Transcribed {len(segments)} segments")
-        
-        if progress_callback:
-            progress_callback(30)
+            if korean_chars / total_chars > 0.2:
+                return "ko"
+            if japanese_chars / total_chars > 0.2:
+                return "ja"
 
-        print("=" * 60)
-        print("[Stage 2: WhisperX] Word-level alignment...")
-        print("=" * 60)
-        
-        if segments:
-            try:
-                if self.align_model is None or self.align_language != detected_language:
-                    print(f"[WhisperX] Loading alignment model for {detected_language}...")
-                    self.align_model, self.align_metadata = whisperx.load_align_model(
-                        language_code=detected_language,
-                        device=self.device
-                    )
-                    self.align_language = detected_language
-                
-                result = whisperx.align(
-                    segments,
-                    self.align_model,
-                    self.align_metadata,
-                    audio,
-                    self.device,
-                    return_char_alignments=False
-                )
-                segments = result.get("segments", segments)
-                
-                total_words = sum(len(seg.get("words", [])) for seg in segments)
-                print(f"[WhisperX] Aligned {total_words} words")
-                
-            except Exception as e:
-                print(f"[WhisperX] Alignment failed: {e}")
-        
-        if progress_callback:
-            progress_callback(50)
+        return "en"
 
-        segments = self._filter_speech_segments(segments, audio)
-        
-        lyrics_lines = self._process_segments(segments, music_start)
-        lyrics_lines = self._postprocess_segments(lyrics_lines, detected_language)
-        lyrics_lines = self._clean_lyrics(lyrics_lines, detected_language)
-        
-        print(f"[WhisperX] Processed {len(lyrics_lines)} lyrics lines")
+    def _build_lines_from_mfa(self, lyrics_text: str, mfa_words: List[Dict]) -> List[Dict]:
+        """Build display lines from API text lines + MFA word timings.
 
-        if progress_callback:
-            progress_callback(70)
+        Maps MFA words to the original API text lines preserving
+        the natural line structure from YouTube Music lyrics.
+        """
+        # Split API lyrics into lines (preserving original structure)
+        raw_lines = [line.strip() for line in lyrics_text.split("\n") if line.strip()]
 
-        api_lyrics_text = self._fetch_lyrics_from_api(title, artist)
-        print(f"[Lyrics] Source: {'YouTube API' if api_lyrics_text else 'WhisperX transcription'}")
+        if not mfa_words:
+            # MFA failed - return lines without timing
+            return [{
+                "start_time": 0,
+                "end_time": 0,
+                "text": line,
+                "words": []
+            } for line in raw_lines]
 
-        print("=" * 60)
-        print("[Stage 3: MFA] Phoneme-level refinement...")
-        print("=" * 60)
-        
-        if api_lyrics_text:
-            lyrics_lines = self._refine_with_mfa(audio_path, lyrics_lines, detected_language, override_text=api_lyrics_text)
-        else:
-            lyrics_lines = self._refine_with_mfa(audio_path, lyrics_lines, detected_language)
-        
-        print("=" * 60)
-        print("[Stage 4: Energy] Analyzing vocal intensity...")
-        print("=" * 60)
-        
-        # Stage 4: Energy analysis using vocals from demucs separation
-        vocals_path = os.path.join(TEMP_DIR, song_id, "vocals.wav")
-        if os.path.exists(vocals_path):
-            lyrics_lines = self._add_energy_to_words(vocals_path, lyrics_lines)
-        else:
-            print(f"[Energy] Vocals file not found at {vocals_path}, skipping energy analysis")
-            # Assign default energy values
-            for segment in lyrics_lines:
-                for word in segment.get("words", []):
-                    word["energy"] = 0.5
-        
-        print("=" * 60)
-        print("[Stage 5: Pitch] Analyzing vocal melody...")
-        print("=" * 60)
+        # Build word queue from MFA output
+        mfa_queue = list(mfa_words)  # [{start_time, end_time, text}, ...]
+        mfa_idx = 0
 
-        if os.path.exists(vocals_path):
-            lyrics_lines = self._add_pitch_to_words(vocals_path, lyrics_lines)
-        else:
-            print(f"[Pitch] Vocals file not found at {vocals_path}, skipping pitch analysis")
-            for segment in lyrics_lines:
-                for word in segment.get("words", []):
-                    word["pitch"] = 0
-                    word["note"] = ""
-                    word["midi"] = 0
+        result_lines = []
 
-        print("=" * 60)
-        print("[Stage 6: VAD] Detecting voice activity...")
-        print("=" * 60)
-
-        if os.path.exists(vocals_path):
-            lyrics_lines = self._add_vad_to_words(vocals_path, lyrics_lines)
-        else:
-            print(f"[VAD] Vocals file not found at {vocals_path}, skipping VAD")
-            for segment in lyrics_lines:
-                for word in segment.get("words", []):
-                    word["voiced"] = 0.0
-
-        if progress_callback:
-            progress_callback(90)
-        
-        gc.collect()
-        if self.device == "cuda":
-            torch.cuda.empty_cache()
-
-        output_dir = os.path.join(TEMP_DIR, song_id)
-        os.makedirs(output_dir, exist_ok=True)
-
-        lyrics_path = os.path.join(output_dir, "lyrics.json")
-        with open(lyrics_path, "w", encoding="utf-8") as f:
-            json.dump(lyrics_lines, f, ensure_ascii=False, indent=2)
-
-        s3_key = f"songs/{folder_name}/lyrics.json"
-        lyrics_url = s3_service.upload_file(lyrics_path, s3_key)
-
-        os.remove(lyrics_path)
-        try:
-            os.rmdir(output_dir)
-        except OSError:
-            pass
-
-        if progress_callback:
-            progress_callback(100)
-
-        full_text = " ".join([line["text"] for line in lyrics_lines])
-
-        return {
-            "lyrics_url": lyrics_url,
-            "lyrics": lyrics_lines,
-            "full_text": full_text,
-            "language": detected_language,
-            "duration": duration,
-        }
-
-    def _process_segments(self, segments: List[Dict], music_start: float = 0.0) -> List[Dict]:
-        lyrics_lines = []
-        
-        for segment in segments:
-            if segment.get("start", 0) < music_start:
-                print(f"[WhisperX] Skipping pre-music segment: {segment.get('text', '')[:50]}")
-                continue
-            
-            text = segment.get("text", "").strip()
-            if not text:
+        for line_text in raw_lines:
+            # Split this line into expected words
+            line_words_text = line_text.split()
+            if not line_words_text:
                 continue
 
-            start_time = segment.get("start", 0)
-            end_time = segment.get("end", 0)
+            line_words = []
 
-            line = {
-                "start_time": round(start_time, 3),
-                "end_time": round(end_time, 3),
-                "text": text,
-                "words": [],
-            }
+            for word_text in line_words_text:
+                # Try to match with next MFA word
+                matched = False
+                clean_word = re.sub(r'[^\w\s]', '', word_text).lower().strip()
 
-            words = segment.get("words", [])
-            for word in words:
-                word_text = word.get("word", "").strip()
-                word_start = word.get("start")
-                word_end = word.get("end")
-                
-                if word_text and word_start is not None and word_end is not None:
-                    word_duration = word_end - word_start
-                    if word_duration > 5:
-                        avg_char_duration = 0.1
-                        word_end = word_start + len(word_text) * avg_char_duration
-                    
-                    line["words"].append({
-                        "start_time": round(word_start, 3),
-                        "end_time": round(word_end, 3),
-                        "text": word_text,
-                    })
-
-            if line["words"]:
-                line["start_time"] = line["words"][0]["start_time"]
-                line["end_time"] = line["words"][-1]["end_time"]
-            
-            if line["words"] or line["text"]:
-                lyrics_lines.append(line)
-
-        return lyrics_lines
-
-    def _postprocess_segments(self, segments: List[Dict], language: str = "en") -> List[Dict]:
-        if not segments:
-            return segments
-
-        all_words = []
-        for segment in segments:
-            words = segment.get("words", [])
-            if words:
-                all_words.extend(words)
-            elif segment.get("text"):
-                all_words.append({
-                    "start_time": segment["start_time"],
-                    "end_time": segment["end_time"],
-                    "text": segment["text"]
-                })
-        
-        if not all_words:
-            return segments
-
-        should_filter_cjk = language == "en"
-        if should_filter_cjk:
-            filtered_words = []
-            for word in all_words:
-                word_text = word.get("text", "").strip()
-                if not word_text:
+                if not clean_word:
                     continue
-                is_cjk_only = bool(re.match(r'^[\u3000-\u9fff\uac00-\ud7af\u3040-\u30ff\u31f0-\u31ff]+[.!?,]*$', word_text))
-                if is_cjk_only:
-                    continue
-                filtered_words.append(word)
-            all_words = filtered_words
-        
-        if not all_words:
-            return []
-        
-        all_words = sorted(all_words, key=lambda w: w.get("start_time", 0))
-        
-        MIN_WORDS = 3
-        MAX_WORDS = 8
-        TARGET_WORDS = 5
-        
-        lines = []
-        current_words = []
-        
-        for i, word in enumerate(all_words):
-            current_words.append(word)
-            word_count = len(current_words)
-            
-            text = word.get("text", "")
-            is_sentence_end = any(text.rstrip().endswith(p) for p in ['.', '?', '!', '。', '？', '！'])
-            is_phrase_end = any(text.rstrip().endswith(p) for p in [',', '，', '~', '♪', ';', '；'])
-            
-            has_long_pause = False
-            if i < len(all_words) - 1:
-                gap = all_words[i + 1]["start_time"] - word["end_time"]
-                has_long_pause = gap > 0.8
-            
-            should_split = (
-                word_count >= MAX_WORDS or
-                (word_count >= TARGET_WORDS and (is_sentence_end or has_long_pause)) or
-                (word_count >= MIN_WORDS and is_sentence_end) or
-                (has_long_pause and word_count >= 2)
-            )
-            
-            if should_split and current_words:
-                lines.append({
-                    "start_time": round(current_words[0]["start_time"], 3),
-                    "end_time": round(current_words[-1]["end_time"], 3),
-                    "text": " ".join(w["text"] for w in current_words).strip(),
-                    "words": current_words.copy()
+
+                # Search in a window ahead
+                for i in range(mfa_idx, min(mfa_idx + 20, len(mfa_queue))):
+                    mfa_word = mfa_queue[i]
+                    mfa_clean = re.sub(r'[^\w\s]', '', mfa_word["text"]).lower().strip()
+
+                    if (mfa_clean == clean_word or
+                        mfa_clean.startswith(clean_word) or
+                        clean_word.startswith(mfa_clean) or
+                        mfa_clean in clean_word or
+                        clean_word in mfa_clean):
+                        line_words.append({
+                            "start_time": round(mfa_word["start_time"], 3),
+                            "end_time": round(mfa_word["end_time"], 3),
+                            "text": word_text,
+                        })
+                        mfa_idx = i + 1
+                        matched = True
+                        break
+
+                if not matched:
+                    # Can't find timing - use interpolated timing or skip
+                    # Use last known time + small offset
+                    if line_words:
+                        last_end = line_words[-1]["end_time"]
+                        line_words.append({
+                            "start_time": round(last_end, 3),
+                            "end_time": round(last_end + 0.3, 3),
+                            "text": word_text,
+                        })
+                    elif result_lines:
+                        last_end = result_lines[-1]["end_time"]
+                        line_words.append({
+                            "start_time": round(last_end + 0.1, 3),
+                            "end_time": round(last_end + 0.4, 3),
+                            "text": word_text,
+                        })
+
+            if line_words:
+                result_lines.append({
+                    "start_time": line_words[0]["start_time"],
+                    "end_time": line_words[-1]["end_time"],
+                    "text": line_text,
+                    "words": line_words,
                 })
-                current_words = []
-        
-        if current_words:
-            lines.append({
-                "start_time": round(current_words[0]["start_time"], 3),
-                "end_time": round(current_words[-1]["end_time"], 3),
-                "text": " ".join(w["text"] for w in current_words).strip(),
-                "words": current_words
-            })
-        
-        return lines
+
+        return result_lines
 
     def _clean_lyrics(self, segments: List[Dict], language: str = "en") -> List[Dict]:
         cleaned = []
@@ -547,95 +226,6 @@ class WhisperProcessor:
                 cleaned.append(segment)
         
         return cleaned
-
-    def _refine_with_mfa(self, audio_path: str, segments: List[Dict], language: str, override_text: Optional[str] = None) -> List[Dict]:
-        if not mfa_processor.is_available():
-            print("[MFA] Not available, using WhisperX timings")
-            return segments
-        
-        if language not in mfa_processor.LANGUAGE_MODELS:
-            print(f"[MFA] Language '{language}' not supported")
-            return segments
-        
-        try:
-            if override_text:
-                full_text = override_text
-            else:
-                full_text = " ".join([seg["text"] for seg in segments])
-            if not full_text.strip():
-                return segments
-            
-            print(f"[MFA] Running alignment for {len(segments)} segments...")
-            
-            mfa_words = mfa_processor.align_lyrics(audio_path, full_text, language)
-            
-            if not mfa_words:
-                print("[MFA] No words returned")
-                return segments
-            
-            print(f"[MFA] Aligned {len(mfa_words)} words")
-            
-            refined = self._map_mfa_words_to_segments(segments, mfa_words)
-            return refined
-            
-        except Exception as e:
-            print(f"[MFA] Failed: {e}")
-            return segments
-
-    def _map_mfa_words_to_segments(self, segments: List[Dict], mfa_words: List[Dict]) -> List[Dict]:
-        mfa_queue = []
-        for w in mfa_words:
-            mfa_queue.append({
-                "normalized": w["text"].lower().strip(),
-                "start_time": w["start_time"],
-                "end_time": w["end_time"],
-                "used": False
-            })
-        
-        mfa_idx = 0
-        refined = []
-        
-        for segment in segments:
-            refined_seg = {
-                "start_time": segment["start_time"],
-                "end_time": segment["end_time"],
-                "text": segment["text"],
-                "words": []
-            }
-            
-            for word in segment.get("words", []):
-                word_text = word["text"].lower().strip()
-                matched = False
-                
-                for i in range(mfa_idx, min(mfa_idx + 15, len(mfa_queue))):
-                    if mfa_queue[i]["used"]:
-                        continue
-                    
-                    mfa_norm = mfa_queue[i]["normalized"]
-                    if mfa_norm == word_text or mfa_norm.startswith(word_text) or word_text.startswith(mfa_norm):
-                        refined_seg["words"].append({
-                            "start_time": mfa_queue[i]["start_time"],
-                            "end_time": mfa_queue[i]["end_time"],
-                            "text": word["text"]
-                        })
-                        mfa_queue[i]["used"] = True
-                        mfa_idx = i + 1
-                        matched = True
-                        break
-                
-                if not matched:
-                    refined_seg["words"].append(word)
-            
-            if refined_seg["words"]:
-                refined_seg["start_time"] = refined_seg["words"][0]["start_time"]
-                refined_seg["end_time"] = refined_seg["words"][-1]["end_time"]
-            
-            refined.append(refined_seg)
-        
-        used = sum(1 for w in mfa_queue if w["used"])
-        print(f"[MFA] Mapped {used}/{len(mfa_queue)} words")
-        
-        return refined
 
     def _add_energy_to_words(self, vocals_path: str, segments: List[Dict]) -> List[Dict]:
         """Add RMS energy values (0.0-1.0) to each word based on vocal intensity"""
@@ -844,5 +434,188 @@ class WhisperProcessor:
                     word["voiced"] = 0.0
             return segments
 
+    def extract_lyrics(self, audio_path: str, song_id: str, language: Optional[str] = None,
+                       folder_name: Optional[str] = None,
+                       title: Optional[str] = None,
+                       artist: Optional[str] = None,
+                       progress_callback: Optional[Callable[[int], None]] = None) -> Dict:
+        if folder_name is None:
+            folder_name = song_id
 
-whisper_processor = WhisperProcessor()
+        if progress_callback:
+            progress_callback(5)
+
+        # ========================================
+        # Stage 1: Fetch lyrics from YouTube Music API
+        # ========================================
+        print("=" * 60)
+        print("[Stage 1: Lyrics API] Fetching lyrics text...")
+        print("=" * 60)
+
+        lyrics_text = self._fetch_lyrics_from_api(title, artist)
+
+        if not lyrics_text:
+            print("[Lyrics API] No lyrics available - cannot proceed")
+            # Return empty result
+            duration = 0
+            try:
+                info = sf.info(audio_path)
+                duration = info.duration
+            except Exception:
+                pass
+            return {
+                "lyrics_url": "",
+                "lyrics": [],
+                "full_text": "",
+                "language": language or "en",
+                "duration": duration,
+            }
+
+        if progress_callback:
+            progress_callback(15)
+
+        # Detect language from lyrics text
+        detected_language = self._detect_language(lyrics_text, language, title, artist)
+        print(f"[Lyrics] Language: {detected_language}")
+        print(f"[Lyrics] Text length: {len(lyrics_text)} chars")
+
+        # Get audio duration
+        try:
+            info = sf.info(audio_path)
+            duration = info.duration
+        except Exception:
+            duration = 0
+
+        if progress_callback:
+            progress_callback(20)
+
+        # ========================================
+        # Stage 2: MFA Forced Alignment
+        # ========================================
+        print("=" * 60)
+        print("[Stage 2: MFA] Forced alignment...")
+        print("=" * 60)
+
+        mfa_words = []
+        if mfa_processor.is_available() and detected_language in mfa_processor.LANGUAGE_MODELS:
+            try:
+                # Clean text for MFA
+                clean_text = lyrics_text.replace("\n", " ")
+                clean_text = re.sub(r'\[.*?\]', '', clean_text)
+                clean_text = re.sub(r'\(.*?\)', '', clean_text)
+                clean_text = re.sub(r'[♪~]', '', clean_text)
+                clean_text = re.sub(r'\s+', ' ', clean_text).strip()
+
+                mfa_words = mfa_processor.align_lyrics(audio_path, clean_text, detected_language)
+                print(f"[MFA] Aligned {len(mfa_words)} words")
+            except Exception as e:
+                print(f"[MFA] Failed: {e}")
+                mfa_words = []
+        else:
+            print(f"[MFA] Not available for language '{detected_language}'")
+
+        if progress_callback:
+            progress_callback(50)
+
+        # ========================================
+        # Stage 3: Build line segments
+        # ========================================
+        print("=" * 60)
+        print("[Stage 3: Build] Creating line segments...")
+        print("=" * 60)
+
+        lyrics_lines = self._build_lines_from_mfa(lyrics_text, mfa_words)
+        lyrics_lines = self._clean_lyrics(lyrics_lines, detected_language)
+
+        print(f"[Build] Created {len(lyrics_lines)} lines with {sum(len(l.get('words', [])) for l in lyrics_lines)} words")
+
+        if progress_callback:
+            progress_callback(60)
+
+        # ========================================
+        # Stage 4: Energy analysis
+        # ========================================
+        print("=" * 60)
+        print("[Stage 4: Energy] Analyzing vocal intensity...")
+        print("=" * 60)
+
+        vocals_path = os.path.join(TEMP_DIR, song_id, "vocals.wav")
+        if os.path.exists(vocals_path):
+            lyrics_lines = self._add_energy_to_words(vocals_path, lyrics_lines)
+        else:
+            print(f"[Energy] Vocals not found at {vocals_path}, using defaults")
+            for seg in lyrics_lines:
+                for w in seg.get("words", []):
+                    w["energy"] = 0.5
+
+        # ========================================
+        # Stage 5: Pitch analysis
+        # ========================================
+        print("=" * 60)
+        print("[Stage 5: Pitch] Analyzing vocal melody...")
+        print("=" * 60)
+
+        if os.path.exists(vocals_path):
+            lyrics_lines = self._add_pitch_to_words(vocals_path, lyrics_lines)
+        else:
+            for seg in lyrics_lines:
+                for w in seg.get("words", []):
+                    w["pitch"] = 0
+                    w["note"] = ""
+                    w["midi"] = 0
+
+        # ========================================
+        # Stage 6: VAD analysis
+        # ========================================
+        print("=" * 60)
+        print("[Stage 6: VAD] Detecting voice activity...")
+        print("=" * 60)
+
+        if os.path.exists(vocals_path):
+            lyrics_lines = self._add_vad_to_words(vocals_path, lyrics_lines)
+        else:
+            for seg in lyrics_lines:
+                for w in seg.get("words", []):
+                    w["voiced"] = 0.0
+
+        if progress_callback:
+            progress_callback(90)
+
+        gc.collect()
+        if self.device == "cuda":
+            torch.cuda.empty_cache()
+
+        # Save and upload
+        output_dir = os.path.join(TEMP_DIR, song_id)
+        os.makedirs(output_dir, exist_ok=True)
+
+        lyrics_path = os.path.join(output_dir, "lyrics.json")
+        with open(lyrics_path, "w", encoding="utf-8") as f:
+            json.dump(lyrics_lines, f, ensure_ascii=False, indent=2)
+
+        s3_key = f"songs/{folder_name}/lyrics.json"
+        lyrics_url = s3_service.upload_file(lyrics_path, s3_key)
+
+        os.remove(lyrics_path)
+        try:
+            os.rmdir(output_dir)
+        except OSError:
+            pass
+
+        if progress_callback:
+            progress_callback(100)
+
+        full_text = " ".join([line["text"] for line in lyrics_lines])
+
+        return {
+            "lyrics_url": lyrics_url,
+            "lyrics": lyrics_lines,
+            "full_text": full_text,
+            "language": detected_language,
+            "duration": duration,
+        }
+
+
+# Singleton - keep old name as alias for backward compatibility
+lyrics_processor = LyricsProcessor()
+whisper_processor = lyrics_processor  # backward compat alias
