@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
@@ -81,11 +81,8 @@ export default function RoomPage() {
     "MjCZfZfucEc", // IVE - Baddie
   ];
 
-  const [bgVideoIndex, setBgVideoIndex] = useState(() => Math.floor(Math.random() * backgroundVideos.length));
+  const [bgVideoId] = useState(() => backgroundVideos[Math.floor(Math.random() * backgroundVideos.length)]);
   const [bgMounted, setBgMounted] = useState(false);
-  const bgPlayerRef = useRef<any>(null);
-  const bgContainerRef = useRef<HTMLDivElement>(null);
-  const bgFailedVideos = useRef(new Set<number>());
 
   const [room, setRoomData] = useState<{
     id: string;
@@ -147,84 +144,10 @@ export default function RoomPage() {
     }
   }, []);
 
-  // YouTube IFrame API 로드 (client-only)
+  // 클라이언트 마운트 후에만 배경 뮤비 렌더링 (SSR hydration 불일치 방지)
   useEffect(() => {
     setBgMounted(true);
-    if (!(window as any).YT) {
-      if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
-        const tag = document.createElement('script');
-        tag.src = 'https://www.youtube.com/iframe_api';
-        document.head.appendChild(tag);
-      }
-    }
   }, []);
-
-  // 배경 뮤비 플레이어 생성/재생성
-  useEffect(() => {
-    if (!bgMounted || !bgContainerRef.current) return;
-
-    const createPlayer = () => {
-      const container = bgContainerRef.current;
-      if (!container) return;
-
-      if (bgPlayerRef.current) {
-        try { bgPlayerRef.current.destroy(); } catch {}
-        bgPlayerRef.current = null;
-      }
-
-      container.innerHTML = '';
-      const playerDiv = document.createElement('div');
-      container.appendChild(playerDiv);
-
-      const videoId = backgroundVideos[bgVideoIndex];
-
-      bgPlayerRef.current = new (window as any).YT.Player(playerDiv, {
-        width: '100%',
-        height: '100%',
-        videoId,
-        playerVars: {
-          autoplay: 1,
-          mute: 1,
-          controls: 0,
-          showinfo: 0,
-          rel: 0,
-          loop: 1,
-          playlist: videoId,
-          modestbranding: 1,
-          playsinline: 1,
-        },
-        events: {
-          onError: () => {
-            bgFailedVideos.current.add(bgVideoIndex);
-            if (bgFailedVideos.current.size < backgroundVideos.length) {
-              let next = (bgVideoIndex + 1) % backgroundVideos.length;
-              while (bgFailedVideos.current.has(next)) {
-                next = (next + 1) % backgroundVideos.length;
-              }
-              setBgVideoIndex(next);
-            }
-          },
-        },
-      });
-    };
-
-    if ((window as any).YT?.Player) {
-      createPlayer();
-    } else {
-      const prev = (window as any).onYouTubeIframeAPIReady;
-      (window as any).onYouTubeIframeAPIReady = () => {
-        prev?.();
-        createPlayer();
-      };
-    }
-
-    return () => {
-      if (bgPlayerRef.current) {
-        try { bgPlayerRef.current.destroy(); } catch {}
-        bgPlayerRef.current = null;
-      }
-    };
-  }, [bgMounted, bgVideoIndex]);
 
   // Auto-play next song when current song finishes
   useEffect(() => {
@@ -492,14 +415,18 @@ export default function RoomPage() {
 
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden relative">
-      {/* 배경 뮤비 (YouTube IFrame API) */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div
-          ref={bgContainerRef}
-          className="absolute top-1/2 left-1/2 w-[150%] h-[150%] -translate-x-1/2 -translate-y-1/2 opacity-60"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/90" />
-      </div>
+      {/* 배경 뮤비 */}
+      {bgMounted && (
+        <div className="fixed inset-0 z-0 pointer-events-none">
+          <iframe
+            src={`https://www.youtube.com/embed/${bgVideoId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&loop=1&playlist=${bgVideoId}&modestbranding=1&playsinline=1`}
+            className="absolute top-1/2 left-1/2 w-[150%] h-[150%] -translate-x-1/2 -translate-y-1/2 opacity-60"
+            allow="autoplay; encrypted-media"
+            title="Background Video"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/90" />
+        </div>
+      )}
 
       {/* 상단 헤더 */}
       <header className="relative z-20 flex items-center justify-between p-4 bg-black/30 backdrop-blur-md border-b border-white/5">
