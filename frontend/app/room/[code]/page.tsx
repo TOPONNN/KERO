@@ -56,6 +56,8 @@ interface TJSong {
   number: string;
   title: string;
   artist: string;
+  composer?: string;
+  lyricist?: string;
 }
 
 export default function RoomPage() {
@@ -149,6 +151,13 @@ export default function RoomPage() {
     setBgMounted(true);
   }, []);
 
+  // Listen for skip forward event from game components
+  useEffect(() => {
+    const handleSkipForward = () => skipToNext();
+    window.addEventListener("kero:skipForward", handleSkipForward);
+    return () => window.removeEventListener("kero:skipForward", handleSkipForward);
+  }, []);
+
   // Auto-play next song when current song finishes
   useEffect(() => {
     if (gameStatus === "finished") {
@@ -175,6 +184,8 @@ export default function RoomPage() {
       addedBy: userName,
       status: "processing",
       tjNumber: song.number,
+      composer: song.composer,
+      lyricist: song.lyricist,
     }));
     
     setShowAddSong(false);
@@ -297,6 +308,8 @@ export default function RoomPage() {
         instrumentalUrl: song.instrumentalUrl,
         vocalUrl: song.vocalsUrl,
         videoId: queueItem.videoId,
+        composer: queueItem.composer,
+        lyricist: queueItem.lyricist,
         lyrics: song.lyrics?.map((l: any) => ({
           startTime: l.startTime ?? l.start_time,
           endTime: l.endTime ?? l.end_time,
@@ -305,6 +318,11 @@ export default function RoomPage() {
             startTime: w.startTime ?? w.start_time,
             endTime: w.endTime ?? w.end_time,
             text: w.text,
+            energy: w.energy,
+            pitch: w.pitch,
+            note: w.note,
+            midi: w.midi,
+            voiced: w.voiced,
           })),
         })) || [],
       }));

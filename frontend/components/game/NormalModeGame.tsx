@@ -49,6 +49,16 @@ export default function NormalModeGame() {
   const [audioLoaded, setAudioLoaded] = useState(false);
   const [audioDuration, setAudioDuration] = useState<number>(0);
 
+  // Score system
+  const [score, setScore] = useState(0);
+  const [combo, setCombo] = useState(0);
+  const [lastScorePopup, setLastScorePopup] = useState<{ points: number; key: number } | null>(null);
+  const scoredWordsRef = useRef<Set<string>>(new Set());
+  const comboRef = useRef(0);
+  const scoreRef = useRef(0);
+  const isMicOnRef = useRef(isMicOn);
+  isMicOnRef.current = isMicOn;
+
   const lyrics: LyricsLine[] = currentSong?.lyrics || [];
   const audioUrl = currentSong?.instrumentalUrl || currentSong?.audioUrl;
   const videoId = currentSong?.videoId;
@@ -201,6 +211,35 @@ export default function NormalModeGame() {
           setCurrentLyricIndex(newIndex);
         }
         
+        // Score: check current word and award points
+        const lineIdx = newIndex >= 0 ? newIndex : currentLyricIndex;
+        if (lineIdx >= 0) {
+          const line = lyrics[lineIdx];
+          if (line?.words) {
+            const wordIdx = line.words.findIndex(w => time >= w.startTime && time <= w.endTime);
+            if (wordIdx >= 0) {
+              const wordKey = `${lineIdx}-${wordIdx}`;
+              if (!scoredWordsRef.current.has(wordKey)) {
+                scoredWordsRef.current.add(wordKey);
+                if (isMicOnRef.current) {
+                  const word = line.words[wordIdx];
+                  const energy = word.energy ?? 0.5;
+                  const comboMult = Math.min(2, 1 + comboRef.current * 0.1);
+                  const points = Math.round(10 * energy * comboMult);
+                  comboRef.current += 1;
+                  scoreRef.current += points;
+                  setScore(scoreRef.current);
+                  setCombo(comboRef.current);
+                  setLastScorePopup({ points, key: Date.now() });
+                } else {
+                  comboRef.current = 0;
+                  setCombo(0);
+                }
+              }
+            }
+          }
+        }
+        
         // Redux 업데이트는 덜 자주 (성능)
         if (Math.floor(time * 10) !== Math.floor(lastTimeRef.current * 10)) {
           dispatch(updateCurrentTime(time));
@@ -257,6 +296,12 @@ export default function NormalModeGame() {
     audioRef.current.currentTime = 0;
     setLocalTime(0);
     setCurrentLyricIndex(-1);
+    setScore(0);
+    setCombo(0);
+    setLastScorePopup(null);
+    scoreRef.current = 0;
+    comboRef.current = 0;
+    scoredWordsRef.current.clear();
   }, []);
 
   const handleMicToggle = () => {
@@ -395,13 +440,13 @@ export default function NormalModeGame() {
             className="absolute inset-0 z-20 flex flex-col items-center justify-center"
           >
             {/* Pink Banner */}
-            <div className="w-[85%] max-w-5xl bg-[#C25E8C]/90 backdrop-blur-sm rounded-[2rem] p-10 pb-14 shadow-2xl flex flex-col items-center text-center relative overflow-hidden border border-white/10">
+            <div className="w-[95%] sm:w-[85%] max-w-5xl bg-[#C25E8C]/90 backdrop-blur-sm rounded-[2rem] p-5 pb-8 sm:p-8 sm:pb-12 md:p-10 md:pb-14 shadow-2xl flex flex-col items-center text-center relative overflow-hidden border border-white/10">
               <div className="absolute top-0 left-0 w-full h-1 bg-white/30" />
               
-              <h1 className="text-5xl md:text-7xl font-bold text-white mb-4 tracking-tight drop-shadow-md">
+              <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold text-white mb-4 tracking-tight drop-shadow-md">
                 {currentSong.title}
               </h1>
-              <p className="text-2xl md:text-3xl text-white/90 font-medium">
+              <p className="text-lg sm:text-2xl md:text-3xl text-white/90 font-medium">
                 {currentSong.artist}
               </p>
 
@@ -410,26 +455,26 @@ export default function NormalModeGame() {
             </div>
 
             {/* Info Row */}
-            <div className="mt-8 flex items-center bg-black/80 backdrop-blur-md rounded-xl border border-white/20 overflow-hidden shadow-xl">
-               <div className="px-8 py-4 flex flex-col items-center min-w-[120px]">
-                 <span className="text-yellow-400 text-sm font-bold mb-1">현재음정</span>
-                 <span className="text-white font-bold text-xl">{currentPitch || "원키"}</span>
+            <div className="mt-8 flex items-center bg-black/80 backdrop-blur-md rounded-xl border border-white/20 overflow-x-auto overflow-y-hidden shadow-xl max-w-full">
+               <div className="px-4 py-2 sm:px-6 sm:py-3 md:px-8 md:py-4 flex flex-col items-center min-w-[80px] sm:min-w-[100px] md:min-w-[120px]">
+                 <span className="text-yellow-400 text-xs sm:text-sm font-bold mb-1">현재음정</span>
+                 <span className="text-white font-bold text-base sm:text-lg md:text-xl">{currentPitch || "원키"}</span>
                </div>
-               <div className="w-px h-12 bg-white/20" />
-               <div className="px-8 py-4 flex flex-col items-center min-w-[120px]">
-                 <span className="text-yellow-400 text-sm font-bold mb-1">원음정</span>
-                 <span className="text-white font-bold text-xl">원키</span>
+               <div className="w-px h-8 sm:h-10 md:h-12 bg-white/20" />
+               <div className="px-4 py-2 sm:px-6 sm:py-3 md:px-8 md:py-4 flex flex-col items-center min-w-[80px] sm:min-w-[100px] md:min-w-[120px]">
+                 <span className="text-yellow-400 text-xs sm:text-sm font-bold mb-1">원음정</span>
+                 <span className="text-white font-bold text-base sm:text-lg md:text-xl">원키</span>
                </div>
-               <div className="w-px h-12 bg-white/20" />
-               <div className="px-8 py-4 flex flex-col items-center min-w-[120px]">
-                 <span className="text-yellow-400 text-sm font-bold mb-1">작사</span>
-                 <span className="text-white font-bold text-xl line-clamp-1 max-w-[150px]">{currentSong.artist}</span>
-               </div>
-               <div className="w-px h-12 bg-white/20" />
-               <div className="px-8 py-4 flex flex-col items-center min-w-[120px]">
-                 <span className="text-yellow-400 text-sm font-bold mb-1">작곡</span>
-                 <span className="text-white font-bold text-xl line-clamp-1 max-w-[150px]">{currentSong.artist}</span>
-               </div>
+               <div className="w-px h-8 sm:h-10 md:h-12 bg-white/20" />
+               <div className="px-4 py-2 sm:px-6 sm:py-3 md:px-8 md:py-4 flex flex-col items-center min-w-[80px] sm:min-w-[100px] md:min-w-[120px]">
+                  <span className="text-yellow-400 text-xs sm:text-sm font-bold mb-1">작사</span>
+                  <span className="text-white font-bold text-base sm:text-lg md:text-xl line-clamp-1 max-w-[150px]">{currentSong.lyricist || currentSong.artist}</span>
+                </div>
+                <div className="w-px h-8 sm:h-10 md:h-12 bg-white/20" />
+                <div className="px-4 py-2 sm:px-6 sm:py-3 md:px-8 md:py-4 flex flex-col items-center min-w-[80px] sm:min-w-[100px] md:min-w-[120px]">
+                  <span className="text-yellow-400 text-xs sm:text-sm font-bold mb-1">작곡</span>
+                  <span className="text-white font-bold text-base sm:text-lg md:text-xl line-clamp-1 max-w-[150px]">{currentSong.composer || currentSong.artist}</span>
+                </div>
             </div>
 
              {/* TJ Branding */}
@@ -440,12 +485,53 @@ export default function NormalModeGame() {
         )}
       </AnimatePresence>
 
+      {/* Score Overlay */}
+      <AnimatePresence>
+        {gamePhase === 'singing' && score > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="absolute top-4 right-4 sm:top-6 sm:right-6 z-20 flex flex-col items-end gap-1"
+          >
+            <motion.div
+              key={score}
+              animate={{ scale: [1.08, 1] }}
+              transition={{ duration: 0.15 }}
+              className="bg-black/40 backdrop-blur-sm rounded-xl px-3 py-1.5 sm:px-4 sm:py-2 flex items-center gap-3 border border-white/10"
+            >
+              <span className="text-white/60 text-xs font-medium tracking-wider uppercase">Score</span>
+              <span className="text-white font-bold text-base sm:text-lg tabular-nums">{score.toLocaleString()}</span>
+              {combo >= 3 && (
+                <span className="text-cyan-400 text-xs font-bold ml-1">
+                  x{Math.min(2, 1 + combo * 0.1).toFixed(1)}
+                </span>
+              )}
+            </motion.div>
+            <AnimatePresence mode="popLayout">
+              {lastScorePopup && (
+                <motion.div
+                  key={lastScorePopup.key}
+                  initial={{ opacity: 1, y: 0 }}
+                  animate={{ opacity: 0, y: -16 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.6 }}
+                  className="text-cyan-300 text-sm font-bold pr-2"
+                >
+                  +{lastScorePopup.points}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* 3. Lyrics Display (Singing Phase) */}
       <AnimatePresence>
         {gamePhase === 'singing' && !isInterlude && (
-          <div className="absolute bottom-[25%] left-0 right-0 z-20 px-8 md:px-16 flex flex-col gap-12 w-full max-w-7xl mx-auto">
+          <div className="absolute bottom-[20%] sm:bottom-[25%] left-0 right-0 z-20 px-4 sm:px-8 md:px-16 flex flex-col gap-6 sm:gap-8 md:gap-12 w-full max-w-7xl mx-auto">
              {/* Current Line */}
-             <div className="self-start pl-4 md:pl-10 relative">
+             <div className="self-start pl-2 sm:pl-4 md:pl-10 relative">
                {currentLine && (
                  <motion.div 
                     key={`line-${currentLyricIndex}`}
@@ -460,7 +546,7 @@ export default function NormalModeGame() {
                        return line.words.map((word, i) => {
                          const progress = getWordProgressInLine(line, i);
                          return (
-                            <span key={i} className="relative block text-4xl md:text-5xl lg:text-6xl font-black">
+                            <span key={i} className="relative block text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-black">
                                <span className="text-white relative z-10" style={{ WebkitTextStroke: '2px rgba(0,0,0,0.8)', paintOrder: 'stroke fill' }}>{word.text}</span>
                                <span className="absolute left-0 top-0 text-cyan-400 overflow-hidden whitespace-nowrap z-20" style={{ width: `${progress}%`, WebkitTextStroke: '2px rgba(0,0,0,0.8)', paintOrder: 'stroke fill' }}>{word.text}</span>
                             </span>
@@ -468,7 +554,7 @@ export default function NormalModeGame() {
                        });
                      } else {
                         return (
-                          <div className="relative text-6xl font-black">
+                          <div className="relative text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-black">
                              <span className="text-white" style={{ WebkitTextStroke: '2px rgba(0,0,0,0.8)', paintOrder: 'stroke fill' }}>{line.text}</span>
                              <span className="absolute left-0 top-0 text-cyan-400 overflow-hidden whitespace-nowrap" style={{ width: `${getLineProgress(line)}%`, WebkitTextStroke: '2px rgba(0,0,0,0.8)', paintOrder: 'stroke fill' }}>{line.text}</span>
                          </div>
@@ -480,10 +566,10 @@ export default function NormalModeGame() {
              </div>
 
              {/* Next Line */}
-             <div className="self-end pr-4 md:pr-10 opacity-70">
+             <div className="self-end pr-2 sm:pr-4 md:pr-10 opacity-70">
                 {nextLine && (
                    <div 
-                     className="text-4xl md:text-5xl font-black text-white" 
+                     className="text-xl sm:text-2xl md:text-3xl lg:text-4xl md:text-5xl font-black text-white" 
                      style={{ 
                        WebkitTextStroke: '2px rgba(0,0,0,0.8)', 
                        paintOrder: 'stroke fill',
@@ -508,7 +594,7 @@ export default function NormalModeGame() {
              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30"
            >
               <div className="bg-black/40 backdrop-blur-sm px-10 py-4 rounded-full border border-white/20">
-                 <span className="text-4xl md:text-5xl font-bold text-cyan-300 animate-pulse tracking-widest drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">
+                 <span className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-cyan-300 animate-pulse tracking-widest drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">
                    ♪ 간 주 중 ♪
                  </span>
               </div>
@@ -517,10 +603,10 @@ export default function NormalModeGame() {
       </AnimatePresence>
 
       {/* 5. Bottom Controls */}
-      <div className="absolute bottom-0 left-0 right-0 z-30 px-6 py-6 pb-8 bg-gradient-to-t from-black via-black/80 to-transparent">
+      <div className="absolute bottom-0 left-0 right-0 z-30 px-3 py-3 pb-4 sm:px-4 sm:py-4 md:px-6 md:py-6 md:pb-8 bg-gradient-to-t from-black via-black/80 to-transparent">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-4 mb-4">
-            <span className="text-xs text-gray-400 font-mono w-10 text-right">{formatTime(localTime)}</span>
+            <span className="text-[10px] sm:text-xs text-gray-400 font-mono w-8 sm:w-10 text-right">{formatTime(localTime)}</span>
             <div
               className="flex-1 h-1.5 bg-white/20 rounded-full cursor-pointer group hover:h-2 transition-all"
               onClick={handleSeek}
@@ -532,7 +618,7 @@ export default function NormalModeGame() {
                 <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity scale-0 group-hover:scale-100" />
               </div>
             </div>
-            <span className="text-xs text-gray-400 font-mono w-10">{formatTime(duration)}</span>
+            <span className="text-[10px] sm:text-xs text-gray-400 font-mono w-8 sm:w-10">{formatTime(duration)}</span>
           </div>
 
           <div className="flex items-center justify-between">
@@ -604,7 +690,10 @@ export default function NormalModeGame() {
                   {isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current ml-1" />}
                 </button>
                 
-                <button className="p-2 text-white/60 hover:text-white transition-colors">
+                <button 
+                  onClick={() => window.dispatchEvent(new Event("kero:skipForward"))}
+                  className="p-2 text-white/60 hover:text-white transition-colors"
+                >
                   <SkipForward className="w-6 h-6" />
                 </button>
               </div>
@@ -613,6 +702,33 @@ export default function NormalModeGame() {
           </div>
         </div>
       </div>
+
+       {/* Final Score */}
+       <AnimatePresence>
+         {status === 'finished' && score > 0 && (
+           <motion.div
+             initial={{ opacity: 0, scale: 0.9 }}
+             animate={{ opacity: 1, scale: 1 }}
+             exit={{ opacity: 0 }}
+             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40"
+           >
+             <div className="bg-black/60 backdrop-blur-md rounded-2xl px-6 py-5 sm:px-8 sm:py-6 md:px-12 md:py-8 border border-white/15 flex flex-col items-center gap-3 shadow-2xl">
+               <span className="text-white/50 text-sm font-medium tracking-widest uppercase">최종 점수</span>
+               <motion.span
+                 initial={{ scale: 0.5 }}
+                 animate={{ scale: 1 }}
+                 transition={{ type: "spring", damping: 12 }}
+                 className="text-white font-black text-3xl sm:text-4xl md:text-5xl tabular-nums"
+               >
+                 {score.toLocaleString()}
+               </motion.span>
+               {combo >= 3 && (
+                 <span className="text-cyan-400/80 text-sm font-medium">최고 콤보 달성!</span>
+               )}
+             </div>
+           </motion.div>
+         )}
+       </AnimatePresence>
 
        {/* Error Toast */}
        {audioError && (

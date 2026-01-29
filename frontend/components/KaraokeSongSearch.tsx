@@ -12,6 +12,8 @@ interface TJSong {
   title: string;
   artist: string;
   country?: string;
+  composer?: string;
+  lyricist?: string;
 }
 
 interface KaraokeSongSearchProps {

@@ -51,6 +51,8 @@ interface QueuedSong {
   processingProgress?: number;
   processingMessage?: string;
   errorMessage?: string;
+  composer?: string;
+  lyricist?: string;
 }
 
 interface GameState {
@@ -68,6 +70,8 @@ interface GameState {
     lyrics: LyricsLine[];
     pitchData?: { time: number; frequency: number; note: string; midi: number }[];
     videoId?: string;
+    composer?: string;
+    lyricist?: string;
   } | null;
   currentTime: number;
   currentLyricIndex: number;
