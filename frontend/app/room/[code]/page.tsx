@@ -264,44 +264,60 @@ export default function RoomPage() {
     }
   };
 
-  const pollSongStatus = useCallback(async (queueId: string, songId: string) => {
-    const checkStatus = async () => {
-      try {
-        const res = await fetch(`/api/songs/${songId}/status`);
-        const data = await res.json();
-        
-        if (!data.success) return;
-        
-        const statusData = data.data;
-        
-        if (statusData.status === "completed") {
-          dispatch(updateQueueItem({ id: queueId, updates: { status: "ready" } }));
-        } else if (statusData.status === "failed") {
-          dispatch(updateQueueItem({ 
-            id: queueId, 
-            updates: { 
-              status: "failed",
-              errorMessage: statusData.message || "처리 중 오류가 발생했습니다"
-            } 
-          }));
-        } else {
-          dispatch(updateQueueItem({ 
-            id: queueId, 
-            updates: { 
-              processingStep: statusData.step,
-              processingProgress: statusData.progress,
-              processingMessage: statusData.message,
-            } 
-          }));
-          setTimeout(() => checkStatus(), 2000);
-        }
-      } catch (e) {
-        setTimeout(() => checkStatus(), 5000);
-      }
-    };
-    
-    checkStatus();
-  }, [dispatch]);
+   const pollSongStatus = useCallback(async (queueId: string, songId: string) => {
+     let retryCount = 0;
+     const maxRetries = 30;
+     
+     const checkStatus = async () => {
+       try {
+         const res = await fetch(`/api/songs/${songId}/status`);
+         const data = await res.json();
+         
+         if (!data.success) {
+           // Retry on API error instead of silently stopping
+           if (retryCount < maxRetries) {
+             retryCount++;
+             setTimeout(() => checkStatus(), 5000);
+           }
+           return;
+         }
+         
+         // Reset retry count on successful API response
+         retryCount = 0;
+         
+         const statusData = data.data;
+         
+         if (statusData.status === "completed") {
+           dispatch(updateQueueItem({ id: queueId, updates: { status: "ready" } }));
+         } else if (statusData.status === "failed") {
+           dispatch(updateQueueItem({ 
+             id: queueId, 
+             updates: { 
+               status: "failed",
+               errorMessage: statusData.message || "처리 중 오류가 발생했습니다"
+             } 
+           }));
+         } else {
+           dispatch(updateQueueItem({ 
+             id: queueId, 
+             updates: { 
+               processingStep: statusData.step,
+               processingProgress: statusData.progress,
+               processingMessage: statusData.message,
+             } 
+           }));
+           setTimeout(() => checkStatus(), 2000);
+         }
+       } catch (e) {
+         if (retryCount < maxRetries) {
+           retryCount++;
+           setTimeout(() => checkStatus(), 5000);
+         }
+       }
+     };
+     
+     checkStatus();
+   }, [dispatch]);
 
   const playSong = async (queueItem: typeof songQueue[0]) => {
     if (queueItem.status !== "ready" || !queueItem.songId) return;

@@ -184,13 +184,40 @@ export class SongService {
     const existingSong = await this.findByVideoId(videoId);
     console.log(`[createFromYouTube] existingSong:`, existingSong ? `id=${existingSong.id}, status=${existingSong.processingStatus}` : 'null');
     
-    if (existingSong && existingSong.processingStatus === ProcessingStatus.COMPLETED) {
-      console.log(`[createFromYouTube] Returning existing COMPLETED song: ${existingSong.id}`);
-      return existingSong;
-    }
-
-    if (existingSong && existingSong.processingStatus === ProcessingStatus.PROCESSING) {
-      console.log(`[createFromYouTube] Returning existing PROCESSING song: ${existingSong.id}`);
+    if (existingSong) {
+      if (existingSong.processingStatus === ProcessingStatus.COMPLETED) {
+        console.log(`[createFromYouTube] Returning existing COMPLETED song: ${existingSong.id}`);
+        return existingSong;
+      }
+      
+      if (existingSong.processingStatus === ProcessingStatus.PROCESSING || 
+          existingSong.processingStatus === ProcessingStatus.PENDING) {
+        console.log(`[createFromYouTube] Returning existing ${existingSong.processingStatus} song: ${existingSong.id}`);
+        return existingSong;
+      }
+      
+      // FAILED — reprocess the existing song
+      console.log(`[createFromYouTube] Reprocessing FAILED song: ${existingSong.id}`);
+      existingSong.processingStatus = ProcessingStatus.PENDING;
+      existingSong.vocalsUrl = undefined;
+      existingSong.instrumentalUrl = undefined;
+      existingSong.duration = undefined;
+      await songRepository.save(existingSong);
+      
+      // Clean up old lyrics
+      await lyricsRepository.delete({ songId: existingSong.id });
+      await quizRepository.delete({ songId: existingSong.id });
+      
+      await publishMessage(QUEUES.AUDIO_PROCESSING, {
+        songId: existingSong.id,
+        videoId: videoId,
+        title: title,
+        artist: artist,
+        source: "youtube",
+        tasks: ["download", "separate", "lyrics", "pitch"],
+        callbackUrl: `${process.env.API_URL}/api/songs/${existingSong.id}/processing-callback`,
+      });
+      
       return existingSong;
     }
 

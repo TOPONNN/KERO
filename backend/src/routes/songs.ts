@@ -149,16 +149,17 @@ router.get("/:id", async (req: Request, res: Response) => {
               endTime: l.end_time ?? l.endTime,
               text: l.text,
               lineOrder: idx,
-               words: l.words?.map((w: any) => ({
-                 startTime: w.start_time ?? w.startTime,
-                 endTime: w.end_time ?? w.endTime,
-                 text: w.text,
-                 energy: w.energy,
-                 pitch: w.pitch,
-                 note: w.note,
-                 midi: w.midi,
-                 voiced: w.voiced,
-               })),
+                words: l.words?.map((w: any) => ({
+                  startTime: w.start_time ?? w.startTime,
+                  endTime: w.end_time ?? w.endTime,
+                  text: w.text,
+                  energy: w.energy,
+                  pitch: w.pitch,
+                  note: w.note,
+                  midi: w.midi,
+                  voiced: w.voiced,
+                  energyCurve: w.energy_curve ?? w.energyCurve,
+                })),
             }));
           }
           if (results.lyrics?.duration) {

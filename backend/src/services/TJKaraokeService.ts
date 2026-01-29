@@ -120,13 +120,22 @@ export class TJKaraokeService {
         return [];
       }
 
-      return data.resultData.items.map((item: any) => ({
+      const songs = data.resultData.items.map((item: any) => ({
         number: String(item.pro),
         title: String(item.indexTitle || ""),
         artist: String(item.indexSong || ""),
         composer: String(item.com || ""),
         lyricist: "",
       })).filter((song: TJSong) => song.number && song.title);
+
+      // Deduplicate by normalized title+artist (keep first/higher-ranked entry)
+      const seen = new Set<string>();
+      return songs.filter((song: TJSong) => {
+        const key = (song.title + '|' + song.artist).replace(/\s/g, '').toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
     } catch (error) {
       console.error("TJ Media chart fetch error:", error);
       return [];
