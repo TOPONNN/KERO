@@ -37,7 +37,7 @@ class CrepeProcessor:
                 hop_length=160,       # Keep 10ms for real-time scoring
                 fmin=65,              # C2 - lowest practical singing note
                 fmax=1047,            # C6 - highest practical singing note
-                model='small',        # Good accuracy, much faster than full
+                model='tiny',         # Fast model, sufficient for karaoke scoring
                 device=self.device,
                 return_periodicity=True,
             )
