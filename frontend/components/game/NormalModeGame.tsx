@@ -27,7 +27,7 @@ interface LyricsLine {
 
 // 노래방 싱크 설정 상수
 const SYNC_CONFIG = {
-  WORD_LEAD_TIME: 0.03,        // 단어 하이라이트가 미리 시작하는 시간 (초)
+  WORD_LEAD_TIME: 0.08,        // 단어 하이라이트가 미리 시작하는 시간 (초)
   NEXT_LINE_PREVIEW: 0.5,      // 다음 가사 미리보기 시간 (초)
   LINE_HOLD_AFTER_END: 0.5,    // 가사가 끝난 후 유지 시간 (초)
 };
@@ -59,8 +59,8 @@ export default function NormalModeGame() {
   const findCurrentLyricIndex = useCallback((time: number): number => {
     if (lyrics.length === 0) return -1;
     
-    // 첫 번째 가사 시작 전이면 -1 반환
-    if (time < lyrics[0].startTime - 0.5) return -1;
+    // 첫 번째 가사 시작 전: 첫 번째 가사를 미리 보여줌 (인덱스 0 반환)
+    if (time < lyrics[0].startTime) return 0;
     
     for (let i = 0; i < lyrics.length; i++) {
       const line = lyrics[i];
@@ -72,24 +72,33 @@ export default function NormalModeGame() {
       }
       
       // 현재 라인 끝났지만 다음 라인 시작 전 (갭 구간)
-      if (time > line.endTime && nextLine && time < nextLine.startTime) {
-        // Short gap: hold current line briefly after it ends
-        if (nextLine.startTime - line.endTime <= 2.0) {
-          // Only hold for LINE_HOLD_AFTER_END seconds after line ends
-          if (time <= line.endTime + SYNC_CONFIG.LINE_HOLD_AFTER_END) {
+      if (time > line.endTime) {
+        // 다음 라인이 있는 경우
+        if (nextLine && time < nextLine.startTime) {
+           const gapDuration = nextLine.startTime - line.endTime;
+           
+           // 라인이 끝나고 잠시 유지 (LINE_HOLD_AFTER_END)
+           if (time <= line.endTime + SYNC_CONFIG.LINE_HOLD_AFTER_END) {
+             return i;
+           }
+           
+           // 짧은 갭 (3초 이하): 다음 가사를 미리 보여줌 (Preview)
+           if (gapDuration <= 3.0) {
+             return i + 1;
+           }
+           
+           // 긴 갭 (> 3초, 간주 등): 점 3개 애니메이션 표시
+           return -1;
+        }
+        
+        // 마지막 라인인 경우
+        if (!nextLine) {
+          // 끝난 후 2초까지만 마지막 라인 표시
+          if (time <= line.endTime + 2.0) {
             return i;
           }
+          return -1;
         }
-        return -1;
-      }
-      
-      // 마지막 라인 이후
-      if (!nextLine && time > line.endTime) {
-        // 끝난 후 2초까지만 마지막 라인 표시
-        if (time <= line.endTime + 2.0) {
-          return i;
-        }
-        return -1;
       }
     }
     
@@ -255,7 +264,7 @@ export default function NormalModeGame() {
     
     // Energy-based easing: words with higher energy fill faster at the start
     const energy = word.energy ?? 0.5;
-    const exponent = 1 / (0.5 + energy);
+    const exponent = 1 / (0.8 + energy * 0.4);
     const easedProgress = Math.pow(linearProgress / 100, exponent) * 100;
     
     return Math.min(100, Math.max(0, easedProgress));
