@@ -73,6 +73,9 @@ export default function LyricsQuizGame() {
    const [ordering, setOrdering] = useState<number[]>([]);
    const [textAnswer, setTextAnswer] = useState("");
    const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null);
+   const [correctCount, setCorrectCount] = useState(0);
+   const [wrongCount, setWrongCount] = useState(0);
+   const [maxStreakLocal, setMaxStreakLocal] = useState(0);
 
   const currentQuestion = quizQuestions[currentQuestionIndex];
 
@@ -188,13 +191,21 @@ export default function LyricsQuizGame() {
       setShowResults(true);
       
       const myResult = roundResults.find(r => r.odId === "local" || r.odName === "나");
+      const remoteResult = roundResults.find(r => r.odId !== "local" && r.odName !== "나");
       if (myResult) {
         if (myResult.isCorrect) {
+          const newStreak = streakRef.current + 1;
+          setCorrectCount(prev => prev + 1);
           setLocalScore(prev => prev + myResult.points);
-          dispatch(updateStreak(streakRef.current + 1));
+          dispatch(updateStreak(newStreak));
+          if (newStreak > maxStreakLocal) setMaxStreakLocal(newStreak);
         } else {
+          setWrongCount(prev => prev + 1);
           dispatch(updateStreak(0));
         }
+      } else if (remoteResult) {
+        // Force-advanced by another player, we didn't answer
+        setWrongCount(prev => prev + 1);
       }
 
       const advanceDelay = myResult?.isCorrect ? 2000 : 4000;
@@ -338,6 +349,9 @@ export default function LyricsQuizGame() {
       
       // Reset local state
       setLocalScore(0);
+      setCorrectCount(0);
+      setWrongCount(0);
+      setMaxStreakLocal(0);
       setSubmitted(false);
       setShowResults(false);
       setTimeLeft(20);
@@ -576,96 +590,143 @@ export default function LyricsQuizGame() {
     }
   };
 
-  if (!currentQuestion) {
-     const sortedParticipants = [...participants].sort((a, b) => {
-      const scoreA = scores.find(s => s.odId === a.id)?.score || 0;
-      const scoreB = scores.find(s => s.odId === b.id)?.score || 0;
-      return scoreB - scoreA;
-    });
-
+   if (!currentQuestion) {
     return (
       <div className="fixed inset-0 bg-[#46178F] flex items-center justify-center p-8 overflow-hidden">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="relative z-10 w-full max-w-4xl bg-white/10 backdrop-blur-xl rounded-3xl border border-white/20 p-12 text-center shadow-2xl"
+          className="relative z-10 w-full max-w-2xl bg-white/10 backdrop-blur-xl rounded-3xl border border-white/20 p-10 text-center shadow-2xl"
         >
-          <Trophy className="w-32 h-32 text-[#FFD700] mx-auto mb-6 drop-shadow-[0_0_20px_rgba(255,215,0,0.5)]" />
-          <h2 className="text-5xl font-black text-white mb-2">게임 종료!</h2>
-          {currentSong && (
-            <p className="text-xl text-white/70 mb-10">{currentSong.title} - {currentSong.artist}</p>
-          )}
+          <Trophy className="w-24 h-24 text-[#FFD700] mx-auto mb-4 drop-shadow-[0_0_20px_rgba(255,215,0,0.5)]" />
+          <h2 className="text-5xl font-black text-white mb-8">게임 종료!</h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end mb-12 min-h-[300px]">
-            <div className="order-2 md:order-1 flex flex-col items-center">
-               <div className="w-20 h-20 rounded-full bg-gray-300 border-4 border-white mb-4 flex items-center justify-center text-3xl font-bold text-gray-700 shadow-lg">
-                 {sortedParticipants[1]?.nickname?.charAt(0) || "?"}
-               </div>
-               <div className="w-full bg-gray-300/80 rounded-t-lg h-40 flex flex-col items-center justify-center p-4 shadow-lg backdrop-blur-sm">
-                 <span className="text-2xl font-bold text-gray-800">2nd</span>
-                 <span className="text-lg text-gray-700 truncate max-w-full">{sortedParticipants[1]?.nickname || "-"}</span>
-                 <span className="font-mono font-bold">{scores.find(s => s.odId === sortedParticipants[1]?.id)?.score || 0}</span>
-               </div>
-            </div>
+          {/* Score */}
+          <motion.div 
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2, type: "spring" }}
+            className="mb-8"
+          >
+            <span className="text-7xl font-black text-[#FFD700] drop-shadow-[0_0_20px_rgba(255,215,0,0.3)]">
+              {localScore.toLocaleString()}
+            </span>
+            <p className="text-xl text-white/60 mt-1">점</p>
+          </motion.div>
 
-            <div className="order-1 md:order-2 flex flex-col items-center z-20">
-               <div className="w-24 h-24 rounded-full bg-[#FFD700] border-4 border-white mb-4 flex items-center justify-center text-4xl font-bold text-yellow-800 shadow-[0_0_30px_rgba(255,215,0,0.6)]">
-                 {sortedParticipants[0]?.nickname?.charAt(0) || "👑"}
-               </div>
-               <div className="w-full bg-[#FFD700]/90 rounded-t-lg h-56 flex flex-col items-center justify-center p-4 shadow-[0_0_30px_rgba(255,215,0,0.3)] backdrop-blur-sm">
-                 <span className="text-4xl font-black text-yellow-900 mb-2">1st</span>
-                 <span className="text-xl font-bold text-yellow-900 truncate max-w-full">{sortedParticipants[0]?.nickname || "Winner"}</span>
-                 <span className="text-2xl font-mono font-black text-yellow-900">{scores.find(s => s.odId === sortedParticipants[0]?.id)?.score || 0}</span>
-               </div>
-            </div>
-
-            <div className="order-3 flex flex-col items-center">
-               <div className="w-20 h-20 rounded-full bg-[#CD7F32] border-4 border-white mb-4 flex items-center justify-center text-3xl font-bold text-amber-900 shadow-lg">
-                 {sortedParticipants[2]?.nickname?.charAt(0) || "?"}
-               </div>
-               <div className="w-full bg-[#CD7F32]/80 rounded-t-lg h-32 flex flex-col items-center justify-center p-4 shadow-lg backdrop-blur-sm">
-                 <span className="text-2xl font-bold text-amber-900">3rd</span>
-                 <span className="text-lg text-amber-900 truncate max-w-full">{sortedParticipants[2]?.nickname || "-"}</span>
-                 <span className="font-mono font-bold text-amber-900">{scores.find(s => s.odId === sortedParticipants[2]?.id)?.score || 0}</span>
-               </div>
-            </div>
+          {/* Stats Grid */}
+          <div className="grid grid-cols-3 gap-4 mb-8">
+            <motion.div 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="bg-[#26890C]/30 rounded-2xl p-4 border border-[#26890C]/30"
+            >
+              <div className="text-4xl font-black text-[#26890C]">{correctCount}</div>
+              <div className="text-sm text-white/60 mt-1">정답</div>
+            </motion.div>
+            <motion.div 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              className="bg-[#E21B3C]/30 rounded-2xl p-4 border border-[#E21B3C]/30"
+            >
+              <div className="text-4xl font-black text-[#E21B3C]">{wrongCount}</div>
+              <div className="text-sm text-white/60 mt-1">오답</div>
+            </motion.div>
+            <motion.div 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="bg-[#1368CE]/30 rounded-2xl p-4 border border-[#1368CE]/30"
+            >
+              <div className="text-4xl font-black text-[#1368CE]">
+                {correctCount + wrongCount > 0 ? Math.round((correctCount / (correctCount + wrongCount)) * 100) : 0}%
+              </div>
+              <div className="text-sm text-white/60 mt-1">정답률</div>
+            </motion.div>
           </div>
 
-           <div className="bg-white/10 rounded-2xl p-6 flex items-center justify-between">
-             <span className="text-xl text-white/80">내 점수</span>
-             <span className="text-4xl font-bold text-[#FFD700]">{localScore.toLocaleString()}점</span>
-           </div>
+          {/* Additional Stats */}
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.6 }}
+            className="flex justify-center gap-6 mb-8 text-white/70"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🔥</span>
+              <span className="font-bold">최대 연속 정답: {maxStreakLocal}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xl">📝</span>
+              <span className="font-bold">총 {quizQuestions.length}문제</span>
+            </div>
+          </motion.div>
 
-           <div className="flex gap-4 mt-8">
-             <button
-               onClick={goToWaitingRoom}
-               className="flex-1 py-4 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-lg transition-colors flex items-center justify-center gap-2 border border-white/10"
-             >
-               <ArrowLeft className="w-5 h-5" />
-               대기실로
-             </button>
-             <button
-               onClick={restartQuiz}
-               disabled={isRestarting}
-               className="flex-1 py-4 rounded-xl bg-[#FFD700] hover:bg-[#FFC800] text-[#46178F] font-bold text-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-             >
-               {isRestarting ? (
-                 <>
-                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#46178F]"></div>
-                   생성 중...
-                 </>
-               ) : (
-                 <>
-                   <RotateCcw className="w-5 h-5" />
-                   다시 하기
-                 </>
-               )}
-             </button>
-           </div>
-         </motion.div>
-       </div>
-     );
+          {/* Participants leaderboard (if multiplayer) */}
+          {participants.length > 1 && (
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.7 }}
+              className="bg-white/5 rounded-2xl p-4 mb-8 border border-white/10"
+            >
+              <h3 className="text-lg font-bold text-white/80 mb-3 flex items-center justify-center gap-2">
+                <Users className="w-5 h-5" /> 참가자
+              </h3>
+              <div className="space-y-2">
+                {[...participants].sort((a, b) => {
+                  const scoreA = scores.find(s => s.odId === a.id)?.score || 0;
+                  const scoreB = scores.find(s => s.odId === b.id)?.score || 0;
+                  return scoreB - scoreA;
+                }).map((p, idx) => (
+                  <div key={p.id} className="flex items-center justify-between px-4 py-2 rounded-lg bg-white/5">
+                    <div className="flex items-center gap-3">
+                      <span className={`text-lg font-black ${idx === 0 ? 'text-[#FFD700]' : idx === 1 ? 'text-gray-300' : idx === 2 ? 'text-[#CD7F32]' : 'text-white/50'}`}>
+                        {idx + 1}
+                      </span>
+                      <span className="text-white font-bold">{p.nickname}</span>
+                      {p.isHost && <span className="text-xs bg-[#FFD700]/20 text-[#FFD700] px-2 py-0.5 rounded-full">HOST</span>}
+                    </div>
+                    <span className="text-white/70 font-mono">{scores.find(s => s.odId === p.id)?.score || 0}점</span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex gap-4">
+            <button
+              onClick={goToWaitingRoom}
+              className="flex-1 py-4 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-lg transition-colors flex items-center justify-center gap-2 border border-white/10"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              대기실로
+            </button>
+            <button
+              onClick={restartQuiz}
+              disabled={isRestarting}
+              className="flex-1 py-4 rounded-xl bg-[#FFD700] hover:bg-[#FFC800] text-[#46178F] font-bold text-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+            >
+              {isRestarting ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#46178F]"></div>
+                  생성 중...
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="w-5 h-5" />
+                  다시 하기
+                </>
+              )}
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
    }
 
   if (quizQuestions.length === 0) {
@@ -806,17 +867,26 @@ export default function LyricsQuizGame() {
                      </motion.div>
                    </div>
                  </>
-               ) : (
-                 <>
-                   <div className="bg-white/20 p-4 rounded-full">
-                     <X className="w-16 h-16" />
-                   </div>
-                   <div className="flex flex-col">
-                     <span className="text-5xl font-black">오답입니다...</span>
-                     <span className="text-2xl font-bold opacity-80">다음 기회를 노려보세요!</span>
-                   </div>
-                 </>
-               )}
+                ) : (
+                  <>
+                    <div className="bg-white/20 p-4 rounded-full">
+                      <X className="w-16 h-16" />
+                    </div>
+                    <div className="flex flex-col">
+                      {roundResults.find(r => r.odId !== "local" && r.odName !== "나") ? (
+                        <>
+                          <span className="text-4xl font-black">{roundResults.find(r => r.odId !== "local" && r.odName !== "나")?.odName}님이 정답!</span>
+                          <span className="text-2xl font-bold opacity-80">정답: {currentQuestion?.correctAnswer}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-5xl font-black">오답!</span>
+                          <span className="text-2xl font-bold opacity-80">정답: {currentQuestion?.correctAnswer}</span>
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
             </div>
           </motion.div>
         )}

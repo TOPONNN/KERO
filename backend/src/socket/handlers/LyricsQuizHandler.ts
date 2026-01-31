@@ -20,7 +20,11 @@ export class LyricsQuizHandler {
   registerEvents(socket: Socket): void {
     socket.on("quiz:submit-answer", async (data: { roomCode: string; answer: any; questionIndex: number; timeLeft?: number }) => {
       const state = this.quizStates.get(data.roomCode);
-      if (!state || data.questionIndex !== state.currentQuestionIndex) return;
+      if (!state || data.questionIndex < 0 || data.questionIndex >= state.questions.length) return;
+
+      if (data.questionIndex > state.currentQuestionIndex) {
+        state.currentQuestionIndex = data.questionIndex;
+      }
 
       const question = state.questions[data.questionIndex];
       const isCorrect = this.validateAnswer(question, data.answer);
@@ -97,6 +101,20 @@ export class LyricsQuizHandler {
     });
   }
 
+  public initializeQuizState(roomCode: string, questions: any[]): void {
+    if (this.quizStates.has(roomCode)) return;
+
+    const state: QuizState = {
+      currentQuestionIndex: 0,
+      questions,
+      answers: new Map(),
+      streaks: new Map(),
+      scores: new Map(),
+      answeredQuestions: new Set(),
+    };
+    this.quizStates.set(roomCode, state);
+  }
+
   async startGame(roomCode: string, songId?: string): Promise<void> {
     const quizQuestionCount = songId ? 10 : 10;
     const questions = await songService.generateTJEnhancedQuiz(quizQuestionCount);
@@ -108,7 +126,7 @@ export class LyricsQuizHandler {
     await roomService.updateRoomStatus(roomCode, RoomStatus.PLAYING);
 
     const state: QuizState = {
-      currentQuestionIndex: -1,
+      currentQuestionIndex: 0,
       questions,
       answers: new Map(),
       streaks: new Map(),

@@ -192,6 +192,7 @@ export function initializeSocket(httpServer: HttpServer): Server {
     socket.on("quiz:broadcast-questions", (data: { roomCode: string; questions: any[] }) => {
       const roomCode = data.roomCode || socket.data.roomCode;
       if (!roomCode) return;
+      lyricsQuizHandler.initializeQuizState(roomCode, data.questions);
       socket.to(roomCode).emit("quiz:questions-data", data.questions);
     });
 

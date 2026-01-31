@@ -382,94 +382,108 @@ export class SongService {
       }));
     }
 
-    // 4. Generate TJ-based questions (no lyrics needed)
-    const tjQuestions: any[] = [];
-    const shuffle = <T>(arr: T[]): T[] => {
-      const a = [...arr];
-      for (let i = a.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [a[i], a[j]] = [a[j], a[i]];
-      }
-      return a;
-    };
+     // 4. Generate TJ-based questions (no lyrics needed)
+     const tjQuestions: any[] = [];
+     const shuffle = <T>(arr: T[]): T[] => {
+       const a = [...arr];
+       for (let i = a.length - 1; i > 0; i--) {
+         const j = Math.floor(Math.random() * (i + 1));
+         [a[i], a[j]] = [a[j], a[i]];
+       }
+       return a;
+     };
+
+     // Strip parenthesized content from titles: "봄날 (Spring Day)" → "봄날"
+     const cleanTitle = (title: string): string => 
+       title.replace(/\s*[\(（\[【].*?[\)）\]】]/g, '').trim();
 
     if (tjSongs.length >= 4) {
       const shuffledTJ = shuffle(tjSongs);
 
-       // TITLE_GUESS from TJ (up to 8)
-       for (let i = 0; i < Math.min(8, shuffledTJ.length); i++) {
-        const song = shuffledTJ[i];
-        const otherTitles = shuffle(
-          tjSongs.filter(s => s.title !== song.title).map(s => s.title)
-        ).slice(0, 3);
-        if (otherTitles.length < 3) continue;
-        tjQuestions.push({
-          type: "title_guess",
-          questionText: `이 노래의 제목은? (가수: ${song.artist})`,
-          correctAnswer: song.title,
-          wrongAnswers: otherTitles,
-          timeLimit: 20,
-          points: 1000,
-          metadata: { source: "tj", tjNumber: song.number },
-        });
-      }
-
-       // ARTIST_GUESS from TJ (up to 8)
-       for (let i = 8; i < Math.min(16, shuffledTJ.length); i++) {
-        const song = shuffledTJ[i];
-        const uniqueArtists = [...new Set(tjSongs.filter(s => s.artist !== song.artist).map(s => s.artist))];
-        const otherArtists = shuffle(uniqueArtists).slice(0, 3);
-        if (otherArtists.length < 3) continue;
-        tjQuestions.push({
-          type: "artist_guess",
-          questionText: `'${song.title}'을(를) 부른 가수는?`,
-          correctAnswer: song.artist,
-          wrongAnswers: otherArtists,
-          timeLimit: 15,
-          points: 1000,
-          metadata: { source: "tj", tjNumber: song.number },
-        });
-      }
-
-       // INITIAL_GUESS from TJ (up to 5)
-       for (let i = 16; i < Math.min(21, shuffledTJ.length); i++) {
-        const song = shuffledTJ[i];
-        const initials = getKoreanInitials(song.title);
-        if (initials === song.title) continue;
-        tjQuestions.push({
-          type: "initial_guess",
-          questionText: initials,
-          correctAnswer: song.title,
-          wrongAnswers: [],
-          timeLimit: 20,
-          points: 1000,
-          metadata: { source: "tj", tjNumber: song.number, hint: `${song.artist}의 노래, ${song.title.length}글자` },
-        });
-       }
-     }
-
-     // 4.5 Add YouTube video IDs to TJ TITLE_GUESS questions for audio playback
-     const titleGuessQuestions = tjQuestions.filter(q => q.type === "title_guess");
-     if (titleGuessQuestions.length > 0) {
-       try {
-         const searchResults = await Promise.all(
-           titleGuessQuestions.map(q => {
-             // Extract artist from questionText: "이 노래의 제목은? (가수: ARTIST)"
-             const artistMatch = q.questionText.match(/가수:\s*(.+?)\)/);
-             const artist = artistMatch ? artistMatch[1] : "";
-             return youtubeService.searchVideos(`${q.correctAnswer} ${artist}`, 1).catch(() => []);
-           })
-         );
-         titleGuessQuestions.forEach((q, idx) => {
-           const videos = searchResults[idx];
-           if (videos && videos.length > 0) {
-             q.metadata = { ...q.metadata, youtubeVideoId: videos[0].videoId };
-           }
+        // TITLE_GUESS from TJ (up to 8)
+        for (let i = 0; i < Math.min(8, shuffledTJ.length); i++) {
+         const song = shuffledTJ[i];
+         const otherTitles = shuffle(
+           tjSongs.filter(s => s.title !== song.title).map(s => cleanTitle(s.title))
+         ).slice(0, 3);
+         if (otherTitles.length < 3) continue;
+         tjQuestions.push({
+           type: "title_guess",
+           questionText: `이 노래의 제목은? (가수: ${song.artist})`,
+           correctAnswer: cleanTitle(song.title),
+           wrongAnswers: otherTitles,
+           timeLimit: 20,
+           points: 1000,
+           metadata: { source: "tj", tjNumber: song.number },
          });
-       } catch (e) {
-         console.error("Failed to fetch YouTube videos for TJ quiz:", e);
        }
+
+        // ARTIST_GUESS from TJ (up to 8)
+        for (let i = 8; i < Math.min(16, shuffledTJ.length); i++) {
+         const song = shuffledTJ[i];
+         const uniqueArtists = [...new Set(tjSongs.filter(s => s.artist !== song.artist).map(s => s.artist))];
+         const otherArtists = shuffle(uniqueArtists).slice(0, 3);
+         if (otherArtists.length < 3) continue;
+         tjQuestions.push({
+           type: "artist_guess",
+           questionText: `'${cleanTitle(song.title)}'을(를) 부른 가수는?`,
+           correctAnswer: song.artist,
+           wrongAnswers: otherArtists,
+           timeLimit: 15,
+           points: 1000,
+           metadata: { source: "tj", tjNumber: song.number },
+         });
+       }
+
+        // INITIAL_GUESS from TJ (up to 5)
+        for (let i = 16; i < Math.min(21, shuffledTJ.length); i++) {
+         const song = shuffledTJ[i];
+         const cleaned = cleanTitle(song.title);
+         const initials = getKoreanInitials(cleaned);
+         if (initials === cleaned) continue;
+         tjQuestions.push({
+           type: "initial_guess",
+           questionText: initials,
+           correctAnswer: cleaned,
+           wrongAnswers: [],
+           timeLimit: 20,
+           points: 1000,
+           metadata: { source: "tj", tjNumber: song.number, hint: `${song.artist}의 노래, ${cleaned.length}글자` },
+         });
+        }
      }
+
+      // 4.5 Add YouTube video IDs to TJ TITLE_GUESS and ARTIST_GUESS questions for audio playback
+      const audioQuestions = tjQuestions.filter(q => q.type === "title_guess" || q.type === "artist_guess");
+      if (audioQuestions.length > 0) {
+        try {
+          const searchResults = await Promise.all(
+            audioQuestions.map(q => {
+              let searchQuery = "";
+              if (q.type === "title_guess") {
+                // Extract artist from questionText: "이 노래의 제목은? (가수: ARTIST)"
+                const artistMatch = q.questionText.match(/가수:\s*(.+?)\)/);
+                const artist = artistMatch ? artistMatch[1] : "";
+                searchQuery = `${q.correctAnswer} ${artist}`;
+              } else {
+                // artist_guess — extract title from questionText: "'TITLE'을(를) 부른 가수는?"
+                const titleMatch = q.questionText.match(/^'(.+?)'/);
+                const title = titleMatch ? titleMatch[1] : q.correctAnswer;
+                searchQuery = `${title} ${q.correctAnswer}`;
+              }
+              return youtubeService.searchVideos(searchQuery, 1).catch(() => []);
+            })
+          );
+          audioQuestions.forEach((q, idx) => {
+            const videos = searchResults[idx];
+            if (videos && videos.length > 0) {
+              q.metadata = { ...q.metadata, youtubeVideoId: videos[0].videoId };
+            }
+          });
+        } catch (e) {
+          console.error("Failed to fetch YouTube videos for TJ quiz:", e);
+        }
+      }
 
      // 5. Mix DB + TJ questions and return
     const allQuestions = shuffle([...dbQuestions, ...tjQuestions]);
