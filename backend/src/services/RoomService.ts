@@ -27,7 +27,7 @@ export class RoomService {
       name: data.name,
       gameMode: data.gameMode,
       hostId: data.hostId,
-      maxParticipants: data.maxParticipants || 8,
+      maxParticipants: data.maxParticipants || 6,
       isPrivate: data.isPrivate || false,
       password: data.password,
       status: RoomStatus.WAITING,

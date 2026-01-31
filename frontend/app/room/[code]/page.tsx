@@ -519,14 +519,14 @@ export default function RoomPage() {
             dispatch(setGameStatus("waiting"));
             dispatch(setCurrentSong(null));
           }}
-          className="absolute top-3 left-3 z-50 p-2 rounded-full bg-black/40 backdrop-blur-sm text-white/50 hover:text-white hover:bg-black/60 transition-all"
+          className="absolute top-3 left-3 z-50 p-2.5 rounded-full bg-black/50 backdrop-blur-sm text-white/60 hover:text-white hover:bg-black/70 transition-all"
           title="대기실로 돌아가기"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-5 h-5" />
         </button>
 
-        {/* Top-right: Camera overlay - bigger, nice layout */}
-        <div className="absolute top-3 right-3 w-64 h-48 rounded-2xl overflow-hidden border border-white/20 shadow-2xl z-40 bg-black/50">
+        {/* Top-right: Camera overlay - vertical sidebar */}
+        <div className="absolute top-3 right-2 bottom-16 w-52 rounded-2xl overflow-hidden border border-white/20 shadow-2xl z-40 bg-black/30 backdrop-blur-sm">
           <VideoRoom
             roomCode={code}
             participantName={userName}
@@ -537,28 +537,28 @@ export default function RoomPage() {
         </div>
 
         {/* Bottom-right: Media controls */}
-        <div className="absolute bottom-4 right-4 z-50 flex items-center gap-2">
+        <div className="absolute bottom-3 right-2 z-50 flex items-center gap-2 bg-black/40 backdrop-blur-md rounded-full px-3 py-1.5">
           <button
             onClick={handleMicToggle}
-            className={`p-3 rounded-full backdrop-blur-md transition-all ${
+            className={`p-2 rounded-full backdrop-blur-md transition-all ${
               mediaStatus.isMicOn
                 ? "bg-white/10 hover:bg-white/20 text-white"
                 : "bg-red-500/80 hover:bg-red-500 text-white"
             }`}
             title={mediaStatus.isMicOn ? "마이크 끄기" : "마이크 켜기"}
           >
-            {mediaStatus.isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+            {mediaStatus.isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
           </button>
           <button
             onClick={handleCameraToggle}
-            className={`p-3 rounded-full backdrop-blur-md transition-all ${
+            className={`p-2 rounded-full backdrop-blur-md transition-all ${
               mediaStatus.isCameraOn
                 ? "bg-white/10 hover:bg-white/20 text-white"
                 : "bg-red-500/80 hover:bg-red-500 text-white"
             }`}
             title={mediaStatus.isCameraOn ? "카메라 끄기" : "카메라 켜기"}
           >
-            {mediaStatus.isCameraOn ? <Video className="w-5 h-5" /> : <CameraOff className="w-5 h-5" />}
+            {mediaStatus.isCameraOn ? <Video className="w-4 h-4" /> : <CameraOff className="w-4 h-4" />}
           </button>
         </div>
       </div>

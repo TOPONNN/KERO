@@ -31,7 +31,7 @@ const initialState: RoomState = {
   status: "waiting",
   participants: [],
   hostId: null,
-  maxParticipants: 8,
+  maxParticipants: 6,
   isConnected: false,
 };
 

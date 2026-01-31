@@ -210,11 +210,14 @@ function VideoGrid() {
     );
   }
 
-  const gridCols = cameraTracks.length === 1 ? "grid-cols-1" : 
-                   cameraTracks.length <= 4 ? "grid-cols-2" : "grid-cols-3";
+  // For a vertical sidebar, use rows-based layout
+  const gridClass = cameraTracks.length === 1 ? "grid-cols-1 grid-rows-1" :
+                    cameraTracks.length === 2 ? "grid-cols-1 grid-rows-2" :
+                    cameraTracks.length <= 4 ? "grid-cols-2 grid-rows-2" :
+                    "grid-cols-2 grid-rows-3";
 
   return (
-    <div className={`grid ${gridCols} gap-2 h-full p-2`}>
+    <div className={`grid ${gridClass} gap-1.5 h-full p-1.5`}>
       {cameraTracks.map((trackRef) => (
         <div
           key={trackRef.participant.sid}
@@ -224,7 +227,7 @@ function VideoGrid() {
             trackRef={trackRef}
             className="w-full h-full object-cover"
           />
-          <div className="absolute bottom-2 left-2 px-2.5 py-1 bg-black/60 backdrop-blur-md rounded-full text-[10px] font-bold text-white/90 border border-white/10 flex items-center gap-1.5 shadow-lg">
+          <div className="absolute bottom-1 left-1 px-2 py-0.5 bg-black/60 backdrop-blur-md rounded-full text-[9px] font-bold text-white/90 border border-white/10 flex items-center gap-1 shadow-lg">
              <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
             {trackRef.participant.name || trackRef.participant.identity}
           </div>
