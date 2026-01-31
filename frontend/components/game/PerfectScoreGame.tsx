@@ -43,6 +43,7 @@ export default function PerfectScoreGame() {
   const drawAnimationRef = useRef<number | null>(null);
   const lastTimeRef = useRef(0);
   const scoredWordsRef = useRef<Set<string>>(new Set());
+  const scoredResultsRef = useRef<Map<string, string>>(new Map());
   const scoreRef = useRef(0);
   const comboRef = useRef(0);
   const userPitchTrailRef = useRef<{ time: number; midi: number }[]>([]);
@@ -198,6 +199,10 @@ export default function PerfectScoreGame() {
                 const cents = hasUserPitch ? 1200 * Math.log2(userFreq / targetFreq) : 999;
                 const absCents = Math.abs(cents);
                 const type = absCents < 10 ? "PERFECT" : absCents < 25 ? "GREAT" : absCents < 50 ? "GOOD" : "MISS";
+                
+                // Store result for visualization
+                scoredResultsRef.current.set(wordKey, type);
+
                 const basePoints = type === "PERFECT" ? 100 : type === "GREAT" ? 75 : type === "GOOD" ? 50 : 0;
                 if (basePoints > 0 && isMicOnRef.current) {
                   const mult = Math.min(2, 1 + comboRef.current * 0.1);
@@ -370,6 +375,7 @@ export default function PerfectScoreGame() {
     scoreRef.current = 0;
     comboRef.current = 0;
     scoredWordsRef.current.clear();
+    scoredResultsRef.current.clear();
     userPitchTrailRef.current = [];
     lastRawPitchesRef.current = [];
   }, []);
@@ -431,7 +437,7 @@ export default function PerfectScoreGame() {
       ctx.clearRect(0, 0, width, height);
 
       // Darker, more blue-tinted background
-      ctx.fillStyle = "rgba(0, 5, 25, 0.7)";
+      ctx.fillStyle = "rgba(0, 5, 25, 0.75)";
       ctx.fillRect(0, 0, width, height);
 
       const leftPadding = 54;
@@ -446,12 +452,28 @@ export default function PerfectScoreGame() {
       const startTime = now - leftWindow;
       const endTime = now + rightWindow;
 
+      // Draw vertical beat lines (faint)
+      const beatInterval = 1.0; // Assume 1 second for simplicity or could use BPM if available
+      const firstBeatTime = Math.ceil(startTime / beatInterval) * beatInterval;
+      ctx.strokeStyle = "rgba(255,255,255,0.03)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let t = firstBeatTime; t < endTime; t += beatInterval) {
+        const x = hitLineX + (t - now) * pixelsPerSecond;
+        ctx.moveTo(x, topPadding);
+        ctx.lineTo(x, height - bottomPadding);
+      }
+      ctx.stroke();
+
       const midiToY = (midi: number) => {
         const range = Math.max(1, midiRange.max - midiRange.min);
         return topPadding + ((midiRange.max - midi) / range) * staffHeight;
       };
 
       // --- 1. Draw Grid Lines (Every semitone) ---
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+
       for (let midi = midiRange.min; midi <= midiRange.max; midi += 1) {
         const y = midiToY(midi);
         const noteIdx = midi % 12;
@@ -465,7 +487,7 @@ export default function PerfectScoreGame() {
         if (isC) {
           // Bold white line for C notes
           ctx.lineWidth = 1.5;
-          ctx.strokeStyle = "rgba(255,255,255,0.2)";
+          ctx.strokeStyle = "rgba(255,255,255,0.25)";
           ctx.setLineDash([]);
           ctx.stroke();
 
@@ -474,29 +496,33 @@ export default function PerfectScoreGame() {
           const label = `C${octave}`;
           ctx.fillStyle = "rgba(255,255,255,0.8)";
           ctx.font = "bold 11px 'Noto Sans KR', sans-serif";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(label, 22, y);
+          ctx.fillText(label, 10, y);
         } else if (isNatural) {
           // Thin line for natural notes
-          ctx.lineWidth = 0.5;
-          ctx.strokeStyle = "rgba(255,255,255,0.07)";
+          ctx.lineWidth = 0.8;
+          ctx.strokeStyle = "rgba(255,255,255,0.10)";
           ctx.setLineDash([]);
           ctx.stroke();
+
+          // Note Label
+          const noteName = NOTE_NAMES[noteIdx];
+          const octave = Math.floor(midi / 12) - 1;
+          ctx.fillStyle = "rgba(255,255,255,0.45)";
+          ctx.font = "9px 'Noto Sans KR', sans-serif";
+          ctx.fillText(`${noteName}${octave}`, 12, y);
         } else {
           // Faint dotted line for sharps/flats
           ctx.lineWidth = 0.5;
-          ctx.strokeStyle = "rgba(255,255,255,0.03)";
-          ctx.setLineDash([2, 4]); // Dotted
+          ctx.strokeStyle = "rgba(255,255,255,0.04)";
+          ctx.setLineDash([2, 4]); 
           ctx.stroke();
-          ctx.setLineDash([]); // Reset
+          ctx.setLineDash([]); 
         }
       }
 
       // --- 2. Draw Hit Line (Scanner) ---
-      // White/Cyan glowing vertical line
       ctx.save();
-      ctx.shadowColor = "rgba(0, 229, 255, 0.6)";
+      ctx.shadowColor = "rgba(0, 229, 255, 0.5)";
       ctx.shadowBlur = 15;
       ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
       ctx.lineWidth = 2;
@@ -506,61 +532,81 @@ export default function PerfectScoreGame() {
       ctx.stroke();
       ctx.restore();
 
-      // --- 3. Draw Target Notes (Cyan Pills) ---
+      // --- 3. Draw Target Notes (Colored Pills) ---
       words.forEach((word) => {
         if (typeof word.midi !== "number") return;
-        // Optimization: Skip if outside view
         if (word.endTime < startTime || word.startTime > endTime) return;
 
         const xStart = hitLineX + (word.startTime - now) * pixelsPerSecond;
         const xEnd = hitLineX + (word.endTime - now) * pixelsPerSecond;
-        // Ensure minimum width for visibility
         const barWidth = Math.max(10, xEnd - xStart);
         const yCenter = midiToY(word.midi);
-        const barHeight = 10; // Chunkier, pill shape
+        const barHeight = 10; 
         const yTop = yCenter - barHeight / 2;
 
-        // Check if this note has been passed/hit
-        const isPast = word.endTime < now;
-        // Ideally we check score, but for now purely visual "passed" state
-        // If passed, we can dim it or keep it bright if hit. 
-        // Simulating "active" vs "future" vs "past"
+        const wordKey = `${word.lineIndex}-${word.wordIndex}`;
+        const result = scoredResultsRef.current.get(wordKey);
         
-        // Gradient Fill
-        const grad = ctx.createLinearGradient(0, yTop, 0, yTop + barHeight);
-        if (isPast) {
-           // Slightly dimmer for past
-           grad.addColorStop(0, "rgba(0, 229, 255, 0.4)");
-           grad.addColorStop(1, "rgba(0, 180, 200, 0.6)");
+        const isPast = word.endTime < now;
+        const isActive = now >= word.startTime && now <= word.endTime;
+
+        let fillStyle: string | CanvasGradient;
+        let glowColor = "rgba(0,0,0,0)";
+        
+        const createGrad = (c1: string, c2: string) => {
+            const g = ctx.createLinearGradient(0, yTop, 0, yTop + barHeight);
+            g.addColorStop(0, c1);
+            g.addColorStop(1, c2);
+            return g;
+        };
+
+        if (result) {
+            if (result === "PERFECT" || result === "GREAT") {
+                fillStyle = createGrad("rgba(255, 215, 0, 0.8)", "rgba(255, 160, 0, 0.8)");
+                glowColor = "rgba(255, 215, 0, 0.6)";
+            } else if (result === "GOOD") {
+                fillStyle = createGrad("rgba(100, 180, 255, 0.7)", "rgba(50, 130, 255, 0.7)");
+            } else { // MISS
+                fillStyle = "rgba(100, 100, 100, 0.3)";
+            }
         } else {
-           // Bright Cyan for active/future
-           grad.addColorStop(0, "rgba(200, 255, 255, 0.9)"); // Top highlight
-           grad.addColorStop(0.3, "rgba(0, 229, 255, 0.8)"); // Main cyan
-           grad.addColorStop(1, "rgba(0, 150, 200, 0.9)"); // Bottom shadow
+            if (isPast) {
+                 fillStyle = "rgba(100, 100, 100, 0.3)";
+            } else if (isActive) {
+                 fillStyle = createGrad("rgba(0, 255, 255, 0.9)", "rgba(0, 229, 255, 0.9)");
+                 glowColor = "rgba(0, 229, 255, 0.9)";
+            } else {
+                 fillStyle = "rgba(0, 200, 255, 0.6)";
+            }
         }
 
-        ctx.fillStyle = grad;
+        ctx.save();
+        if (isActive || (result === "PERFECT")) {
+           ctx.shadowColor = glowColor;
+           ctx.shadowBlur = isActive ? 15 : 10;
+        }
         
-        // Draw Pill
+        ctx.fillStyle = fillStyle;
         drawPill(xStart, yTop, barWidth, barHeight);
         ctx.fill();
-
-        // White Border
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-        ctx.lineWidth = 1;
+        
+        ctx.strokeStyle = isActive ? "rgba(255,255,255,1)" : "rgba(255,255,255,0.4)";
+        ctx.lineWidth = isActive ? 1.5 : 1;
         ctx.stroke();
+        
+        ctx.restore();
       });
 
-      // --- 4. Draw User Pitch Trail (Quantized Step-Function) ---
+      // --- 4. Draw User Pitch Trail (Clean Step-Function) ---
       const trail = userPitchTrailRef.current;
       if (trail.length > 0) {
         ctx.save();
-        ctx.strokeStyle = "#FFD700"; // Gold
+        ctx.strokeStyle = "#00E5FF"; // Bright Cyan
         ctx.lineWidth = 3;
-        ctx.shadowColor = "rgba(255, 215, 0, 0.6)";
-        ctx.shadowBlur = 10;
+        ctx.shadowColor = "rgba(0, 229, 255, 0.6)";
+        ctx.shadowBlur = 12;
         ctx.lineCap = "round";
-        ctx.lineJoin = "miter"; // Sharp corners for steps
+        ctx.lineJoin = "round";
         ctx.beginPath();
         
         let started = false;
@@ -568,62 +614,46 @@ export default function PerfectScoreGame() {
         for (let i = 0; i < trail.length; i++) {
           const point = trail[i];
           const x = hitLineX + (point.time - now) * pixelsPerSecond;
-          const y = midiToY(point.midi); // This is already quantized
+          const y = midiToY(point.midi);
 
-          if (x < 0) continue; // Skip if off-screen left (optimization)
+          if (x < 0) continue; 
 
           if (!started) {
             ctx.moveTo(x, y);
             started = true;
           } else {
             const prevPoint = trail[i - 1];
-            const prevY = midiToY(prevPoint.midi);
-            // Step function logic:
-            // 1. Draw horizontal line from prevX to currX at prevY level?
-            //    No, usually pitch changes instantaneously.
-            //    Better: Horizontal to mid-point, or direct jump?
-            //    "Step function" usually means hold previous value until new value.
-            //    So: Line from prevX to currX at prevY level? No, that would mean pitch doesn't change until the new sample.
-            //    But we want to connect the points.
-            //    Let's draw: Horizontal from prevX to currX, then Vertical to new Y?
-            //    Or: Vertical from prevY to new Y at prevX, then Horizontal to currX?
-            //    Let's try: Horizontal to currX, then Vertical.
             
-            // Actually, visually for pitch tracking, simple connected lines looks weird if quantized.
-            // Best look: "Staircase".
-            // Draw horizontal line from prevX to currX at prevY?
-            // Then vertical line at currX to currY?
-            
-            // Wait, we have discrete samples.
-            // Let's just connect them with straight lines but since they are quantized, 
-            // if the MIDI is same, it's horizontal. If it changes, it's a slope.
-            // But user wants "vertical jumps".
-            // So: Horizontal from prevX to currX (at prevY), then vertical to currY.
-            
-            ctx.lineTo(x, prevY); // Horizontal
-            ctx.lineTo(x, y);     // Vertical
+            // Check for break in trail
+            if (point.time - prevPoint.time > 0.3 || Math.abs(point.midi - prevPoint.midi) > 12) {
+               ctx.moveTo(x, y);
+            } else {
+               const prevY = midiToY(prevPoint.midi);
+               ctx.lineTo(x, prevY); // Horizontal hold
+               ctx.lineTo(x, y);     // Vertical jump
+            }
           }
         }
         ctx.stroke();
         
-        // Draw sparkle/dot at the head (latest point)
+        // Sparkle at head
         if (trail.length > 0) {
             const lastPoint = trail[trail.length - 1];
             const headX = hitLineX + (lastPoint.time - now) * pixelsPerSecond;
             const headY = midiToY(lastPoint.midi);
             
-            // Glowing head
             ctx.fillStyle = "#FFF";
+            ctx.shadowColor = "rgba(255, 255, 255, 0.8)";
+            ctx.shadowBlur = 10;
             ctx.beginPath();
-            ctx.arc(headX, headY, 3, 0, Math.PI * 2);
+            ctx.arc(headX, headY, 4, 0, Math.PI * 2);
             ctx.fill();
             
-            // Extra sparkle on hit line if crossing
-            // (Optional detail: sparkle on scanner line)
-             if (Math.abs(headX - hitLineX) < 2) {
+             if (Math.abs(headX - hitLineX) < 5) {
+                // Crossing the hit line
                 ctx.fillStyle = "#00E5FF";
                 ctx.beginPath();
-                ctx.arc(headX, headY, 5, 0, Math.PI * 2);
+                ctx.arc(headX, headY, 6, 0, Math.PI * 2);
                 ctx.fill();
              }
         }
@@ -683,18 +713,34 @@ export default function PerfectScoreGame() {
       )}
 
       <div className="shrink-0 px-4 pt-4 pb-2 z-20">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm text-white/60 tracking-wider font-bold">PERFECT SCORE</p>
-            <h1 className="text-xl sm:text-2xl font-bold truncate max-w-[200px] sm:max-w-md">{currentSong.title}</h1>
-            <p className="text-sm text-white/50">{currentSong.artist}</p>
-          </div>
-          <div className="text-right">
-            <div className="text-3xl sm:text-4xl font-black text-[#FFD700] tabular-nums drop-shadow-lg">
-              {score.toLocaleString()}
+        <div className="flex items-start justify-between gap-4 select-none">
+          {/* Left: Score */}
+          <div className="flex flex-col items-start">
+            <p className="text-sm text-[#00E5FF] tracking-wider font-extrabold italic drop-shadow-[0_0_8px_rgba(0,229,255,0.6)]">
+              PERFECT SCORE
+            </p>
+            <div className="relative mt-[-4px]">
+               <div className="text-4xl sm:text-5xl font-black text-white tabular-nums tracking-tight"
+                    style={{ textShadow: "0 0 15px rgba(0, 229, 255, 0.4)" }}>
+                 {score.toLocaleString()}
+               </div>
             </div>
-            <div className="text-xl font-black bg-gradient-to-r from-[#FFD700] to-[#FFAA00] bg-clip-text text-transparent drop-shadow-sm">
-              {combo} COMBO
+          </div>
+
+          {/* Center: Song Info (Compact) */}
+           <div className="flex flex-col items-center text-center pt-1 hidden sm:flex">
+              <h1 className="text-lg font-bold truncate max-w-[300px] text-white/90">{currentSong.title}</h1>
+              <p className="text-xs text-white/50">{currentSong.artist}</p>
+           </div>
+
+          {/* Right: Combo */}
+          <div className="flex flex-col items-end">
+            <div className="text-4xl sm:text-5xl font-black text-[#FFD700] tabular-nums tracking-tighter"
+                 style={{ textShadow: "0 0 15px rgba(255, 215, 0, 0.4)" }}>
+              {combo}
+            </div>
+            <div className="text-sm text-[#FFD700] font-bold tracking-widest mt-[-4px]">
+              COMBO
             </div>
           </div>
         </div>
@@ -773,7 +819,7 @@ export default function PerfectScoreGame() {
                           width: `${progress * 100}%`,
                           WebkitTextStroke: "2px rgba(0,0,0,0.9)", 
                           paintOrder: "stroke fill",
-                          textShadow: "0 0 10px rgba(0, 229, 255, 0.5)"
+                          textShadow: "0 0 12px rgba(0, 229, 255, 0.6)"
                         }}
                       >
                         {word.text}
