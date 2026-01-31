@@ -42,7 +42,7 @@ export class LyricsQuizQuestion {
   @Column({ type: "enum", enum: QuizType, default: QuizType.LYRICS_FILL })
   type!: QuizType;
 
-  @Column({ type: "jsonb", nullable: true })
+  @Column({ type: "json", nullable: true })
   metadata?: Record<string, any>;
 
   @ManyToOne(() => Song, { onDelete: "CASCADE" })
