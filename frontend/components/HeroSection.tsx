@@ -4,6 +4,7 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
 import { ChevronDown, Music, Target, MessageSquareText, Swords, Users } from "lucide-react";
 import Link from "next/link";
+import OnlineIndicator from "@/components/OnlineIndicator";
 
 const modes = [
   {
@@ -260,8 +261,9 @@ export default function HeroSection() {
         >
           <span className="text-xs tracking-widest uppercase">Skip to Content</span>
           <ChevronDown className="h-5 w-5" />
-        </motion.button>
-      </div>
-    </section>
-  );
+         </motion.button>
+       </div>
+       <OnlineIndicator />
+     </section>
+   );
 }

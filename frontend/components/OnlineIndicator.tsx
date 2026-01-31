@@ -118,12 +118,12 @@ export default function OnlineIndicator() {
 
   if (!mounted) return null;
 
-  return (
-    <motion.div
-      className="fixed bottom-6 right-6 z-40"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-    >
+   return (
+     <motion.div
+       className="absolute bottom-6 right-6 z-30"
+       initial={{ opacity: 0, y: 20 }}
+       animate={{ opacity: 1, y: 0 }}
+     >
       <motion.div
         onClick={() => setExpanded(!expanded)}
         className="cursor-pointer flex items-center gap-3 px-4 py-2.5 bg-black/60 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl hover:bg-black/80 transition-colors"

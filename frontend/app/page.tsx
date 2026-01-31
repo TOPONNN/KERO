@@ -5,13 +5,11 @@ import HighlightCTA from "@/components/HighlightCTA";
 import FAQ from "@/components/FAQ";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
-import OnlineIndicator from "@/components/OnlineIndicator";
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-black text-white selection:bg-[#C0C0C0] selection:text-black">
       <Header />
-      <OnlineIndicator />
       <HeroSection />
       <TeamMarquee />
       <SpecsTable />
