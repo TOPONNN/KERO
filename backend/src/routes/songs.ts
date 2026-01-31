@@ -128,6 +128,48 @@ router.get("/quiz/generate", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/random-mv", async (req: Request, res: Response) => {
+  try {
+    let tjSongs: { number: string; title: string; artist: string }[] = [];
+    const cacheKey = "tj:chart:monthly";
+    const cached = await redis.get(cacheKey);
+    
+    if (cached) {
+      tjSongs = JSON.parse(cached);
+    } else {
+      const { tjKaraokeService } = await import("../services/TJKaraokeService");
+      tjSongs = await tjKaraokeService.searchPopular("monthly", "KOR", 100);
+      if (tjSongs.length > 0) {
+        await redis.setex(cacheKey, 3600, JSON.stringify(tjSongs));
+      }
+    }
+    
+    if (tjSongs.length === 0) {
+      return res.json({ success: false, message: "No songs available" });
+    }
+    
+    const randomSong = tjSongs[Math.floor(Math.random() * tjSongs.length)];
+    const searchQuery = `${randomSong.artist} ${randomSong.title} MV`;
+    const results = await youtubeService.searchVideos(searchQuery, 1);
+    
+    if (results.length === 0) {
+      return res.json({ success: false, message: "No YouTube result found" });
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        videoId: results[0].videoId,
+        title: randomSong.title,
+        artist: randomSong.artist,
+      }
+    });
+  } catch (error: any) {
+    console.error("Random MV error:", error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 router.get("/", async (req: Request, res: Response) => {
   try {
     const songs = await songService.getAllSongs();

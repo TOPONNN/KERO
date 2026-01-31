@@ -85,95 +85,28 @@ export default function RoomPage() {
   const { participants } = useSelector((state: RootState) => state.room);
   const { emitEvent } = useSocket(code);
   
-  const [userName, setUserName] = useState<string>("Guest");
-  const [visitorId, setVisitorId] = useState<string>("");
-  
-  const backgroundVideos = [
-    // BLACKPINK
-    "CKZvWhCqx1s", // Shut Down
-    "ioNng23DkIM", // How You Like That
-    "POe9SOEKotk", // Kill This Love
-    "2S24-y0Ij3Y", // DDU-DU DDU-DU
-    "IHNzOHi8sJs", // Lovesick Girls
-    // BTS
-    "gdZLi9oWNZg", // Dynamite
-    "MBdVXkSdhwU", // Boy With Luv
-    "pBuZEGYXA6E", // Butter
-    "WMweEpGlu_U", // Spring Day
-    "XsX3ATc3FbA", // Fake Love
-    "7C2z4GqqS5E", // DNA
-    // aespa
-    "ArmDp-zijuc", // Supernova
-    "WPdWvnAAurg", // Next Level
-    "Os_heh8vPfs", // Savage
-    "4TWR90KJl84", // Black Mamba
-    // NewJeans
-    "pC6tPEaAiYU", // Super Shy
-    "sVTy_wmn5SU", // Ditto
-    "js1CtxSY38I", // Hype Boy
-    "Km71Rr9K-Bk", // OMG
-    // LE SSERAFIM
-    "dZs_cLHfnNA", // EASY
-    "pyf8cbqyfPs", // UNFORGIVEN
-    "UBURTj20HXI", // ANTIFRAGILE
-    "kTk3HQOA8OY", // FEARLESS (JP)
-    // IVE
-    "MjCZfZfucEc", // Baddie
-    "6ZUIwj3FgUY", // I AM
-    "F0B7HDiY-10", // After LIKE
-    "Y8JFxS1HlDo", // LOVE DIVE
-    // IU
-    "os_hS_gY7p8", // Shopper
-    "v7bnOxV4jAc", // Blueming
-    "D1PvIWdJ8xo", // Lilac
-    "jeqdYqsrsA0", // Celebrity
-    // Stray Kids
-    "JDaLGGSkmNM", // God's Menu (神メニュー)
-    "LYJDf9oPQ-0", // MANIAC
-    "AdfIfFGCqgo", // S-Class
-    "2HjMiMPEFEo", // LALALALA
-    // (G)I-DLE
-    "z3szNvgQxHo", // Queencard
-    "IKo-1doiVfY", // TOMBOY
-    "OKNkKrqpR_8", // Super Lady
-    // TWICE
-    "kOHB85vDuow", // Feel Special
-    "pOGEFDLFcic", // I CAN'T STOP ME
-    "CM4CkVFmTds", // What is Love?
-    // EXO
-    "pSudEWAYvVc", // Love Me Right
-    "KSH-FGg9d2A", // Monster
-    "yWfsla_Uh80", // Call Me Baby
-    // Red Velvet
-    "JUJ3Pq74H4c", // Psycho
-    "glXgSSOKlls", // Peek-A-Boo
-    // SEVENTEEN
-    "FZ4kPFoMwAM", // Super
-    "PFNFcSEBRFg", // HOT
-    // TXT
-    "W3iSnJ663II", // Sugar Rush Ride
-    "UxcLv6Bfidc", // 0X1=LOVESONG
-    // ATEEZ
-    "p1bjnyDqI9k", // BOUNCY
-    "RqJ1rH9M5G0", // Guerrilla
-    // NMIXX
-    "BjOll51MnKg", // Dash
-    "LIz01xGgvVo", // Love Me Like This
-    // RIIZE
-    "VhMbWv_jiCU", // Impossible
-    // Zico
-    "LoHGjapInEg", // Any Song
-    // BABYMONSTER
-    "a6WxIFOOkLM", // SHEESH
-    // ILLIT
-    "rMBJwT8gJfg", // Magnetic
-    // PSY
-    "9bZkp7q19f0", // Gangnam Style
-    "ASO_zypdnsQ", // That That
-  ];
+   const [userName, setUserName] = useState<string>("Guest");
+   const [visitorId, setVisitorId] = useState<string>("");
+   
+   const [bgVideoId, setBgVideoId] = useState<string | null>(null);
+   useEffect(() => {
+     const fetchRandomMV = async () => {
+       try {
+         const res = await fetch("/api/songs/random-mv");
+         const data = await res.json();
+         if (data.success && data.data?.videoId) {
+           setBgVideoId(data.data.videoId);
+         } else {
+           setBgVideoId("gdZLi9oWNZg");
+         }
+       } catch {
+         setBgVideoId("gdZLi9oWNZg");
+       }
+     };
+     fetchRandomMV();
+   }, []);
 
-  const [bgVideoId] = useState(() => backgroundVideos[Math.floor(Math.random() * backgroundVideos.length)]);
-  const [bgMounted, setBgMounted] = useState(false);
+   const [bgMounted, setBgMounted] = useState(false);
 
   const [room, setRoomData] = useState<{
     id: string;
@@ -689,20 +622,20 @@ export default function RoomPage() {
     )
   );
 
-  return (
-    <div className="min-h-screen bg-black text-white overflow-hidden relative">
-      {/* 배경 뮤비 */}
-      {bgMounted && (
-        <div className="fixed inset-0 z-0 pointer-events-none">
-          <iframe
-            src={`https://www.youtube.com/embed/${bgVideoId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&loop=1&playlist=${bgVideoId}&modestbranding=1&playsinline=1`}
-            className="absolute top-1/2 left-1/2 w-[150%] h-[150%] -translate-x-1/2 -translate-y-1/2 opacity-60"
-            allow="autoplay; encrypted-media"
-            title="Background Video"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/90" />
-        </div>
-      )}
+   return (
+     <div className="min-h-screen bg-black text-white overflow-hidden relative">
+       {/* 배경 뮤비 */}
+       {bgMounted && bgVideoId && (
+         <div className="fixed inset-0 z-0 pointer-events-none">
+           <iframe
+             src={`https://www.youtube.com/embed/${bgVideoId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&loop=1&playlist=${bgVideoId}&modestbranding=1&playsinline=1`}
+             className="absolute top-1/2 left-1/2 w-[150%] h-[150%] -translate-x-1/2 -translate-y-1/2 opacity-60"
+             allow="autoplay; encrypted-media"
+             title="Background Video"
+           />
+           <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/90" />
+         </div>
+       )}
 
       {/* 상단 헤더 */}
       <header className="relative z-20 flex items-center justify-between px-4 py-3 md:p-6 bg-black/30 backdrop-blur-md border-b border-white/5">
