@@ -13,6 +13,9 @@ import {
   setQuizQuestions,
   nextQuestion,
   revealAnswer,
+  addToQueue,
+  removeFromQueue,
+  updateQueueItem,
 } from "@/store/slices/gameSlice";
 
 export function useSocket(roomCode: string | null) {
@@ -104,6 +107,19 @@ export function useSocket(roomCode: string | null) {
     socket.on("quiz:questions-data", (questions: any[]) => {
       dispatch(setQuizQuestions(questions));
       dispatch(setGameStatus("playing"));
+    });
+
+    // Queue synchronization listeners
+    socket.on("queue:song-added", (song: any) => {
+      dispatch(addToQueue(song));
+    });
+
+    socket.on("queue:song-removed", (data: { songId: string }) => {
+      dispatch(removeFromQueue(data.songId));
+    });
+
+    socket.on("queue:song-updated", (data: { songId: string; updates: any }) => {
+      dispatch(updateQueueItem({ id: data.songId, updates: data.updates }));
     });
 
     return () => {

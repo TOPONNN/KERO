@@ -169,6 +169,25 @@ export function initializeSocket(httpServer: HttpServer): Server {
       io.to(roomCode).emit("game:finished");
     });
 
+    // Queue synchronization events
+    socket.on("queue:add", (data: { roomCode: string; song: any }) => {
+      const roomCode = data.roomCode || socket.data.roomCode;
+      if (!roomCode) return;
+      socket.to(roomCode).emit("queue:song-added", data.song);
+    });
+
+    socket.on("queue:remove", (data: { roomCode: string; songId: string }) => {
+      const roomCode = data.roomCode || socket.data.roomCode;
+      if (!roomCode) return;
+      socket.to(roomCode).emit("queue:song-removed", { songId: data.songId });
+    });
+
+    socket.on("queue:update", (data: { roomCode: string; songId: string; updates: any }) => {
+      const roomCode = data.roomCode || socket.data.roomCode;
+      if (!roomCode) return;
+      socket.to(roomCode).emit("queue:song-updated", { songId: data.songId, updates: data.updates });
+    });
+
     normalModeHandler.registerEvents(socket);
     perfectScoreHandler.registerEvents(socket);
     lyricsQuizHandler.registerEvents(socket);

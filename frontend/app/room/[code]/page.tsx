@@ -196,21 +196,26 @@ export default function RoomPage() {
      }
    }, [gameStatus, songQueue]);
 
-  const addSongToQueue = async (song: TJSong) => {
-    const queueId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    dispatch(addToQueue({
-      id: queueId,
-      title: song.title,
-      artist: song.artist,
-      addedBy: userName,
-      status: "processing",
-      tjNumber: song.number,
-      composer: song.composer,
-      lyricist: song.lyricist,
-    }));
-    
-    setShowAddSong(false);
+   const addSongToQueue = async (song: TJSong) => {
+     const queueId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+     
+     const queueSong = {
+       id: queueId,
+       title: song.title,
+       artist: song.artist,
+       addedBy: userName,
+       status: "processing" as const,
+       tjNumber: song.number,
+       composer: song.composer,
+       lyricist: song.lyricist,
+     };
+     
+     dispatch(addToQueue(queueSong));
+     
+     // 다른 플레이어에게 대기열 추가 브로드캐스트
+     emitEvent("queue:add", { roomCode: code, song: queueSong });
+     
+     setShowAddSong(false);
     
     try {
       const ytRes = await fetch(`/api/search/youtube?q=${encodeURIComponent(`${song.title} ${song.artist} official MV`)}`);
@@ -243,22 +248,24 @@ export default function RoomPage() {
       const songId = data.data.id;
       const songStatus = data.data.processingStatus || data.data.status;
       
-      if (songStatus === "completed") {
-        dispatch(updateQueueItem({ 
-          id: queueId, 
-          updates: { songId, videoId: video.videoId, status: "ready" } 
-        }));
-      } else if (songStatus === "failed") {
-        dispatch(updateQueueItem({ 
-          id: queueId, 
-          updates: { 
-            songId, 
-            videoId: video.videoId, 
-            status: "failed",
-            errorMessage: data.data.message || "처리 중 오류가 발생했습니다"
-          } 
-        }));
-      } else {
+       if (songStatus === "completed") {
+         dispatch(updateQueueItem({ 
+           id: queueId, 
+           updates: { songId, videoId: video.videoId, status: "ready" } 
+         }));
+         emitEvent("queue:update", { roomCode: code, songId: queueId, updates: { songId, videoId: video.videoId, status: "ready" } });
+       } else if (songStatus === "failed") {
+         dispatch(updateQueueItem({ 
+           id: queueId, 
+           updates: { 
+             songId, 
+             videoId: video.videoId, 
+             status: "failed",
+             errorMessage: data.data.message || "처리 중 오류가 발생했습니다"
+           } 
+         }));
+         emitEvent("queue:update", { roomCode: code, songId: queueId, updates: { songId, videoId: video.videoId, status: "failed", errorMessage: data.data.message || "처리 중 오류가 발생했습니다" } });
+       } else {
         // Song is still processing, start polling
         dispatch(updateQueueItem({ 
           id: queueId, 
@@ -456,12 +463,48 @@ export default function RoomPage() {
     setMediaStatus(prev => ({ ...prev, isMicOn: !prev.isMicOn }));
   };
 
-    const startQuiz = () => {
+    const startQuiz = async () => {
       setIsQuizLoading(true);
-      emitEvent("quiz:start", { roomCode: code });
-      // Server will emit quiz:questions-data to all clients
-      // The useSocket hook handles receiving questions and setting game status
-      // Loading state will be cleared when game status changes to "playing"
+      try {
+        const res = await fetch(`/api/songs/quiz/generate?count=10`);
+        const data = await res.json();
+        
+        if (!data.success || !data.data?.questions) {
+          console.error("퀴즈 생성 실패:", data.message);
+          return;
+        }
+        
+        const questions = data.data.questions.map((q: any, idx: number) => {
+          const options = q.wrongAnswers && q.wrongAnswers.length > 0
+            ? [q.correctAnswer, ...q.wrongAnswers].sort(() => Math.random() - 0.5)
+            : undefined;
+          const correctIndex = options ? options.indexOf(q.correctAnswer) : undefined;
+          
+          return {
+            id: q.id || String(idx),
+            type: q.type || "lyrics_fill",
+            questionText: q.questionText,
+            options,
+            correctIndex,
+            correctAnswer: q.correctAnswer,
+            timeLimit: q.timeLimit || 10,
+            metadata: q.metadata,
+            lines: q.type === "lyrics_order" && q.wrongAnswers
+              ? q.wrongAnswers.map((text: string, i: number) => ({ idx: i, text })).sort(() => Math.random() - 0.5)
+              : undefined,
+          };
+        });
+        
+        dispatch(setQuizQuestions(questions));
+        dispatch(setGameStatus("playing"));
+        
+        // 다른 플레이어에게도 브로드캐스트
+        emitEvent("quiz:broadcast-questions", { roomCode: code, questions });
+      } catch (error) {
+        console.error("퀴즈 시작 오류:", error);
+      } finally {
+        setIsQuizLoading(false);
+      }
     };
 
   if (gameStatus === "playing" && (currentSong || room?.gameMode === "lyrics_quiz")) {
@@ -698,7 +741,10 @@ export default function RoomPage() {
                       )}
 
                       <button
-                        onClick={() => dispatch(removeFromQueue(song.id))}
+                        onClick={() => {
+                          dispatch(removeFromQueue(song.id));
+                          emitEvent("queue:remove", { roomCode: code, songId: song.id });
+                        }}
                         className="p-2.5 rounded-xl text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
                       >
                         <Trash2 className="w-5 h-5" />

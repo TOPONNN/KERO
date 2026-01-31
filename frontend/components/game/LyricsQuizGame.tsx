@@ -5,7 +5,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, Users, Check, X, AlertCircle, Send, RotateCcw, ArrowLeft } from "lucide-react";
 import type { RootState } from "@/store";
-import { selectAnswer, nextQuestion, revealAnswer, setGameStatus, updateStreak, resetQuiz } from "@/store/slices/gameSlice";
+import { selectAnswer, nextQuestion, revealAnswer, setGameStatus, updateStreak, resetQuiz, setQuizQuestions } from "@/store/slices/gameSlice";
 import { useSocket } from "@/hooks/useSocket";
 
 const KAHOOT_COLORS = [
@@ -254,7 +254,7 @@ export default function LyricsQuizGame() {
      }
    };
 
-    const restartQuiz = () => {
+    const restartQuiz = async () => {
       setIsRestarting(true);
       
       // Reset local state
@@ -271,10 +271,46 @@ export default function LyricsQuizGame() {
       dispatch(resetQuiz());
       dispatch(updateStreak(0));
       
-      // Emit socket event — server will generate new questions and broadcast to all clients
-      emitEvent("quiz:start", { roomCode: code });
-      // The useSocket hook will receive quiz:questions-data and dispatch setQuizQuestions
-      // isRestarting will be cleared by the useEffect below
+      try {
+        const res = await fetch(`/api/songs/quiz/generate?count=10`);
+        const data = await res.json();
+        
+        if (!data.success || !data.data?.questions) {
+          console.error("퀴즈 생성 실패:", data.message);
+          return;
+        }
+        
+        const questions = data.data.questions.map((q: any, idx: number) => {
+          const options = q.wrongAnswers && q.wrongAnswers.length > 0
+            ? [q.correctAnswer, ...q.wrongAnswers].sort(() => Math.random() - 0.5)
+            : undefined;
+          const correctIndex = options ? options.indexOf(q.correctAnswer) : undefined;
+          
+          return {
+            id: q.id || String(idx),
+            type: q.type || "lyrics_fill",
+            questionText: q.questionText,
+            options,
+            correctIndex,
+            correctAnswer: q.correctAnswer,
+            timeLimit: q.timeLimit || 10,
+            metadata: q.metadata,
+            lines: q.type === "lyrics_order" && q.wrongAnswers
+              ? q.wrongAnswers.map((text: string, i: number) => ({ idx: i, text })).sort(() => Math.random() - 0.5)
+              : undefined,
+          };
+        });
+        
+        dispatch(setQuizQuestions(questions));
+        dispatch(setGameStatus("playing"));
+        
+        // 다른 플레이어에게도 브로드캐스트
+        emitEvent("quiz:broadcast-questions", { roomCode: code, questions });
+      } catch (error) {
+        console.error("퀴즈 재시작 오류:", error);
+      } finally {
+        setIsRestarting(false);
+      }
     };
 
    const goToWaitingRoom = () => {
