@@ -49,3 +49,4 @@ __pycache__/
 
 # Sensitive cookies
 backend/cookies/
+.sisyphus/

@@ -6,8 +6,9 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { 
   Music, Target, MessageSquareText, Swords, Zap, ArrowLeft, Plus, Users, 
-  Search, Loader2, DoorOpen, Lock, Globe, RefreshCw, Trash2, Dices
+  Search, Loader2, DoorOpen, Lock, Globe, RefreshCw, Trash2, Dices, ChevronRight
 } from "lucide-react";
+import { toast } from "sonner";
 
 const modeConfig = {
    normal: { title: "일반 모드", icon: Music, color: "#C0C0C0" },
@@ -110,12 +111,12 @@ function LobbyContent() {
     }
 
     if (!roomName.trim()) {
-      alert("방 이름을 입력해주세요.");
+      toast.error("방 이름을 입력해주세요.");
       return;
     }
 
     if (!nickname.trim()) {
-      alert("닉네임을 입력해주세요.");
+      toast.error("닉네임을 입력해주세요.");
       return;
     }
 
@@ -148,14 +149,14 @@ function LobbyContent() {
       const data = await res.json();
 
       if (!data.success) {
-        alert(data.message || "방 생성에 실패했습니다.");
+        toast.error(data.message || "방 생성에 실패했습니다.");
         setCreating(false);
         return;
       }
 
       router.push(`/room/${data.data.code}`);
     } catch {
-      alert("서버 연결에 실패했습니다.");
+      toast.error("서버 연결에 실패했습니다.");
       setCreating(false);
     }
   };
@@ -163,7 +164,7 @@ function LobbyContent() {
   const joinRoom = async (code?: string) => {
     const roomCode = code || joinCode.trim().toUpperCase();
     if (!roomCode) {
-      alert("방 코드를 입력해주세요.");
+      toast.error("방 코드를 입력해주세요.");
       return;
     }
 
@@ -178,14 +179,14 @@ function LobbyContent() {
       const data = await res.json();
 
       if (!data.success) {
-        alert("방을 찾을 수 없습니다.");
+        toast.error("방을 찾을 수 없습니다.");
         setJoining(false);
         return;
       }
 
       router.push(`/room/${roomCode}`);
     } catch {
-      alert("서버 연결에 실패했습니다.");
+      toast.error("서버 연결에 실패했습니다.");
       setJoining(false);
     }
   };
@@ -193,7 +194,7 @@ function LobbyContent() {
   const deleteRoom = async (e: React.MouseEvent, code: string) => {
     e.stopPropagation();
     if (!userId) {
-      alert("로그인이 필요합니다.");
+      toast.error("로그인이 필요합니다.");
       return;
     }
     if (!confirm("정말 이 방을 삭제하시겠습니까?")) return;
@@ -210,10 +211,10 @@ function LobbyContent() {
       if (data.success) {
         fetchRooms();
       } else {
-        alert(data.message || "방 삭제에 실패했습니다.");
+        toast.error(data.message || "방 삭제에 실패했습니다.");
       }
     } catch {
-      alert("서버 연결에 실패했습니다.");
+      toast.error("서버 연결에 실패했습니다.");
     }
   };
 
@@ -246,7 +247,7 @@ function LobbyContent() {
         </button>
       </header>
 
-      <main className="relative z-10 px-6 md:px-12 pb-12">
+      <main className="relative z-10 px-4 sm:px-6 md:px-8 pb-12">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-8">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">
@@ -283,9 +284,13 @@ function LobbyContent() {
 
           {!mode && (
             <div className="relative mb-8 group">
-              <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-black to-transparent z-10 pointer-events-none md:hidden" />
-              <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-black to-transparent z-10 pointer-events-none md:hidden" />
-              <div className="flex overflow-x-auto pb-4 md:pb-0 px-4 md:px-0 md:justify-center gap-2 snap-x scrollbar-hide -mx-6 md:mx-0">
+              {/* Mobile Scroll Hints */}
+              <div className="absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-black via-black/50 to-transparent z-10 pointer-events-none md:hidden" />
+              <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-black via-black/50 to-transparent z-10 pointer-events-none md:hidden flex items-center justify-end pr-2">
+                <ChevronRight className="w-6 h-6 text-white/50 animate-pulse" />
+              </div>
+
+              <div className="flex overflow-x-auto pb-4 md:pb-0 px-4 md:px-0 md:justify-center gap-2 snap-x scrollbar-hide -mx-4 sm:-mx-6 md:mx-0">
                 <Link 
                   href="/lobby" 
                   className={`snap-center shrink-0 px-4 py-2.5 rounded-full transition-all border ${
@@ -336,7 +341,7 @@ function LobbyContent() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {rooms.map((room) => {
                 const roomConfig = modeConfig[room.gameMode];
                 const Icon = roomConfig.icon;
@@ -446,7 +451,7 @@ function LobbyContent() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="w-full max-w-md bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl ring-1 ring-white/5"
+              className="w-full max-w-md mx-4 sm:mx-auto bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl ring-1 ring-white/5 max-h-[90vh] overflow-y-auto scrollbar-hide"
               onClick={(e) => e.stopPropagation()}
             >
               <h2 className="text-2xl font-bold mb-2">방 만들기</h2>
@@ -470,7 +475,7 @@ function LobbyContent() {
                     value={nickname}
                     onChange={(e) => setNickname(e.target.value)}
                     placeholder="닉네임"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-white/30 focus:bg-white/10 transition-colors"
+                    className="w-full px-4 py-3 min-h-[44px] bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-white/30 focus:bg-white/10 transition-colors"
                   />
                 </div>
 
@@ -482,12 +487,12 @@ function LobbyContent() {
                       value={roomName}
                       onChange={(e) => setRoomName(e.target.value)}
                       placeholder="방 이름을 입력하세요"
-                      className="w-full px-4 py-3 pr-12 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-white/30 focus:bg-white/10 transition-colors"
+                      className="w-full px-4 py-3 pr-12 min-h-[44px] bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-white/30 focus:bg-white/10 transition-colors"
                     />
                     <button
                       type="button"
                       onClick={generateRandomName}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg hover:bg-white/10 transition-colors text-gray-400 hover:text-white"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-white/10 transition-colors text-gray-400 hover:text-white"
                       title="랜덤 이름 생성"
                     >
                       <Dices className="w-5 h-5" />
@@ -502,7 +507,7 @@ function LobbyContent() {
                       <button
                         key={num}
                         onClick={() => setMaxParticipants(num)}
-                        className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all border ${
+                        className={`flex-1 py-2.5 min-h-[44px] rounded-xl font-bold text-sm transition-all border ${
                           maxParticipants === num
                             ? "border-white/40 bg-white/15 text-white shadow-lg"
                             : "border-white/5 bg-white/5 text-gray-500 hover:bg-white/10 hover:text-gray-300"
@@ -520,7 +525,7 @@ function LobbyContent() {
 
                 <button
                   onClick={() => setIsPrivate(!isPrivate)}
-                  className="flex items-center gap-3 w-full p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors"
+                  className="flex items-center gap-3 w-full p-3 min-h-[44px] rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors"
                 >
                   <div className={`w-10 h-6 rounded-full transition-colors relative ${
                     isPrivate ? "bg-yellow-500" : "bg-white/20"
@@ -564,7 +569,7 @@ function LobbyContent() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-2xl p-6"
+              className="w-full max-w-md mx-4 sm:mx-auto bg-zinc-900 border border-white/10 rounded-2xl p-6"
               onClick={(e) => e.stopPropagation()}
             >
               <h2 className="text-2xl font-bold mb-6">코드로 입장</h2>
@@ -578,14 +583,14 @@ function LobbyContent() {
                     onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                     placeholder="6자리 코드 입력"
                     maxLength={6}
-                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl focus:outline-none focus:border-white/40 text-center text-2xl font-mono tracking-widest"
+                    className="w-full px-4 py-3 min-h-[44px] bg-white/10 border border-white/20 rounded-xl focus:outline-none focus:border-white/40 text-center text-2xl font-mono tracking-widest"
                   />
                 </div>
 
                 <button
                   onClick={() => joinRoom()}
                   disabled={joining || joinCode.length < 6}
-                  className="w-full py-3 rounded-xl font-bold text-black bg-white disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-3 min-h-[44px] rounded-xl font-bold text-black bg-white disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {joining ? (
                     <>

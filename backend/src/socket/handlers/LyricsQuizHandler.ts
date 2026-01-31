@@ -22,10 +22,6 @@ export class LyricsQuizHandler {
       const state = this.quizStates.get(data.roomCode);
       if (!state || data.questionIndex < 0 || data.questionIndex >= state.questions.length) return;
 
-      if (data.questionIndex > state.currentQuestionIndex) {
-        state.currentQuestionIndex = data.questionIndex;
-      }
-
       const question = state.questions[data.questionIndex];
       const isCorrect = this.validateAnswer(question, data.answer);
 

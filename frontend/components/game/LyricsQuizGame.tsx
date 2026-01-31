@@ -23,7 +23,7 @@ const TimerCircle = ({ timeLeft, timeLimit }: { timeLeft: number; timeLimit: num
   const progress = (timeLeft / timeLimit) * circumference;
   
   return (
-    <div className="relative w-20 h-20">
+    <div className="relative w-14 h-14 sm:w-20 sm:h-20">
       <svg className="w-full h-full -rotate-90" viewBox="0 0 80 80">
         <circle cx="40" cy="40" r={radius} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="6" />
         <circle 
@@ -39,7 +39,7 @@ const TimerCircle = ({ timeLeft, timeLimit }: { timeLeft: number; timeLimit: num
           className="transition-all duration-1000 ease-linear" 
         />
       </svg>
-      <span className={`absolute inset-0 flex items-center justify-center text-2xl font-bold ${timeLeft <= 5 ? "text-red-400" : "text-white"}`}>
+      <span className={`absolute inset-0 flex items-center justify-center text-lg sm:text-2xl font-bold ${timeLeft <= 5 ? "text-red-400" : "text-white"}`}>
         {timeLeft}
       </span>
     </div>
@@ -421,7 +421,7 @@ export default function LyricsQuizGame() {
       case "title_guess":
       case "artist_guess":
         return (
-          <div className="grid grid-cols-3 gap-3 w-full h-full">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 w-full h-full">
             {currentQuestion.options?.map((option, index) => {
               const isSelected = selectedAnswer === index;
               const isCorrect = isAnswerRevealed && index === currentQuestion.correctIndex;
@@ -437,16 +437,16 @@ export default function LyricsQuizGame() {
                    whileTap={!submitted ? { scale: 0.98 } : {}}
                    style={{ backgroundColor: KAHOOT_COLORS[index].bg }}
                    className={`
-                     relative p-4 rounded-lg shadow-lg flex items-center gap-3 text-left overflow-hidden
+                     relative p-3 sm:p-4 rounded-lg shadow-lg flex items-center gap-2 sm:gap-3 text-left overflow-hidden min-h-[60px] sm:min-h-auto
                      ${isOther ? "opacity-40" : "opacity-100"}
                      ${isSelected ? "ring-4 ring-white" : ""}
                      transition-all duration-300
                    `}
                  >
-                  <div className="flex-shrink-0 w-10 h-10 bg-black/20 rounded-full flex items-center justify-center text-xl font-bold text-white shadow-inner">
+                  <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-black/20 rounded-full flex items-center justify-center text-lg sm:text-xl font-bold text-white shadow-inner">
                     {KAHOOT_COLORS[index].shape}
                   </div>
-                   <span className="text-base font-bold text-white drop-shadow-md leading-tight">{cleanDisplay(option)}</span>
+                   <span className="text-sm sm:text-base font-bold text-white drop-shadow-md leading-tight">{cleanDisplay(option)}</span>
                   
                   {isCorrect && (
                     <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="absolute top-2 right-2">
@@ -466,22 +466,22 @@ export default function LyricsQuizGame() {
 
       case "true_false":
         return (
-          <div className="grid grid-cols-2 gap-6 w-full h-full">
+          <div className="grid grid-cols-2 gap-3 sm:gap-6 w-full h-full">
             <motion.button
               onClick={() => handleSelectAnswer(0)}
               disabled={submitted || isAnswerRevealed}
               whileHover={!submitted ? { scale: 1.05 } : {}}
               whileTap={!submitted ? { scale: 0.95 } : {}}
               className={`
-                bg-[#1368CE] rounded-xl flex flex-col items-center justify-center gap-4 p-8 shadow-xl
+                bg-[#1368CE] rounded-xl flex flex-col items-center justify-center gap-2 sm:gap-4 p-4 sm:p-8 shadow-xl
                 ${selectedAnswer === 0 ? "ring-8 ring-white" : ""}
                 ${isAnswerRevealed && currentQuestion.correctIndex !== 0 ? "opacity-40" : ""}
               `}
             >
-              <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center">
-                <div className="w-24 h-24 border-8 border-[#1368CE] rounded-full" />
+              <div className="w-20 h-20 sm:w-32 sm:h-32 bg-white rounded-full flex items-center justify-center">
+                <div className="w-12 h-12 sm:w-24 sm:h-24 border-4 sm:border-8 border-[#1368CE] rounded-full" />
               </div>
-              <span className="text-4xl font-black text-white">TRUE</span>
+              <span className="text-2xl sm:text-4xl font-black text-white">TRUE</span>
             </motion.button>
 
             <motion.button
@@ -490,23 +490,23 @@ export default function LyricsQuizGame() {
               whileHover={!submitted ? { scale: 1.05 } : {}}
               whileTap={!submitted ? { scale: 0.95 } : {}}
               className={`
-                bg-[#E21B3C] rounded-xl flex flex-col items-center justify-center gap-4 p-8 shadow-xl
+                bg-[#E21B3C] rounded-xl flex flex-col items-center justify-center gap-2 sm:gap-4 p-4 sm:p-8 shadow-xl
                 ${selectedAnswer === 1 ? "ring-8 ring-white" : ""}
                 ${isAnswerRevealed && currentQuestion.correctIndex !== 1 ? "opacity-40" : ""}
               `}
             >
-               <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center">
-                <X className="w-24 h-24 text-[#E21B3C] stroke-[5]" />
+               <div className="w-20 h-20 sm:w-32 sm:h-32 bg-white rounded-full flex items-center justify-center">
+                <X className="w-12 h-12 sm:w-24 sm:h-24 text-[#E21B3C] stroke-[5]" />
               </div>
-              <span className="text-4xl font-black text-white">FALSE</span>
+              <span className="text-2xl sm:text-4xl font-black text-white">FALSE</span>
             </motion.button>
           </div>
         );
 
       case "lyrics_order":
         return (
-          <div className="flex flex-col h-full gap-4">
-            <div className="flex-1 grid grid-rows-4 gap-3">
+          <div className="flex flex-col h-full gap-2 sm:gap-4">
+            <div className="flex-1 grid grid-rows-4 gap-2 sm:gap-3">
               {currentQuestion.lines?.map((line, idx) => {
                 const orderIndex = ordering.indexOf(idx);
                 const isSelected = orderIndex !== -1;
@@ -519,14 +519,14 @@ export default function LyricsQuizGame() {
                     layout
                     whileHover={!submitted && !isSelected ? { scale: 1.02, x: 10 } : {}}
                     className={`
-                      relative w-full p-4 rounded-xl flex items-center gap-4 text-left font-medium text-lg shadow-lg
+                      relative w-full p-3 sm:p-4 rounded-xl flex items-center gap-3 sm:gap-4 text-left font-medium text-base sm:text-lg shadow-lg
                       ${isSelected ? "bg-[#46178F] border-2 border-[#fff]" : "bg-white text-gray-800"}
                       ${isAnswerRevealed ? "opacity-50" : ""}
                       transition-colors
                     `}
                   >
                      <div className={`
-                       w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0
+                       w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-base sm:text-lg flex-shrink-0
                        ${isSelected ? "bg-[#FFD700] text-[#46178F]" : "bg-gray-200 text-gray-500"}
                      `}>
                        {isSelected ? orderIndex + 1 : idx + 1}
@@ -542,7 +542,7 @@ export default function LyricsQuizGame() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 onClick={handleOrderSubmit}
-                className="w-full py-4 bg-[#26890C] hover:bg-[#20720A] text-white font-bold text-xl rounded-xl shadow-xl flex items-center justify-center gap-2"
+                className="w-full py-3 sm:py-4 bg-[#26890C] hover:bg-[#20720A] text-white font-bold text-lg sm:text-xl rounded-xl shadow-xl flex items-center justify-center gap-2"
               >
                 <Check className="w-6 h-6" /> 제출하기
               </motion.button>
@@ -552,9 +552,9 @@ export default function LyricsQuizGame() {
 
       case "initial_guess":
         return (
-          <div className="flex flex-col items-center justify-center h-full gap-8">
-            <div className="bg-white/10 backdrop-blur-md p-12 rounded-3xl border border-white/20 shadow-2xl">
-              <span className="text-8xl font-black text-white tracking-widest drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">
+          <div className="flex flex-col items-center justify-center h-full gap-4 sm:gap-8">
+            <div className="bg-white/10 backdrop-blur-md p-6 sm:p-12 rounded-3xl border border-white/20 shadow-2xl">
+              <span className="text-5xl sm:text-8xl font-black text-white tracking-widest drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">
                 {currentQuestion.questionText}
               </span>
             </div>
@@ -567,7 +567,7 @@ export default function LyricsQuizGame() {
                    onChange={(e) => setTextAnswer(e.target.value)}
                    disabled={submitted || isAnswerRevealed}
                    placeholder="정답을 입력하세요"
-                   className="w-full px-8 py-6 rounded-full bg-white/90 text-[#46178F] text-2xl font-bold text-center placeholder:text-gray-400 focus:outline-none focus:ring-4 focus:ring-[#FFD700] shadow-xl disabled:opacity-50"
+                   className="w-full px-4 sm:px-8 py-3 sm:py-6 rounded-full bg-white/90 text-[#46178F] text-lg sm:text-2xl font-bold text-center placeholder:text-gray-400 focus:outline-none focus:ring-4 focus:ring-[#FFD700] shadow-xl disabled:opacity-50"
                    autoFocus
                  />
                  {submitted && !isAnswerRevealed && (
@@ -581,7 +581,7 @@ export default function LyricsQuizGame() {
                  <button
                    type="submit"
                    disabled={!textAnswer.trim()}
-                   className="w-full py-4 bg-[#1368CE] hover:bg-[#0E52A3] disabled:bg-gray-500 text-white font-bold text-xl rounded-full shadow-lg transition-colors flex items-center justify-center gap-2"
+                   className="w-full py-3 sm:py-4 bg-[#1368CE] hover:bg-[#0E52A3] disabled:bg-gray-500 text-white font-bold text-lg sm:text-xl rounded-full shadow-lg transition-colors flex items-center justify-center gap-2"
                  >
                    <Send className="w-6 h-6" /> 제출
                  </button>
@@ -760,7 +760,7 @@ export default function LyricsQuizGame() {
   };
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-[#46178F] to-[#1D0939] pl-16 pr-56 font-sans">
+    <div className="fixed inset-0 bg-gradient-to-br from-[#46178F] to-[#1D0939] p-3 sm:pl-16 sm:pr-56 font-sans">
       {/* Hidden YouTube audio player for TJ songs */}
       {youtubeVideoId && (
         <iframe
@@ -773,48 +773,48 @@ export default function LyricsQuizGame() {
       )}
       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 pointer-events-none"></div>
 
-      <div className="relative z-10 flex items-center justify-between h-24 px-8 border-b border-white/10">
-        <div className="flex items-center gap-6">
+      <div className="relative z-10 flex items-center justify-between h-auto sm:h-24 py-2 px-3 sm:px-8 border-b border-white/10">
+        <div className="flex items-center gap-3 sm:gap-6">
           <div className="flex flex-col">
-            <span className="text-sm font-bold text-white/60 uppercase tracking-widest">Question</span>
-            <span className="text-3xl font-black text-white">{currentQuestionIndex + 1} <span className="text-lg text-white/40">/ {quizQuestions.length}</span></span>
+            <span className="text-xs sm:text-sm font-bold text-white/60 uppercase tracking-widest">Question</span>
+            <span className="text-xl sm:text-3xl font-black text-white">{currentQuestionIndex + 1} <span className="text-sm sm:text-lg text-white/40">/ {quizQuestions.length}</span></span>
           </div>
           
           {streak >= 2 && (
             <motion.div 
               initial={{ scale: 0 }} 
               animate={{ scale: 1 }}
-              className="flex items-center gap-2 px-4 py-1 bg-[#FF6B6B] rounded-full shadow-[0_0_15px_rgba(255,107,107,0.5)]"
+              className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1 bg-[#FF6B6B] rounded-full shadow-[0_0_15px_rgba(255,107,107,0.5)]"
             >
-              <span className="text-xl">🔥</span>
-              <span className="font-bold text-white">{streak} 연속 정답!</span>
+              <span className="text-base sm:text-xl">🔥</span>
+              <span className="text-sm sm:text-base font-bold text-white">{streak} <span className="hidden sm:inline">연속 정답!</span></span>
             </motion.div>
           )}
         </div>
 
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3 sm:gap-6">
           <div className="flex flex-col items-end">
-             <span className="text-sm font-bold text-white/60 uppercase tracking-widest">Score</span>
-             <span className="text-2xl font-black text-white">{localScore.toLocaleString()}</span>
+             <span className="text-xs sm:text-sm font-bold text-white/60 uppercase tracking-widest">Score</span>
+             <span className="text-xl sm:text-2xl font-black text-white">{localScore.toLocaleString()}</span>
           </div>
           <TimerCircle timeLeft={timeLeft} timeLimit={currentQuestion.timeLimit || 20} />
         </div>
       </div>
 
-      <div className="relative z-10 flex flex-col h-[calc(100vh-6rem)] p-8 gap-8">
+      <div className="relative z-10 flex flex-col h-[calc(100vh-6rem)] p-3 gap-4 sm:p-8 sm:gap-8">
         
-        <div className="h-1/3 w-full bg-white rounded-2xl shadow-2xl flex flex-col items-center justify-center p-8 text-center relative overflow-hidden group">
+        <div className="h-1/3 w-full bg-white rounded-2xl shadow-2xl flex flex-col items-center justify-center p-4 sm:p-8 text-center relative overflow-hidden group">
           <div className="absolute top-0 left-0 w-full h-2 bg-[#46178F]"></div>
           
           {getQuestionHeader() && (
             <div className="absolute top-4 left-0 w-full text-center">
-               <span className="px-4 py-1 bg-gray-100 rounded-full text-gray-600 text-sm font-bold uppercase tracking-wide">
+               <span className="px-3 py-0.5 sm:px-4 sm:py-1 bg-gray-100 rounded-full text-gray-600 text-xs sm:text-sm font-bold uppercase tracking-wide">
                  {getQuestionHeader()}
                </span>
             </div>
           )}
 
-          <h1 className="text-4xl md:text-5xl font-black text-gray-800 leading-tight max-w-5xl">
+          <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-gray-800 leading-tight max-w-5xl">
             {currentQuestion.type === "lyrics_fill" ? (
                <span className="leading-normal">
                  {currentQuestion.questionText.split("___").map((part, i, arr) => (
@@ -848,25 +848,25 @@ export default function LyricsQuizGame() {
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className={`fixed bottom-0 left-0 right-0 h-48 z-50 flex items-center justify-center
+            className={`fixed bottom-0 left-0 right-0 h-auto py-6 sm:h-48 sm:py-0 z-50 flex items-center justify-center
               ${roundResults.find(r => r.odId === "local" || r.odName === "나")?.isCorrect ? "bg-[#26890C]" : "bg-[#E21B3C]"}
             `}
           >
-            <div className="flex items-center gap-8 text-white">
+            <div className="flex items-center gap-4 sm:gap-8 text-white">
                {roundResults.find(r => r.odId === "local" || r.odName === "나")?.isCorrect ? (
                  <>
-                   <div className="bg-white/20 p-4 rounded-full">
-                     <Check className="w-16 h-16" />
+                   <div className="bg-white/20 p-3 sm:p-4 rounded-full">
+                     <Check className="w-10 h-10 sm:w-16 sm:h-16" />
                    </div>
                    <div className="flex flex-col">
-                     <span className="text-5xl font-black">정답입니다!</span>
-                     <span className="text-2xl font-bold opacity-80">
+                     <span className="text-3xl sm:text-5xl font-black">정답입니다!</span>
+                     <span className="text-xl sm:text-2xl font-bold opacity-80">
                        +{roundResults.find(r => r.odId === "local" || r.odName === "나")?.points} points
                      </span>
                      <motion.div 
                         initial={{ y: 20, opacity: 0 }}
                         animate={{ y: -50, opacity: 1 }}
-                        className="absolute text-4xl font-black text-[#FFD700] right-1/4"
+                        className="absolute text-2xl sm:text-4xl font-black text-[#FFD700] right-4 sm:right-1/4"
                      >
                        +1000
                      </motion.div>
@@ -874,8 +874,8 @@ export default function LyricsQuizGame() {
                  </>
                 ) : (
                   <>
-                    <div className="bg-white/20 p-4 rounded-full">
-                      <X className="w-16 h-16" />
+                    <div className="bg-white/20 p-3 sm:p-4 rounded-full">
+                      <X className="w-10 h-10 sm:w-16 sm:h-16" />
                     </div>
                      <div className="flex flex-col">
                        {(() => {
@@ -883,20 +883,20 @@ export default function LyricsQuizGame() {
                          if (remote) {
                            return remote.isCorrect ? (
                              <>
-                               <span className="text-4xl font-black">{remote.odName}님이 정답!</span>
-                               <span className="text-2xl font-bold opacity-80">정답: {cleanDisplay(currentQuestion?.correctAnswer || '')}</span>
+                               <span className="text-2xl sm:text-4xl font-black">{remote.odName}님이 정답!</span>
+                               <span className="text-lg sm:text-2xl font-bold opacity-80">정답: {cleanDisplay(currentQuestion?.correctAnswer || '')}</span>
                              </>
                            ) : (
                              <>
-                               <span className="text-4xl font-black">{remote.odName}님도 오답!</span>
-                               <span className="text-2xl font-bold opacity-80">정답: {cleanDisplay(currentQuestion?.correctAnswer || '')}</span>
+                               <span className="text-2xl sm:text-4xl font-black">{remote.odName}님도 오답!</span>
+                               <span className="text-lg sm:text-2xl font-bold opacity-80">정답: {cleanDisplay(currentQuestion?.correctAnswer || '')}</span>
                              </>
                            );
                          }
                          return (
                            <>
-                             <span className="text-5xl font-black">오답!</span>
-                             <span className="text-2xl font-bold opacity-80">정답: {cleanDisplay(currentQuestion?.correctAnswer || '')}</span>
+                             <span className="text-3xl sm:text-5xl font-black">오답!</span>
+                             <span className="text-lg sm:text-2xl font-bold opacity-80">정답: {cleanDisplay(currentQuestion?.correctAnswer || '')}</span>
                            </>
                          );
                        })()}

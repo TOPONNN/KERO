@@ -75,6 +75,12 @@ router.post("/youtube", async (req: Request, res: Response) => {
 
 router.post("/:id/processing-callback", async (req: Request, res: Response) => {
   try {
+    const secret = req.headers['x-processing-secret'];
+    const expectedSecret = process.env.PROCESSING_SECRET || '***REDACTED_PROCESSING_SECRET***';
+    if (secret !== expectedSecret) {
+      return res.status(403).json({ success: false, message: "Unauthorized callback" });
+    }
+
     const id = req.params.id as string;
     const { vocalsUrl, instrumentalUrl, lyrics, duration, status } = req.body;
 

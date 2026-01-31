@@ -66,7 +66,22 @@ app.post("/api/online/heartbeat", async (req, res) => {
 // Get all online visitors
 app.get("/api/online", async (req, res) => {
   try {
-    const keys = await redis.keys("online:*");
+    // Use scan instead of keys to avoid blocking Redis
+    const keys: string[] = [];
+    let cursor = "0";
+    
+    do {
+      const [nextCursor, resultKeys] = await redis.scan(
+        cursor,
+        "MATCH",
+        "online:*",
+        "COUNT",
+        100
+      );
+      cursor = nextCursor;
+      keys.push(...resultKeys);
+    } while (cursor !== "0");
+    
     if (keys.length === 0) {
       return res.json({ success: true, data: { count: 0, users: [] } });
     }

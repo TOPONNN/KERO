@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
@@ -125,9 +125,12 @@ export default function RoomPage() {
    const [searching, setSearching] = useState(false);
    const [mediaStatus, setMediaStatus] = useState({ isCameraOn: true, isMicOn: true });
    const [isQuizLoading, setIsQuizLoading] = useState(false);
-  const [quizCount, setQuizCount] = useState(30);
+   const [quizCount, setQuizCount] = useState(30);
 
-  useEffect(() => {
+   const mountedRef = useRef(true);
+   const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+   useEffect(() => {
     const fetchRoom = async () => {
       try {
         const res = await fetch(`/api/rooms/${code}`);
@@ -170,12 +173,22 @@ export default function RoomPage() {
     }
   }, []);
 
-  // 클라이언트 마운트 후에만 배경 뮤비 렌더링 (SSR hydration 불일치 방지)
-  useEffect(() => {
-    setBgMounted(true);
-  }, []);
+   // 클라이언트 마운트 후에만 배경 뮤비 렌더링 (SSR hydration 불일치 방지)
+   useEffect(() => {
+     setBgMounted(true);
+   }, []);
 
-  // Listen for skip forward event from game components
+   // Cleanup polling on unmount
+   useEffect(() => {
+     return () => {
+       mountedRef.current = false;
+       if (pollTimeoutRef.current) {
+         clearTimeout(pollTimeoutRef.current);
+       }
+     };
+   }, []);
+
+   // Listen for skip forward event from game components
   useEffect(() => {
     const handleSkipForward = () => skipToNext();
     window.addEventListener("kero:skipForward", handleSkipForward);
@@ -288,60 +301,64 @@ export default function RoomPage() {
     }
   };
 
-   const pollSongStatus = useCallback(async (queueId: string, songId: string) => {
-     let retryCount = 0;
-     const maxRetries = 30;
-     
-     const checkStatus = async () => {
-       try {
-         const res = await fetch(`/api/songs/${songId}/status`);
-         const data = await res.json();
-         
-         if (!data.success) {
-           // Retry on API error instead of silently stopping
-           if (retryCount < maxRetries) {
-             retryCount++;
-             setTimeout(() => checkStatus(), 5000);
-           }
-           return;
-         }
-         
-         // Reset retry count on successful API response
-         retryCount = 0;
-         
-         const statusData = data.data;
-         
-         if (statusData.status === "completed") {
-           dispatch(updateQueueItem({ id: queueId, updates: { status: "ready" } }));
-         } else if (statusData.status === "failed") {
-           dispatch(updateQueueItem({ 
-             id: queueId, 
-             updates: { 
-               status: "failed",
-               errorMessage: statusData.message || "처리 중 오류가 발생했습니다"
-             } 
-           }));
-         } else {
-           dispatch(updateQueueItem({ 
-             id: queueId, 
-             updates: { 
-               processingStep: statusData.step,
-               processingProgress: statusData.progress,
-               processingMessage: statusData.message,
-             } 
-           }));
-           setTimeout(() => checkStatus(), 2000);
-         }
-       } catch (e) {
-         if (retryCount < maxRetries) {
-           retryCount++;
-           setTimeout(() => checkStatus(), 5000);
-         }
-       }
-     };
-     
-     checkStatus();
-   }, [dispatch]);
+    const pollSongStatus = useCallback(async (queueId: string, songId: string) => {
+      let retryCount = 0;
+      const maxRetries = 30;
+      
+      const checkStatus = async () => {
+        if (!mountedRef.current) return;
+        
+        try {
+          const res = await fetch(`/api/songs/${songId}/status`);
+          const data = await res.json();
+          
+          if (!data.success) {
+            // Retry on API error instead of silently stopping
+            if (retryCount < maxRetries && mountedRef.current) {
+              retryCount++;
+              pollTimeoutRef.current = setTimeout(() => checkStatus(), 5000);
+            }
+            return;
+          }
+          
+          // Reset retry count on successful API response
+          retryCount = 0;
+          
+          const statusData = data.data;
+          
+          if (statusData.status === "completed") {
+            dispatch(updateQueueItem({ id: queueId, updates: { status: "ready" } }));
+          } else if (statusData.status === "failed") {
+            dispatch(updateQueueItem({ 
+              id: queueId, 
+              updates: { 
+                status: "failed",
+                errorMessage: statusData.message || "처리 중 오류가 발생했습니다"
+              } 
+            }));
+          } else {
+            dispatch(updateQueueItem({ 
+              id: queueId, 
+              updates: { 
+                processingStep: statusData.step,
+                processingProgress: statusData.progress,
+                processingMessage: statusData.message,
+              } 
+            }));
+            if (mountedRef.current) {
+              pollTimeoutRef.current = setTimeout(() => checkStatus(), 2000);
+            }
+          }
+        } catch (e) {
+          if (retryCount < maxRetries && mountedRef.current) {
+            retryCount++;
+            pollTimeoutRef.current = setTimeout(() => checkStatus(), 5000);
+          }
+        }
+      };
+      
+      checkStatus();
+    }, [dispatch, mountedRef, pollTimeoutRef]);
 
   const playSong = async (queueItem: typeof songQueue[0]) => {
     if (queueItem.status !== "ready" || !queueItem.songId) return;
@@ -518,7 +535,7 @@ export default function RoomPage() {
 
   if (gameStatus === "playing" && (currentSong || room?.gameMode === "lyrics_quiz")) {
     return (
-      <div className="fixed inset-0 bg-black text-white">
+      <div className="fixed inset-0 bg-black text-white p-2 sm:pl-16 sm:pr-56">
         <GameComponent />
         
         {/* Top-left: small back button - compact, doesn't block quiz content */}
@@ -533,7 +550,7 @@ export default function RoomPage() {
           <ArrowLeft className="w-5 h-5" />
         </button>
 
-        <div className="absolute top-3 right-2 z-40 w-48 flex flex-col rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-black/40 backdrop-blur-md max-h-[70vh]">
+        <div className="absolute top-3 right-2 z-40 w-28 sm:w-48 flex flex-col rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-black/40 backdrop-blur-md max-h-[70vh]">
           <div className="w-full">
             <VideoRoom
               roomCode={code}
@@ -546,7 +563,7 @@ export default function RoomPage() {
           <div className="flex items-center justify-center gap-2 py-1.5 px-2 border-t border-white/10 bg-black/30">
             <button 
               onClick={handleMicToggle} 
-              className={`p-1.5 rounded-full transition-all ${
+              className={`p-1 sm:p-1.5 rounded-full transition-all ${
                 mediaStatus.isMicOn 
                   ? "text-white/70 hover:text-white hover:bg-white/10" 
                   : "bg-red-500/80 text-white"
@@ -557,7 +574,7 @@ export default function RoomPage() {
             </button>
             <button 
               onClick={handleCameraToggle} 
-              className={`p-1.5 rounded-full transition-all ${
+              className={`p-1 sm:p-1.5 rounded-full transition-all ${
                 mediaStatus.isCameraOn 
                   ? "text-white/70 hover:text-white hover:bg-white/10" 
                   : "bg-red-500/80 text-white"
@@ -647,7 +664,7 @@ export default function RoomPage() {
           <span className="hidden md:inline font-medium">로비</span>
         </Link>
 
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-3 max-w-[40%] md:max-w-[50%]">
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-3 max-w-[50%] sm:max-w-[60%]">
           <div 
             className="p-1.5 rounded-lg shrink-0 hidden md:block"
             style={{ backgroundColor: config.color }}
@@ -668,7 +685,7 @@ export default function RoomPage() {
           </div>
           <button
             onClick={copyCode}
-            className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full bg-white/10 hover:bg-white/20 transition-all border border-white/5 active:scale-95 backdrop-blur-md"
+            className="flex items-center gap-2 px-2 sm:px-4 py-1 sm:py-2 rounded-full bg-white/10 hover:bg-white/20 transition-all border border-white/5 active:scale-95 backdrop-blur-md"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
             <span className="font-mono font-bold text-sm tracking-wider">{code}</span>
@@ -678,7 +695,7 @@ export default function RoomPage() {
 
       {room?.gameMode === "lyrics_quiz" ? (
         <main className="relative z-10 flex flex-col items-center justify-center min-h-[calc(100vh-80px)] p-4 gap-4">
-          <div className="w-full max-w-lg bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl ring-1 ring-white/5 text-center">
+          <div className="w-full max-w-lg bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl p-4 sm:p-8 shadow-2xl ring-1 ring-white/5 text-center">
             <div className="w-20 h-20 rounded-2xl bg-[#FF6B6B]/20 flex items-center justify-center mx-auto mb-6">
               <MessageSquareText className="w-10 h-10 text-[#FF6B6B]" />
             </div>
@@ -693,7 +710,7 @@ export default function RoomPage() {
                   <button
                     key={num}
                     onClick={() => setQuizCount(num)}
-                    className={`px-6 py-3 rounded-xl font-bold text-lg transition-all border ${
+                    className={`px-4 py-2 sm:px-6 sm:py-3 rounded-xl font-bold text-lg transition-all border ${
                       quizCount === num
                         ? "bg-[#FF6B6B]/20 border-[#FF6B6B]/60 text-[#FF6B6B] shadow-[0_0_15px_-5px_rgba(255,107,107,0.4)]"
                         : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-gray-300"
@@ -756,7 +773,7 @@ export default function RoomPage() {
                   </div>
                 </div>
                 <h3 className="text-xl font-bold text-white mb-2">대기열이 비었습니다</h3>
-                <p className="text-gray-400 text-sm mb-8 leading-relaxed">
+                <p className="text-gray-400 text-xs sm:text-sm mb-8 leading-relaxed">
                   지금 바로 노래를 예약하고<br/>무대의 주인공이 되어보세요!
                 </p>
                 <button
@@ -776,7 +793,7 @@ export default function RoomPage() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.05 }}
-                    className="group relative flex items-center gap-4 p-4 bg-black/40 hover:bg-white/10 border border-white/5 hover:border-white/20 rounded-2xl transition-all duration-300 backdrop-blur-sm"
+                    className="group relative flex items-center gap-4 p-3 sm:p-4 bg-black/40 hover:bg-white/10 border border-white/5 hover:border-white/20 rounded-2xl transition-all duration-300 backdrop-blur-sm"
                   >
                     <div 
                       className="w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold shrink-0 shadow-lg"
@@ -803,7 +820,7 @@ export default function RoomPage() {
 
                     <div className="flex items-center gap-3 shrink-0">
                       {song.status === "processing" && (
-                        <div className="flex flex-col gap-1.5 min-w-[140px] p-3 rounded-xl bg-black/20 border border-white/5">
+                        <div className="flex flex-col gap-1.5 min-w-[100px] sm:min-w-[140px] p-2 sm:p-3 rounded-xl bg-black/20 border border-white/5">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <Loader2 className="w-3.5 h-3.5 animate-spin text-yellow-400" />

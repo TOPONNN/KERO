@@ -1,4 +1,4 @@
-import { spawn } from "child_process";
+import { spawn, ChildProcess } from "child_process";
 import { promises as fs } from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
@@ -22,6 +22,24 @@ export class YouTubeService {
   private readonly tempDir = "/tmp/kero-youtube";
   private readonly cookiesPath = "/app/cookies/youtube.txt";
 
+  private withTimeout<T>(
+    promise: Promise<T>,
+    ms: number,
+    message: string,
+    process?: ChildProcess
+  ): Promise<T> {
+    const timeout = new Promise<never>((_, reject) => {
+      const timer = setTimeout(() => {
+        if (process) {
+          process.kill();
+        }
+        reject(new Error(message));
+      }, ms);
+      promise.finally(() => clearTimeout(timer));
+    });
+    return Promise.race([promise, timeout]);
+  }
+
   constructor() {
     fs.mkdir(this.tempDir, { recursive: true }).catch(() => {});
   }
@@ -38,7 +56,7 @@ export class YouTubeService {
   async searchVideos(query: string, maxResults: number = 10): Promise<YouTubeSearchResult[]> {
     const cookiesArgs = await this.getCookiesArgs();
     
-    return new Promise((resolve, reject) => {
+    const promise = new Promise<YouTubeSearchResult[]>((resolve, reject) => {
       const args = [
         ...cookiesArgs,
         `ytsearch${maxResults}:${query}`,
@@ -83,13 +101,15 @@ export class YouTubeService {
         }
       });
     });
+
+    return this.withTimeout(promise, 30000, "YouTube search timed out after 30 seconds");
   }
 
    async downloadAudio(videoId: string, songId: string): Promise<DownloadResult> {
      const outputPath = path.join(this.tempDir, `${songId}.flac`);
     const cookiesArgs = await this.getCookiesArgs();
 
-    await new Promise<void>((resolve, reject) => {
+    const downloadPromise = new Promise<void>((resolve, reject) => {
        const args = [
          ...cookiesArgs,
          `https://www.youtube.com/watch?v=${videoId}`,
@@ -114,6 +134,8 @@ export class YouTubeService {
       });
     });
 
+    await this.withTimeout(downloadPromise, 300000, "YouTube download timed out after 300 seconds");
+
     const stats = await fs.stat(outputPath);
     const duration = await this.getAudioDuration(outputPath);
 
@@ -133,7 +155,7 @@ export class YouTubeService {
   async getVideoInfo(videoId: string): Promise<{ title: string; artist: string; duration: number } | null> {
     const cookiesArgs = await this.getCookiesArgs();
     
-    return new Promise((resolve) => {
+    const promise = new Promise<{ title: string; artist: string; duration: number } | null>((resolve) => {
       const args = [
         ...cookiesArgs,
         `https://www.youtube.com/watch?v=${videoId}`,
@@ -165,6 +187,8 @@ export class YouTubeService {
         }
       });
     });
+
+    return this.withTimeout(promise, 30000, "YouTube video info fetch timed out after 30 seconds").catch(() => null);
   }
 
   private parseTitle(title: string): { title: string; artist: string } {
@@ -186,7 +210,7 @@ export class YouTubeService {
   }
 
   private async getAudioDuration(filePath: string): Promise<number> {
-    return new Promise((resolve) => {
+    const promise = new Promise<number>((resolve) => {
       const process = spawn("ffprobe", [
         "-v", "error",
         "-show_entries", "format=duration",
@@ -202,6 +226,8 @@ export class YouTubeService {
         resolve(isNaN(duration) ? 0 : Math.round(duration));
       });
     });
+
+    return this.withTimeout(promise, 30000, "Audio duration probe timed out after 30 seconds").catch(() => 0);
   }
 
   private formatDuration(seconds: number | null): string {

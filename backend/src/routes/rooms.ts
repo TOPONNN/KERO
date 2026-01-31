@@ -53,6 +53,17 @@ router.delete("/:code", async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: "userId가 필요합니다." });
     }
 
+    // 방 조회
+    const room = await roomService.getRoomByCode(code);
+    if (!room) {
+      return res.status(404).json({ success: false, message: "방을 찾을 수 없습니다." });
+    }
+
+    // 호스트 검증
+    if (room.hostId !== userId) {
+      return res.status(403).json({ success: false, message: "방 호스트만 삭제할 수 있습니다." });
+    }
+
     await roomService.deleteRoom(code, userId);
     res.json({ success: true, message: "방이 삭제되었습니다." });
   } catch (error: any) {

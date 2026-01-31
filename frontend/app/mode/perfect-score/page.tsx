@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Target, ArrowLeft, Trophy, BarChart3, Zap, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function PerfectScoreModePage() {
   const router = useRouter();
@@ -52,14 +53,14 @@ export default function PerfectScoreModePage() {
       const data = await res.json();
 
       if (!data.success) {
-        alert(data.message || "방 생성에 실패했습니다.");
+        toast.error(data.message || "방 생성에 실패했습니다.");
         setLoading(false);
         return;
       }
 
       router.push(`/room/${data.data.code}`);
     } catch {
-      alert("서버 연결에 실패했습니다.");
+      toast.error("서버 연결에 실패했습니다.");
       setLoading(false);
     }
   };

@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect } from "react";
 import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
-import { ChevronDown, Music, Target, MessageSquareText, Swords, Users } from "lucide-react";
+import { ChevronDown, Music, Target, MessageSquareText, Swords, Users, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import OnlineIndicator from "@/components/OnlineIndicator";
 
@@ -56,9 +56,7 @@ const modes = [
 
 export default function HeroSection() {
   const [activeMode, setActiveMode] = useState(0);
-  const [hasExitedHero, setHasExitedHero] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const lastScrollTime = useRef(0);
   
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -69,60 +67,12 @@ export default function HeroSection() {
   const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
   const scale = useTransform(scrollYProgress, [0, 1], [1, 1.2]);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 100) {
-        setHasExitedHero(true);
-      } else if (window.scrollY === 0) {
-        setHasExitedHero(false);
-        setActiveMode(0);
-      }
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  const scrollToContent = () => {
-    const heroHeight = containerRef.current?.offsetHeight || window.innerHeight;
-    window.scrollTo({ top: heroHeight, behavior: 'smooth' });
-  };
-
-  const handleWheel = useCallback((e: WheelEvent) => {
-    if (hasExitedHero || window.scrollY > 10) return;
-    
-    const isLastMode = activeMode === modes.length - 1;
-    const isFirstMode = activeMode === 0;
-    const scrollingDown = e.deltaY > 0;
-    const scrollingUp = e.deltaY < 0;
-    
-    if (scrollingDown && isLastMode) return;
-    if (scrollingUp && isFirstMode) return;
-    
-    e.preventDefault();
-    
-    const now = Date.now();
-    if (now - lastScrollTime.current < 400) return;
-    
-    if (scrollingDown && activeMode < modes.length - 1) {
-      setActiveMode(prev => prev + 1);
-      lastScrollTime.current = now;
-    } else if (scrollingUp && activeMode > 0) {
-      setActiveMode(prev => prev - 1);
-      lastScrollTime.current = now;
-    }
-  }, [hasExitedHero, activeMode]);
-
-  useEffect(() => {
-    window.addEventListener('wheel', handleWheel, { passive: false });
-    return () => window.removeEventListener('wheel', handleWheel);
-  }, [handleWheel]);
-
   const currentMode = modes[activeMode];
   const Icon = currentMode.icon;
 
   return (
-    <section ref={containerRef} className="relative h-screen w-full overflow-hidden bg-black">
-      <motion.div style={{ y, scale, opacity }} className="absolute inset-0 z-0">
+    <section ref={containerRef} className="relative min-h-screen w-full overflow-hidden bg-black flex flex-col">
+      <motion.div style={{ y, scale, opacity }} className="absolute inset-0 z-0 hidden md:block">
         <video
           autoPlay
           loop
@@ -142,17 +92,34 @@ export default function HeroSection() {
         />
       </motion.div>
 
-      <div className="relative z-10 flex h-full w-full flex-col justify-between p-4 sm:p-6 md:p-12 lg:p-20">
-        <div className="flex flex-col gap-6 mt-12 sm:mt-16 md:mt-20">
-          <div className="flex items-end gap-6">
-            <motion.h1 
-              initial={{ opacity: 0, x: -50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8 }}
-              className="text-5xl sm:text-7xl font-bold tracking-tighter text-white md:text-[10rem]"
-            >
-              KERO
-            </motion.h1>
+      <div className="absolute inset-0 z-0 md:hidden">
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover opacity-60"
+        >
+           <source src="/hero-video.webm" type="video/webm" />
+           <source src="/hero-video.mp4" type="video/mp4" />
+        </video>
+        <div className="absolute inset-0 bg-black/60" />
+      </div>
+
+      <div className="relative z-10 flex h-full w-full flex-col p-4 sm:p-6 md:p-12 lg:p-20 overflow-y-auto md:overflow-visible">
+        
+        <div className="flex flex-col gap-2 mt-8 sm:mt-12 md:mt-20 shrink-0">
+          <motion.h1 
+            initial={{ opacity: 0, x: -50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8 }}
+            className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl xl:text-[10rem] font-bold tracking-tighter text-white"
+          >
+            KERO
+          </motion.h1>
+        </div>
+
+        <div className="hidden md:flex flex-col gap-6 mt-8">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeMode}
@@ -160,18 +127,17 @@ export default function HeroSection() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
-                className="flex items-center gap-2 mb-4 md:gap-3 md:mb-6"
+                className="flex items-center gap-3 mb-6"
               >
-                <Icon className="w-6 h-6 sm:w-8 sm:h-8" style={{ color: currentMode.accent }} />
+                <Icon className="w-8 h-8" style={{ color: currentMode.accent }} />
                 <span 
-                  className="text-xl sm:text-2xl md:text-3xl font-bold tracking-wider"
+                  className="text-3xl font-bold tracking-wider"
                   style={{ color: currentMode.accent }}
                 >
                   {currentMode.title}
                 </span>
               </motion.div>
             </AnimatePresence>
-          </div>
           
           <AnimatePresence mode="wait">
             <motion.div 
@@ -182,10 +148,10 @@ export default function HeroSection() {
               transition={{ duration: 0.3 }}
               className="space-y-4"
             >
-              <p className="text-base sm:text-xl font-medium tracking-wide text-gray-300 md:text-2xl">
+              <p className="text-2xl font-medium tracking-wide text-gray-300">
                 {currentMode.subtitle}
               </p>
-              <div className="max-w-md text-gray-400 space-y-1">
+              <div className="max-w-xl text-gray-400 space-y-1 text-lg">
                 {currentMode.description.map((line, i) => (
                   <p key={i}>{line}</p>
                 ))}
@@ -201,67 +167,70 @@ export default function HeroSection() {
           >
             <Link href={currentMode.href}>
               <motion.button 
-                className="rounded-full px-5 py-2.5 sm:px-8 sm:py-3 text-sm font-medium text-black transition-all"
+                className="rounded-full px-8 py-3 text-base font-medium text-black transition-all"
                 style={{ backgroundColor: currentMode.accent }}
-                whileHover={{ 
-                  backgroundColor: "#fff",
-                  scale: 1.05 
-                }}
+                whileHover={{ scale: 1.05, backgroundColor: "#fff" }}
                 whileTap={{ scale: 0.95 }}
               >
                 지금 참여하기
               </motion.button>
             </Link>
-            <motion.button 
-              onClick={scrollToContent}
-              className="rounded-full border px-5 py-2.5 sm:px-8 sm:py-3 text-sm font-medium text-white transition-all hover:text-black"
-              style={{ borderColor: `${currentMode.accent}50` }}
-              whileHover={{ 
-                backgroundColor: currentMode.accent,
-                scale: 1.05 
-              }}
-              whileTap={{ scale: 0.95 }}
-            >
-              기능 둘러보기
-            </motion.button>
           </motion.div>
         </div>
 
-        <div className="absolute right-8 top-1/2 -translate-y-1/2 hidden flex-col gap-8 md:flex">
-          <div className="flex flex-col gap-4 text-right">
-            {modes.map((mode, i) => (
-              <motion.button
-                key={mode.id}
-                onClick={() => setActiveMode(i)}
-                className={`cursor-pointer text-xl font-bold transition-all duration-300 ${
-                  i === activeMode 
-                    ? "scale-125" 
-                    : "text-white/30 hover:text-white/60"
-                }`}
-                style={{ color: i === activeMode ? mode.accent : undefined }}
-                whileHover={{ scale: i === activeMode ? 1.25 : 1.1 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                {mode.id}
-              </motion.button>
-            ))}
+        <div className="flex-1 mt-8 md:mt-auto md:pt-12 pb-20 md:pb-0">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4">
+            {modes.map((mode, i) => {
+              const ModeIcon = mode.icon;
+              const isActive = i === activeMode;
+              
+              return (
+                <Link 
+                  key={mode.id} 
+                  href={mode.href}
+                  onClick={(e) => {
+                    setActiveMode(i);
+                  }}
+                  onMouseEnter={() => setActiveMode(i)}
+                  className="group relative"
+                >
+                  <motion.div
+                    className={`h-full p-4 rounded-2xl border transition-all duration-300 flex flex-col justify-between gap-3
+                      ${isActive ? 'bg-white/10 border-white/20' : 'bg-black/20 border-white/5 hover:bg-white/5'}
+                    `}
+                    style={{ borderColor: isActive ? mode.accent : undefined }}
+                    whileHover={{ y: -5 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                     <div className="flex items-start justify-between">
+                        <ModeIcon 
+                          className={`w-6 h-6 transition-colors duration-300`}
+                          style={{ color: isActive ? mode.accent : '#666' }}
+                        />
+                        {isActive && <div className="hidden md:block w-2 h-2 rounded-full" style={{ backgroundColor: mode.accent }} />}
+                     </div>
+                     
+                     <div>
+                       <h3 className={`font-bold text-sm sm:text-base mb-1 transition-colors ${isActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-200'}`}>
+                         {mode.title}
+                       </h3>
+                       <p className="text-xs text-gray-500 line-clamp-1 group-hover:text-gray-400">
+                         {mode.subtitle}
+                       </p>
+                     </div>
+                     
+                     <div className="md:hidden mt-2 flex justify-end">
+                        <div className="p-1.5 rounded-full bg-white/10" style={{ color: mode.accent }}>
+                           <ArrowRight className="w-4 h-4" />
+                        </div>
+                     </div>
+                  </motion.div>
+                </Link>
+              );
+            })}
           </div>
-          <motion.div 
-            className="h-24 w-[2px] self-end mr-3 rounded-full"
-            style={{ backgroundColor: `${currentMode.accent}40` }}
-            layoutId="mode-indicator"
-          />
         </div>
 
-        <motion.button
-          onClick={scrollToContent}
-          animate={{ y: [0, 10, 0] }}
-          transition={{ repeat: Infinity, duration: 2 }}
-          className="self-center flex flex-col items-center gap-2 text-white/50 hover:text-white transition-colors cursor-pointer"
-        >
-          <span className="text-xs tracking-widest uppercase">Skip to Content</span>
-          <ChevronDown className="h-5 w-5" />
-         </motion.button>
        </div>
        <OnlineIndicator />
      </section>
