@@ -97,29 +97,29 @@ export default function LyricsQuizModePage() {
              <span className="text-[#FF6B6B]">노래 퀴즈</span>
            </h1>
 
-          <p className="text-xl text-gray-400 mb-12 leading-relaxed">
-            빈칸으로 가려진 가사를 맞춰보세요.
-            <br />
-            얼마나 많은 노래 가사를 알고 있나요?
-          </p>
+           <p className="text-xl text-gray-400 mb-12 leading-relaxed">
+             6가지 퀴즈 유형으로 노래 실력을 겨뤄보세요.
+             <br />
+             가사, 제목, 가수, 초성, 순서, O/X 퀴즈까지 다양한 문제가 기다리고 있습니다!
+           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-            <div className="p-6 rounded-2xl bg-white/5 border border-white/10">
-              <Brain className="w-8 h-8 text-[#FF6B6B] mb-4" />
-              <h3 className="font-bold mb-2">기억력 테스트</h3>
-              <p className="text-sm text-gray-400">좋아하는 노래 가사 기억하기</p>
-            </div>
-            <div className="p-6 rounded-2xl bg-white/5 border border-white/10">
-              <Sparkles className="w-8 h-8 text-[#FF6B6B] mb-4" />
-              <h3 className="font-bold mb-2">다양한 난이도</h3>
-              <p className="text-sm text-gray-400">쉬움부터 극한까지 선택</p>
-            </div>
-            <div className="p-6 rounded-2xl bg-white/5 border border-white/10">
-              <Clock className="w-8 h-8 text-[#FF6B6B] mb-4" />
-              <h3 className="font-bold mb-2">타임 어택</h3>
-              <p className="text-sm text-gray-400">제한 시간 내 정답 맞추기</p>
-            </div>
-          </div>
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+             <div className="p-6 rounded-2xl bg-white/5 border border-white/10">
+               <Brain className="w-8 h-8 text-[#FF6B6B] mb-4" />
+               <h3 className="font-bold mb-2">6가지 퀴즈 유형</h3>
+               <p className="text-sm text-gray-400">가사, 제목, 가수, 초성, 순서, O/X</p>
+             </div>
+             <div className="p-6 rounded-2xl bg-white/5 border border-white/10">
+               <Sparkles className="w-8 h-8 text-[#FF6B6B] mb-4" />
+               <h3 className="font-bold mb-2">실시간 대결</h3>
+               <p className="text-sm text-gray-400">친구들과 함께 경쟁하며 즐기기</p>
+             </div>
+             <div className="p-6 rounded-2xl bg-white/5 border border-white/10">
+               <Clock className="w-8 h-8 text-[#FF6B6B] mb-4" />
+               <h3 className="font-bold mb-2">스트릭 점수</h3>
+               <p className="text-sm text-gray-400">연속 정답으로 점수 배수 올리기</p>
+             </div>
+           </div>
 
           {mounted && (
             <motion.button
