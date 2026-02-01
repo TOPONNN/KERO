@@ -589,6 +589,43 @@ class LyricsProcessor:
                 line["start_time"] = 0.0
                 line["end_time"] = 0.5
 
+        for idx in range(len(line_timings)):
+            lt = line_timings[idx]
+            if lt["start_time"] is None or lt["end_time"] is None:
+                continue
+            dur = lt["end_time"] - lt["start_time"]
+            if dur < 1.5 and idx > 0:
+                prev_lt = line_timings[idx - 1]
+                if prev_lt["start_time"] is not None and prev_lt["end_time"] is not None:
+                    prev_dur = prev_lt["end_time"] - prev_lt["start_time"]
+                    if prev_dur > 6.0:
+                        prev_chars = max(1, len(_extract_syllables(prev_lt["text"])))
+                        curr_chars = max(1, len(_extract_syllables(lt["text"])))
+                        total_dur = prev_dur + dur
+                        total_chars = prev_chars + curr_chars
+                        new_prev_dur = total_dur * (prev_chars / total_chars)
+                        new_prev_dur = max(new_prev_dur, 2.0)
+                        new_boundary = prev_lt["start_time"] + new_prev_dur
+                        prev_lt["end_time"] = round(new_boundary, 3)
+                        lt["start_time"] = round(new_boundary, 3)
+                        lt["end_time"] = round(new_boundary + (total_dur - new_prev_dur), 3)
+
+            if dur > 6.0 and idx < len(line_timings) - 1:
+                next_lt = line_timings[idx + 1]
+                if next_lt["start_time"] is not None and next_lt["end_time"] is not None:
+                    next_dur = next_lt["end_time"] - next_lt["start_time"]
+                    if next_dur < 1.5:
+                        curr_chars = max(1, len(_extract_syllables(lt["text"])))
+                        next_chars = max(1, len(_extract_syllables(next_lt["text"])))
+                        total_dur = dur + next_dur
+                        total_chars = curr_chars + next_chars
+                        new_curr_dur = total_dur * (curr_chars / total_chars)
+                        new_curr_dur = max(new_curr_dur, 2.0)
+                        new_boundary = lt["start_time"] + new_curr_dur
+                        lt["end_time"] = round(new_boundary, 3)
+                        next_lt["start_time"] = round(new_boundary, 3)
+                        next_lt["end_time"] = round(new_boundary + (total_dur - new_curr_dur), 3)
+
         def _build_word_timings(line_text: str, line_start: float, line_end: float) -> List[Dict]:
             words = line_text.split()
             if not words:
@@ -622,9 +659,9 @@ class LyricsProcessor:
                 end_time = start_time + 0.5
 
             duration = end_time - start_time
-            if duration < 0.5:
-                end_time = start_time + 0.5
-                duration = 0.5
+            if duration < 1.0:
+                end_time = start_time + 1.0
+                duration = 1.0
             if duration > 15.0:
                 end_time = start_time + 15.0
 
