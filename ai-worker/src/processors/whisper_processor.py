@@ -4,6 +4,7 @@ import re
 import gc
 import uuid
 import torch
+import unicodedata
 
 # WhisperX uses Silero VAD (not Pyannote) to avoid torch.load compatibility issues
 
@@ -573,137 +574,269 @@ class LyricsProcessor:
         WhisperX provides the TIMING (when each line/word is sung).
         """
         api_lines = [l.strip() for l in lyrics_text.split("\n") if l.strip()]
+        if not api_lines:
+            return []
 
-        # Convert WhisperX segments to our line format (with word timing)
-        wx_lines = self._build_lines_from_whisperx(whisperx_segments)
+        def _is_hangul_syllable(char: str) -> bool:
+            return "\uac00" <= char <= "\ud7a3"
 
-        if not wx_lines:
-            # No WhisperX timing — return API lines without timing
+        def _strip_for_match(text: str) -> str:
+            normalized = unicodedata.normalize("NFKC", text or "")
+            stripped = []
+            for char in normalized:
+                if char.isspace():
+                    continue
+                category = unicodedata.category(char)
+                if category.startswith("P") or category.startswith("S"):
+                    continue
+                stripped.append(char)
+            return "".join(stripped)
+
+        def _extract_syllables(text: str) -> List[str]:
+            stripped = _strip_for_match(text)
+            syllables = []
+            for char in stripped:
+                if _is_hangul_syllable(char):
+                    syllables.append(char)
+                elif char.isalnum():
+                    syllables.append(char.lower())
+            return syllables
+
+        def _count_chars(text: str) -> int:
+            return len(_extract_syllables(text))
+
+        def _build_syllable_stream(segments: List[Dict]) -> List[Dict]:
+            stream = []
+            for seg in segments or []:
+                words = seg.get("words", []) or []
+                if not words and seg.get("text", "").strip():
+                    words = [{
+                        "start": seg.get("start", 0.0),
+                        "end": seg.get("end", seg.get("start", 0.0)),
+                        "word": seg.get("text", ""),
+                    }]
+
+                for word in words:
+                    start = word.get("start", word.get("start_time", 0.0))
+                    end = word.get("end", word.get("end_time", start))
+                    text = word.get("word", word.get("text", "")).strip()
+                    syllables = _extract_syllables(text)
+                    if not syllables:
+                        continue
+                    duration = max(end - start, 0.001)
+                    step = duration / len(syllables)
+                    for idx, syl in enumerate(syllables):
+                        stream.append({
+                            "syl": syl,
+                            "start_time": start + idx * step,
+                            "end_time": start + (idx + 1) * step,
+                        })
+            stream.sort(key=lambda item: item["start_time"])
+            return stream
+
+        wx_syllables = _build_syllable_stream(whisperx_segments)
+        if not wx_syllables:
             return [{"start_time": 0, "end_time": 0, "text": line, "words": []}
                     for line in api_lines]
 
-        WINDOW_SIZE = 15
-        SIMILARITY_THRESHOLD = 0.25
-        wx_search_start = 0
-        matched_results = []
+        line_ranges = []
+        api_tokens = []
+        line_break = "<LB>"
+        for idx, line in enumerate(api_lines):
+            line_syllables = _extract_syllables(line)
+            start_idx = len(api_tokens)
+            api_tokens.extend(line_syllables)
+            end_idx = len(api_tokens)
+            line_ranges.append((start_idx, end_idx))
+            if idx < len(api_lines) - 1:
+                api_tokens.append(line_break)
 
-        for api_idx, api_line in enumerate(api_lines):
-            best_idx = -1
-            best_score = 0.0
-
-            search_end = min(wx_search_start + WINDOW_SIZE, len(wx_lines))
-            for i in range(wx_search_start, search_end):
-                score = self._text_similarity(api_line, wx_lines[i]["text"])
-                if score > best_score:
-                    best_score = score
-                    best_idx = i
-
-            if best_idx >= 0 and best_score >= SIMILARITY_THRESHOLD:
-                matched_results.append((api_idx, api_line, wx_lines[best_idx]))
-                wx_search_start = best_idx + 1
-            else:
-                matched_results.append((api_idx, api_line, None))
-
-        result = []
-        next_match_indices = [None] * len(matched_results)
-        next_idx = None
-        for i in range(len(matched_results) - 1, -1, -1):
-            if matched_results[i][2] is not None:
-                next_idx = i
-            next_match_indices[i] = next_idx
-
-        prev_match_idx = None
-        for idx, (_, api_line, wx_line) in enumerate(matched_results):
-            if wx_line is not None:
-                prev_match_idx = idx
-
-                # Use API text + WhisperX timing
-                api_words = api_line.split()
-                wx_words = wx_line.get("words", [])
-
-                if api_words and wx_words:
-                    if len(api_words) == len(wx_words):
-                        # 1:1 — replace text, keep timing
-                        mapped_words = []
-                        for aw, ww in zip(api_words, wx_words):
-                            mapped_words.append({
-                                "start_time": ww["start_time"],
-                                "end_time": ww["end_time"],
-                                "text": aw,
-                            })
-                    else:
-                        # Different word count — distribute timing proportionally
-                        line_start = wx_words[0]["start_time"]
-                        line_end = max(w["end_time"] for w in wx_words)
-                        total_dur = max(line_end - line_start, 0.5)
-                        n = len(api_words)
-                        word_dur = total_dur / n
-                        mapped_words = []
-                        for j, aw in enumerate(api_words):
-                            mapped_words.append({
-                                "start_time": round(line_start + j * word_dur, 3),
-                                "end_time": round(line_start + (j + 1) * word_dur, 3),
-                                "text": aw,
-                            })
-                else:
-                    mapped_words = [{"start_time": wx_line["start_time"],
-                                    "end_time": wx_line["end_time"], "text": api_line}]
-
+        if not api_tokens:
+            total_start = wx_syllables[0]["start_time"]
+            total_end = wx_syllables[-1]["end_time"]
+            total_duration = max(total_end - total_start, 0.5)
+            per_line = total_duration / len(api_lines)
+            result = []
+            for i, line in enumerate(api_lines):
+                start_time = total_start + i * per_line
+                end_time = start_time + per_line
+                words = line.split()
+                word_timings = []
+                if words:
+                    word_dur = per_line / len(words)
+                    for j, word in enumerate(words):
+                        word_timings.append({
+                            "start_time": round(start_time + j * word_dur, 3),
+                            "end_time": round(start_time + (j + 1) * word_dur, 3),
+                            "text": word,
+                        })
                 result.append({
-                    "start_time": wx_line["start_time"],
-                    "end_time": wx_line["end_time"],
-                    "text": api_line,
-                    "words": mapped_words,
+                    "start_time": round(start_time, 3),
+                    "end_time": round(end_time, 3),
+                    "text": line,
+                    "words": word_timings,
                 })
+            return result
+
+        match_score = 2.0
+        mismatch_penalty = -1.0
+        gap_penalty = -0.5
+        neg_inf = -1e9
+
+        n = len(api_tokens)
+        m = len(wx_syllables)
+        score = [[0.0] * (m + 1) for _ in range(n + 1)]
+        trace = [[0] * (m + 1) for _ in range(n + 1)]
+
+        for i in range(1, n + 1):
+            gap = 0.0 if api_tokens[i - 1] == line_break else gap_penalty
+            score[i][0] = score[i - 1][0] + gap
+            trace[i][0] = 1
+
+        for j in range(1, m + 1):
+            score[0][j] = score[0][j - 1] + gap_penalty
+            trace[0][j] = 2
+
+        for i in range(1, n + 1):
+            api_token = api_tokens[i - 1]
+            for j in range(1, m + 1):
+                if api_token == line_break:
+                    diag = neg_inf
+                    up = score[i - 1][j]
+                    left = score[i][j - 1] + gap_penalty
+                else:
+                    wx_token = wx_syllables[j - 1]["syl"]
+                    match = match_score if api_token == wx_token else mismatch_penalty
+                    diag = score[i - 1][j - 1] + match
+                    up = score[i - 1][j] + gap_penalty
+                    left = score[i][j - 1] + gap_penalty
+
+                best = diag
+                direction = 0
+                if up > best:
+                    best = up
+                    direction = 1
+                if left > best:
+                    best = left
+                    direction = 2
+                score[i][j] = best
+                trace[i][j] = direction
+
+        aligned_indices = [-1] * n
+        i = n
+        j = m
+        while i > 0 or j > 0:
+            if i > 0 and j > 0 and trace[i][j] == 0:
+                if api_tokens[i - 1] != line_break:
+                    aligned_indices[i - 1] = j - 1
+                i -= 1
+                j -= 1
+            elif i > 0 and (trace[i][j] == 1 or j == 0):
+                i -= 1
+            else:
+                j -= 1
+
+        line_timings = []
+        for line_idx, (start_idx, end_idx) in enumerate(line_ranges):
+            aligned = [aligned_indices[k] for k in range(start_idx, end_idx)
+                       if aligned_indices[k] >= 0]
+            if aligned:
+                min_idx = min(aligned)
+                max_idx = max(aligned)
+                start_time = wx_syllables[min_idx]["start_time"]
+                end_time = wx_syllables[max_idx]["end_time"]
+            else:
+                start_time = None
+                end_time = None
+            line_timings.append({
+                "start_time": start_time,
+                "end_time": end_time,
+                "text": api_lines[line_idx],
+            })
+
+        next_with_time: List[int] = [-1] * len(line_timings)
+        next_idx = -1
+        for idx in range(len(line_timings) - 1, -1, -1):
+            if line_timings[idx]["start_time"] is not None:
+                next_idx = idx
+            next_with_time[idx] = next_idx
+
+        prev_idx: Optional[int] = None
+        for idx, line in enumerate(line_timings):
+            if line["start_time"] is not None:
+                prev_idx = idx
                 continue
 
-            prev_line = matched_results[prev_match_idx][2] if prev_match_idx is not None else None
-            next_match_idx = next_match_indices[idx]
-            next_line = matched_results[next_match_idx][2] if next_match_idx is not None else None
+            next_idx = next_with_time[idx]
+            prev_line = line_timings[prev_idx] if prev_idx is not None else None
+            next_line = line_timings[next_idx] if next_idx >= 0 else None
 
-            if prev_line and next_line:
-                gap = next_match_idx - prev_match_idx
-                ratio = (idx - prev_match_idx) / gap if gap else 1.0
-                start_time = prev_line["start_time"] + (next_line["start_time"] - prev_line["start_time"]) * ratio
-                end_time = prev_line["end_time"] + (next_line["end_time"] - prev_line["end_time"]) * ratio
-            elif next_line and not prev_line:
-                gap = next_match_idx + 1
+            if prev_line is not None and next_line is not None and prev_idx is not None:
+                gap = next_idx - prev_idx
+                ratio = (idx - prev_idx) / gap if gap else 1.0
+                line["start_time"] = prev_line["start_time"] + (next_line["start_time"] - prev_line["start_time"]) * ratio
+                line["end_time"] = prev_line["end_time"] + (next_line["end_time"] - prev_line["end_time"]) * ratio
+            elif next_line is not None and prev_line is None:
+                gap = next_idx + 1
                 ratio = (idx + 1) / gap if gap else 1.0
-                start_time = (next_line["start_time"]) * ratio
-                end_time = (next_line["end_time"]) * ratio
-            elif prev_line and not next_line:
-                offset = idx - prev_match_idx
-                start_time = prev_line["end_time"] + 0.5 * offset
-                end_time = start_time + 0.5
+                line["start_time"] = next_line["start_time"] * ratio
+                line["end_time"] = next_line["end_time"] * ratio
+            elif prev_line is not None and next_line is None and prev_idx is not None:
+                offset = idx - prev_idx
+                line["start_time"] = prev_line["end_time"] + 0.5 * offset
+                line["end_time"] = line["start_time"] + 0.5
             else:
-                start_time = 0.0
-                end_time = 0.5
+                line["start_time"] = 0.0
+                line["end_time"] = 0.5
 
+        def _build_word_timings(line_text: str, line_start: float, line_end: float) -> List[Dict]:
+            words = line_text.split()
+            if not words:
+                return []
+
+            char_counts = [max(1, _count_chars(word)) for word in words]
+            total_chars = sum(char_counts)
+            duration = max(line_end - line_start, 0.5)
+            word_timings = []
+            char_offset = 0
+            for word, chars in zip(words, char_counts):
+                start = line_start + (char_offset / total_chars) * duration
+                end = line_start + ((char_offset + chars) / total_chars) * duration
+                word_timings.append({
+                    "start_time": round(start, 3),
+                    "end_time": round(end, 3),
+                    "text": word,
+                })
+                char_offset += chars
+            return word_timings
+
+        result = []
+        prev_end = 0.0
+        for line in line_timings:
+            start_time = float(line["start_time"] or 0.0)
+            end_time = float(line["end_time"] or (start_time + 0.5))
+
+            if start_time < prev_end:
+                start_time = prev_end
             if end_time < start_time:
                 end_time = start_time + 0.5
 
-            api_words = api_line.split()
-            mapped_words = []
-            if api_words:
-                total_dur = max(end_time - start_time, 0.5)
-                n = len(api_words)
-                word_dur = total_dur / n
-                for j, aw in enumerate(api_words):
-                    mapped_words.append({
-                        "start_time": round(start_time + j * word_dur, 3),
-                        "end_time": round(start_time + (j + 1) * word_dur, 3),
-                        "text": aw,
-                    })
+            duration = end_time - start_time
+            if duration < 0.5:
+                end_time = start_time + 0.5
+                duration = 0.5
+            if duration > 15.0:
+                end_time = start_time + 15.0
 
+            word_timings = _build_word_timings(line["text"], start_time, end_time)
             result.append({
                 "start_time": round(start_time, 3),
                 "end_time": round(end_time, 3),
-                "text": api_line,
-                "words": mapped_words,
+                "text": line["text"],
+                "words": word_timings,
             })
+            prev_end = end_time
 
-        # Sort by timing
-        result.sort(key=lambda l: l["start_time"])
         return result
 
     def _build_lines_with_mfa_only(self, audio_path: str, lyrics_text: str, language: str) -> List[Dict]:
