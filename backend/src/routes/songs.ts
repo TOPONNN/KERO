@@ -136,6 +136,17 @@ router.get("/quiz/generate", async (req: Request, res: Response) => {
 
 router.get("/random-mv", async (req: Request, res: Response) => {
   try {
+    // 1. Try pre-cached pool first (instant)
+    const poolData = await redis.get("random-mv:pool");
+    if (poolData) {
+      const pool = JSON.parse(poolData);
+      if (pool.length > 0) {
+        const random = pool[Math.floor(Math.random() * pool.length)];
+        return res.json({ success: true, data: random });
+      }
+    }
+
+    // 2. Fallback: check individual caches
     let tjSongs: { number: string; title: string; artist: string }[] = [];
     const cacheKey = "tj:chart:monthly";
     const cached = await redis.get(cacheKey);
@@ -154,22 +165,31 @@ router.get("/random-mv", async (req: Request, res: Response) => {
       return res.json({ success: false, message: "No songs available" });
     }
     
-    const randomSong = tjSongs[Math.floor(Math.random() * tjSongs.length)];
-     const searchQuery = `${randomSong.artist} ${randomSong.title} 공식 MV 4K`;
+    // Try cached YouTube results before live search
+    const shuffled = [...tjSongs].sort(() => Math.random() - 0.5);
+    for (const song of shuffled.slice(0, 10)) {
+      const ytCacheKey = `yt:mv:4k:${song.artist}:${song.title}`;
+      const ytCached = await redis.get(ytCacheKey);
+      if (ytCached) {
+        const data = JSON.parse(ytCached);
+        return res.json({ success: true, data: { videoId: data.videoId, title: song.title, artist: song.artist } });
+      }
+    }
+
+    // 3. Last resort: live YouTube search
+    const randomSong = shuffled[0];
+    const searchQuery = `${randomSong.artist} ${randomSong.title} 공식 MV 4K`;
     const results = await youtubeService.searchVideos(searchQuery, 1);
     
     if (results.length === 0) {
       return res.json({ success: false, message: "No YouTube result found" });
     }
     
-    res.json({
-      success: true,
-      data: {
-        videoId: results[0].videoId,
-        title: randomSong.title,
-        artist: randomSong.artist,
-      }
-    });
+    // Cache for next time
+    const entry = { videoId: results[0].videoId, title: randomSong.title, artist: randomSong.artist };
+    await redis.setex(`yt:mv:4k:${randomSong.artist}:${randomSong.title}`, 86400, JSON.stringify(entry));
+    
+    res.json({ success: true, data: entry });
   } catch (error: any) {
     console.error("Random MV error:", error.message);
     res.status(500).json({ success: false, message: error.message });

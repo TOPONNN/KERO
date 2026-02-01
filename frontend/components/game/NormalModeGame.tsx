@@ -464,14 +464,14 @@ export default function NormalModeGame() {
        <div className="absolute inset-0 z-0" style={{ transform: 'translateZ(0)' }}>
          {videoId ? (
            <>
-             <iframe
-               src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&loop=1&playlist=${videoId}&modestbranding=1&playsinline=1`}
-               className="absolute top-1/2 left-1/2 w-[140%] h-[140%] -translate-x-1/2 -translate-y-1/2"
-               allow="autoplay; encrypted-media"
-               title="Background MV"
-               style={{ pointerEvents: 'none' }}
-               loading="lazy"
-             />
+              <iframe
+                src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&loop=1&playlist=${videoId}&modestbranding=1&playsinline=1&vq=hd2160`}
+                className="absolute top-1/2 left-1/2 w-[140%] h-[140%] -translate-x-1/2 -translate-y-1/2"
+                allow="autoplay; encrypted-media"
+                title="Background MV"
+                style={{ pointerEvents: 'none' }}
+                loading="lazy"
+              />
             <div className="absolute inset-0 bg-black/40" />
           </>
         ) : (

@@ -136,9 +136,11 @@ async function bootstrap() {
     // Pre-cache quiz data on startup (5s delay) and every hour
     setTimeout(() => {
       songService.warmupQuizCache().catch(e => console.error("[QuizCache] Startup warmup failed:", e));
+      songService.warmupRandomMVPool().catch(e => console.error("[MVPool] Startup warmup failed:", e));
     }, 5000);
     setInterval(() => {
       songService.warmupQuizCache().catch(e => console.error("[QuizCache] Scheduled warmup failed:", e));
+      songService.warmupRandomMVPool().catch(e => console.error("[MVPool] Scheduled warmup failed:", e));
     }, 3600000);
   } catch (error) {
     console.error("Bootstrap error:", error);

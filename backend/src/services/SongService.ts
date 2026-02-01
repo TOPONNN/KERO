@@ -414,6 +414,64 @@ export class SongService {
     }
   }
 
+  async warmupRandomMVPool(): Promise<void> {
+    console.log("[MVPool] Starting warmup...");
+    try {
+      const cacheKey = "tj:chart:monthly";
+      let tjSongs: { number: string; title: string; artist: string }[] = [];
+      
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        tjSongs = JSON.parse(cached);
+      } else {
+        tjSongs = await tjKaraokeService.searchPopular("monthly", "KOR", 100);
+        if (tjSongs.length > 0) {
+          await redis.setex(cacheKey, 3600, JSON.stringify(tjSongs));
+        }
+      }
+
+      if (tjSongs.length === 0) {
+        console.warn("[MVPool] No TJ songs available");
+        return;
+      }
+
+      const pool: { videoId: string; title: string; artist: string }[] = [];
+
+      for (let i = 0; i < tjSongs.length; i += 5) {
+        const batch = tjSongs.slice(i, i + 5);
+        await Promise.all(
+          batch.map(async (song) => {
+            try {
+              const searchQuery = `${song.artist} ${song.title} 공식 MV 4K`;
+              const ytCacheKey = `yt:mv:4k:${song.artist}:${song.title}`;
+              
+              const existing = await redis.get(ytCacheKey);
+              if (existing) {
+                const data = JSON.parse(existing);
+                pool.push({ videoId: data.videoId, title: song.title, artist: song.artist });
+                return;
+              }
+              
+              const videos = await youtubeService.searchVideos(searchQuery, 1).catch(() => []);
+              if (videos.length > 0) {
+                const entry = { videoId: videos[0].videoId, title: song.title, artist: song.artist };
+                await redis.setex(ytCacheKey, 86400, JSON.stringify(entry));
+                pool.push(entry);
+              }
+            } catch {}
+          })
+        );
+      }
+
+      if (pool.length > 0) {
+        await redis.setex("random-mv:pool", 7200, JSON.stringify(pool));
+        console.log(`[MVPool] Warmup complete: ${pool.length} MVs cached`);
+      }
+    } catch (e) {
+      console.error("[MVPool] Warmup error:", e);
+    }
+  }
+
   async generateTJEnhancedQuiz(count: number = 10): Promise<any[]> {
     // 1. Get TJ chart songs for quiz material (Redis-cached)
     let tjSongs: { number: string; title: string; artist: string }[] = [];

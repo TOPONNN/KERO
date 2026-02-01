@@ -646,14 +646,14 @@ export default function RoomPage() {
        {/* 배경 뮤비 */}
         {bgMounted && bgVideoId && (
           <div className="fixed inset-0 z-0 pointer-events-none">
-            <iframe
-              src={`https://www.youtube-nocookie.com/embed/${bgVideoId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&loop=1&playlist=${bgVideoId}&modestbranding=1&playsinline=1`}
-              loading="lazy"
-              onLoad={() => setBgVideoLoaded(true)}
-              className={`absolute top-1/2 left-1/2 w-[150%] h-[150%] -translate-x-1/2 -translate-y-1/2 transition-opacity duration-1000 ${bgVideoLoaded ? 'opacity-60' : 'opacity-0'}`}
-              allow="autoplay; encrypted-media"
-              title="Background Video"
-            />
+             <iframe
+               src={`https://www.youtube-nocookie.com/embed/${bgVideoId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&loop=1&playlist=${bgVideoId}&modestbranding=1&playsinline=1&vq=hd2160`}
+               loading="lazy"
+               onLoad={() => setBgVideoLoaded(true)}
+               className={`absolute top-1/2 left-1/2 w-[150%] h-[150%] -translate-x-1/2 -translate-y-1/2 transition-opacity duration-1000 ${bgVideoLoaded ? 'opacity-60' : 'opacity-0'}`}
+               allow="autoplay; encrypted-media"
+               title="Background Video"
+             />
             <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/90" />
           </div>
         )}
