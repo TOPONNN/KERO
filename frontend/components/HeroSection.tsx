@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback } from "react";
 import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
-import { ChevronDown, Music, Target, MessageSquareText, Swords, Users, ArrowRight } from "lucide-react";
+import { ChevronDown, Music, Target, MessageSquareText, Swords, Users } from "lucide-react";
 import Link from "next/link";
 import OnlineIndicator from "@/components/OnlineIndicator";
 
@@ -180,12 +180,12 @@ export default function HeroSection() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.3 }}
-              className="space-y-4"
+              className="space-y-3 md:space-y-4 rounded-2xl bg-black/40 backdrop-blur-sm p-4 md:bg-transparent md:backdrop-blur-none md:p-0 md:rounded-none"
             >
-              <p className="text-base sm:text-xl font-medium tracking-wide text-gray-300 md:text-2xl">
+              <p className="text-lg sm:text-xl font-semibold tracking-wide text-white md:text-2xl md:font-medium md:text-gray-300">
                 {currentMode.subtitle}
               </p>
-              <div className="max-w-md text-gray-400 space-y-1">
+              <div className="max-w-md text-gray-300 md:text-gray-400 space-y-1 text-sm md:text-base">
                 {currentMode.description.map((line, i) => (
                   <p key={i}>{line}</p>
                 ))}
@@ -197,11 +197,11 @@ export default function HeroSection() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.8, duration: 0.6 }}
-            className="flex gap-4 mt-8"
+            className="flex gap-3 sm:gap-4 mt-6 md:mt-8"
           >
             <Link href={currentMode.href}>
               <motion.button 
-                className="rounded-full px-5 py-2.5 sm:px-8 sm:py-3 text-sm font-medium text-black transition-all"
+                className="rounded-full px-5 py-2.5 sm:px-8 sm:py-3 text-sm font-bold sm:font-medium text-black transition-all"
                 style={{ backgroundColor: currentMode.accent }}
                 whileHover={{ 
                   backgroundColor: "#fff",
@@ -225,24 +225,28 @@ export default function HeroSection() {
               기능 둘러보기
             </motion.button>
           </motion.div>
-          {/* Mobile mode grid */}
-          <div className="grid grid-cols-2 gap-2.5 mt-8 md:hidden">
-            {modes.map((mode) => {
+          <div className="grid grid-cols-2 gap-2.5 mt-6 md:hidden">
+            {modes.map((mode, i) => {
               const ModeIcon = mode.icon;
+              const isActive = i === activeMode;
               return (
-                <Link key={mode.id} href={mode.href}>
-                  <motion.div
-                    className="flex items-center gap-3 p-3.5 rounded-xl bg-white/5 border border-white/10 active:scale-95 transition-transform"
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <ModeIcon className="w-5 h-5 shrink-0" style={{ color: mode.accent }} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-white truncate">{mode.title}</p>
-                      <p className="text-[11px] text-gray-500 truncate">{mode.subtitle}</p>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-white/30 shrink-0" />
-                  </motion.div>
-                </Link>
+                <motion.button
+                  key={mode.id}
+                  onClick={() => setActiveMode(i)}
+                  className={`flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all ${
+                    isActive
+                      ? "bg-white/10 border-white/20"
+                      : "bg-white/5 border-white/10"
+                  }`}
+                  style={isActive ? { borderColor: `${mode.accent}60`, boxShadow: `0 0 20px -5px ${mode.accent}30` } : undefined}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <ModeIcon className="w-5 h-5 shrink-0" style={{ color: isActive ? mode.accent : '#666' }} />
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-bold truncate ${isActive ? 'text-white' : 'text-gray-400'}`}>{mode.title}</p>
+                    <p className="text-[11px] text-gray-500 truncate">{mode.subtitle}</p>
+                  </div>
+                </motion.button>
               );
             })}
           </div>
@@ -278,7 +282,7 @@ export default function HeroSection() {
           onClick={scrollToContent}
           animate={{ y: [0, 10, 0] }}
           transition={{ repeat: Infinity, duration: 2 }}
-          className="self-center flex flex-col items-center gap-2 text-white/50 hover:text-white transition-colors cursor-pointer"
+          className="self-center flex flex-col items-center gap-2 text-white/50 hover:text-white transition-colors cursor-pointer mt-8 mb-4 md:mt-0 md:mb-0"
         >
            <span className="text-xs tracking-widest uppercase hidden md:block">Skip to Content</span>
            <ChevronDown className="h-5 w-5" />
