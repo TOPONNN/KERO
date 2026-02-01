@@ -71,7 +71,13 @@ export default function LyricsQuizGame() {
    const streakRef = useRef(streak);
    const audioRef = useRef<HTMLAudioElement | null>(null);
    const questionIndexRef = useRef(currentQuestionIndex);
-    
+   const advanceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+   const roundResultsRef = useRef(roundResults);
+   const isRevealedRef = useRef(isAnswerRevealed);
+
+   roundResultsRef.current = roundResults;
+   isRevealedRef.current = isAnswerRevealed;
+   
    const [ordering, setOrdering] = useState<number[]>([]);
    const [textAnswer, setTextAnswer] = useState("");
    const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null);
@@ -190,12 +196,19 @@ export default function LyricsQuizGame() {
   }, [currentQuestionIndex]);
 
   useEffect(() => {
+    return () => {
+      if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
     if (isAnswerRevealed && !hasProcessedRevealRef.current) {
       hasProcessedRevealRef.current = true;
       setShowResults(true);
       
-      const myResult = roundResults.find(r => r.odId === "local" || r.odName === "나");
-      const remoteResult = roundResults.find(r => r.odId !== "local" && r.odName !== "나");
+      const results = roundResultsRef.current;
+      const myResult = results.find(r => r.odId === "local" || r.odName === "나");
+      const remoteResult = results.find(r => r.odId !== "local" && r.odName !== "나");
       if (myResult) {
         if (myResult.isCorrect) {
           const newStreak = streakRef.current + 1;
@@ -220,7 +233,8 @@ export default function LyricsQuizGame() {
       }
 
       const capturedIndex = currentQuestionIndex;
-      const timeout = setTimeout(() => {
+      if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
+      advanceTimeoutRef.current = setTimeout(() => {
         // If socket already advanced us past this question, skip
         if (questionIndexRef.current !== capturedIndex) return;
         setShowResults(false);
@@ -230,14 +244,14 @@ export default function LyricsQuizGame() {
         }
         setYoutubeVideoId(null);
         dispatch(nextQuestion());
+        advanceTimeoutRef.current = null;
       }, advanceDelay);
-      return () => clearTimeout(timeout);
     }
 
     if (!isAnswerRevealed) {
       hasProcessedRevealRef.current = false;
     }
-   }, [isAnswerRevealed, currentQuestionIndex, dispatch, roundResults]);
+  }, [isAnswerRevealed, currentQuestionIndex, dispatch]);
 
    const handleSelectAnswer = (index: number) => {
      if (submitted || isAnswerRevealed) return;
@@ -270,11 +284,12 @@ export default function LyricsQuizGame() {
 
      // Local answer revelation after short delay
      setTimeout(() => {
-       dispatch(revealAnswer([{
-         odId: "local",
-         odName: "나",
-         isCorrect,
-         points,
+        if (isRevealedRef.current) return;
+        dispatch(revealAnswer([{
+          odId: "local",
+          odName: "나",
+          isCorrect,
+          points,
        }]));
      }, 800);
    };
@@ -299,11 +314,12 @@ export default function LyricsQuizGame() {
      });
 
      setTimeout(() => {
-       dispatch(revealAnswer([{
-         odId: "local",
-         odName: "나",
-         isCorrect,
-         points,
+        if (isRevealedRef.current) return;
+        dispatch(revealAnswer([{
+          odId: "local",
+          odName: "나",
+          isCorrect,
+          points,
        }]));
      }, 800);
    };
@@ -329,11 +345,12 @@ export default function LyricsQuizGame() {
      });
 
      setTimeout(() => {
-       dispatch(revealAnswer([{
-         odId: "local",
-         odName: "나",
-         isCorrect,
-         points,
+        if (isRevealedRef.current) return;
+        dispatch(revealAnswer([{
+          odId: "local",
+          odName: "나",
+          isCorrect,
+          points,
        }]));
      }, 800);
    };

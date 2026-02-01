@@ -128,6 +128,8 @@ export default function RoomPage() {
    const [isQuizLoading, setIsQuizLoading] = useState(false);
    const [quizCount, setQuizCount] = useState(30);
 
+   const isHost = participants.some(p => p.nickname === userName && p.isHost);
+
    const mountedRef = useRef(true);
    const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -711,36 +713,43 @@ export default function RoomPage() {
             <div className="mb-6">
               <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">문제 수</p>
               <div className="flex gap-3 justify-center">
-                {[10, 30, 50, 100].map((num) => (
-                  <button
-                    key={num}
-                    onClick={() => setQuizCount(num)}
-                    className={`px-3 py-2 sm:px-5 sm:py-3 rounded-xl font-bold text-sm sm:text-base whitespace-nowrap transition-all border ${
-                      quizCount === num
-                        ? "bg-[#FF6B6B]/20 border-[#FF6B6B]/60 text-[#FF6B6B] shadow-[0_0_15px_-5px_rgba(255,107,107,0.4)]"
-                        : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-gray-300"
-                    }`}
-                  >
-                    {num}문제
-                  </button>
-                ))}
+               {[10, 30, 50, 100].map((num) => (
+                   <button
+                     key={num}
+                     onClick={() => isHost && setQuizCount(num)}
+                     disabled={!isHost}
+                     className={`px-3 py-2 sm:px-5 sm:py-3 rounded-xl font-bold text-sm sm:text-base whitespace-nowrap transition-all border ${
+                       quizCount === num
+                         ? "bg-[#FF6B6B]/20 border-[#FF6B6B]/60 text-[#FF6B6B] shadow-[0_0_15px_-5px_rgba(255,107,107,0.4)]"
+                         : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-gray-300"
+                     } ${!isHost ? "opacity-50 cursor-not-allowed" : ""}`}
+                   >
+                     {num}문제
+                   </button>
+                 ))}
               </div>
             </div>
 
-             <button
-               onClick={startQuiz}
-               disabled={isQuizLoading}
-               className="w-full py-4 rounded-xl bg-[#FF6B6B] text-black font-bold text-xl hover:bg-[#FF5252] transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-             >
-               {isQuizLoading ? (
-                 <>
-                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-black"></div>
-                   퀴즈 생성 중...
-                 </>
-               ) : (
-                 "퀴즈 시작"
-               )}
-             </button>
+              <button
+                onClick={startQuiz}
+                disabled={isQuizLoading || !isHost}
+                className={`w-full py-4 rounded-xl font-bold text-xl transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+                  isHost
+                    ? "bg-[#FF6B6B] text-black hover:bg-[#FF5252]"
+                    : "bg-white/10 text-white/50 border border-white/10"
+                }`}
+              >
+                {isQuizLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-black"></div>
+                    퀴즈 생성 중...
+                  </>
+                ) : isHost ? (
+                  "퀴즈 시작"
+                ) : (
+                  "호스트가 퀴즈를 시작합니다"
+                )}
+              </button>
           </div>
           {renderParticipants()}
         </main>
