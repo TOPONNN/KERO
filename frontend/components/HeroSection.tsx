@@ -252,11 +252,11 @@ export default function HeroSection() {
                 <motion.button
                   key={mode.id}
                   onClick={() => setActiveMode(i)}
-                  className="flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all backdrop-blur-sm"
+                  className="flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all"
                   style={{
-                    background: isActive ? `linear-gradient(135deg, ${mode.accent}25, ${mode.accent}10)` : `linear-gradient(135deg, ${mode.accent}10, transparent)`,
-                    borderColor: isActive ? `${mode.accent}80` : `${mode.accent}20`,
-                    boxShadow: isActive ? `0 0 24px -4px ${mode.accent}50` : 'none',
+                    background: isActive ? `linear-gradient(135deg, ${mode.accent}40, ${mode.accent}20)` : `${mode.accent}12`,
+                    borderColor: isActive ? `${mode.accent}90` : `${mode.accent}30`,
+                    boxShadow: isActive ? `0 0 20px -2px ${mode.accent}50` : 'none',
                   }}
                   whileTap={{ scale: 0.95 }}
                 >
