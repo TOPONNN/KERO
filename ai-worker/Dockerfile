@@ -89,8 +89,8 @@ ENV PATH="/app/venv/bin:${PATH}"
 ENV PYTHONPATH="/app/venv/lib/python3.12/site-packages"
 ENV LD_LIBRARY_PATH="/app/venv/lib/python3.12/site-packages/nvidia/cudnn/lib:/app/venv/lib/python3.12/site-packages/nvidia/cublas/lib:/app/venv/lib/python3.12/site-packages/nvidia/cufft/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 
-# Pre-download BS Roformer model so it's baked into the image
-RUN python -c "from audio_separator.separator import Separator; s = Separator(); s.load_model('model_bs_roformer_ep_317_sdr_12.9755.ckpt')"
+# Pre-download MelBand Roformer model so it's baked into the image
+RUN python -c "from audio_separator.separator import Separator; s = Separator(); s.load_model('mel_band_roformer_kim_ft3_unwa.ckpt')"
 
 COPY src/ ./src/
 
