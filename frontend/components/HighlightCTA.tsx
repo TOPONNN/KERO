@@ -13,7 +13,7 @@ export default function HighlightCTA() {
     >
       <div className="flex flex-1 flex-col justify-center p-6 sm:p-12 md:p-24">
         <BlurIn>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold leading-tight text-white">
+          <h2 className="text-4xl md:text-7xl font-bold leading-tight text-white">
             THE <span className="text-[#C0C0C0]">REAL-TIME</span>
             <br /> KARAOKE
           </h2>

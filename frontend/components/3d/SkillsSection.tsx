@@ -11,12 +11,12 @@ const SkillsSection = () => {
     >
       <div className="flex flex-col items-center justify-start pt-16 md:pt-24 text-center">
         <RevealAnimation>
-          <h2 className="text-4xl md:text-6xl font-bold text-white/90">
+          <h2 className="text-4xl md:text-7xl font-bold text-center text-white">
             Tech Stack
           </h2>
         </RevealAnimation>
         <RevealAnimation delay={0.2}>
-          <p className="mt-4 text-lg text-white/50">(hint: press a key)</p>
+          <p className="mt-4 text-base text-white/50 text-center">(hint: press a key)</p>
         </RevealAnimation>
       </div>
     </SectionWrapper>
