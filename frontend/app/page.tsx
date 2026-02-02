@@ -10,10 +10,16 @@ import Header from "@/components/Header";
 import AnimatedBackground from "@/components/3d/AnimatedBackground";
 import SkillsSection from "@/components/3d/SkillsSection";
 import SmoothScroll from "@/components/animations/SmoothScroll";
+import Particles from "@/components/effects/Particles";
+import ShootingStars from "@/components/effects/ShootingStars";
 
 export default function Home() {
   return (
     <SmoothScroll>
+      <div className="fixed inset-0 -z-10">
+        <Particles className="absolute inset-0" quantity={100} />
+        <ShootingStars />
+      </div>
       <AnimatedBackground />
       <main className="relative z-10 min-h-screen text-white selection:bg-[#C0C0C0] selection:text-black">
         <Header />

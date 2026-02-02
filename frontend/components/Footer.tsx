@@ -9,7 +9,7 @@ export default function Footer() {
   };
 
   return (
-    <footer className="w-full border-t border-white/10 bg-black py-12 px-6 md:px-20">
+    <footer className="w-full border-t border-white/10 bg-black/80 backdrop-blur-md py-12 px-6 md:px-20">
       <RevealAnimation className="flex flex-col md:flex-row items-center justify-between gap-8">
         <div className="flex items-center gap-4">
           <h2 className="text-2xl font-bold text-white">KERO</h2>

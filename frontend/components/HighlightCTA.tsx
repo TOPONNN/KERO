@@ -9,7 +9,7 @@ export default function HighlightCTA() {
   return (
     <SectionWrapper
       id="cta"
-      className="flex flex-col md:flex-row min-h-screen md:h-screen w-full bg-black/70 backdrop-blur-sm"
+      className="flex flex-col md:flex-row min-h-screen md:h-screen w-full bg-black/60 backdrop-blur-md"
     >
       <div className="flex flex-1 flex-col justify-center p-6 sm:p-12 md:p-24">
         <BlurIn>
@@ -35,7 +35,7 @@ export default function HighlightCTA() {
           </Link>
         </RevealAnimation>
       </div>
-      <div className="relative h-[40vh] md:flex-1 md:h-auto bg-black/50 overflow-hidden">
+      <div className="relative h-[40vh] md:flex-1 md:h-auto bg-black/40 overflow-hidden">
         <video
           autoPlay
           loop

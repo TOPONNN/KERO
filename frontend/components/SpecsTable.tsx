@@ -19,7 +19,7 @@ export default function SpecsTable() {
   ];
 
   return (
-    <SectionWrapper id="specs" className="w-full py-16 sm:py-24 md:py-32 bg-black/80 backdrop-blur-sm text-white px-6 md:px-20">
+    <SectionWrapper id="specs" className="w-full py-16 sm:py-24 md:py-32 bg-black/60 backdrop-blur-md text-white px-6 md:px-20">
       <div className="max-w-7xl mx-auto">
         <RevealAnimation>
           <h2 className="mb-8 sm:mb-12 md:mb-16 text-xs font-bold tracking-[0.2em] text-white/50 uppercase">

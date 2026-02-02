@@ -20,7 +20,7 @@ export default function FAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <SectionWrapper id="faq" className="w-full py-16 sm:py-24 md:py-32 bg-black/85 backdrop-blur-sm px-6 md:px-20">
+    <SectionWrapper id="faq" className="w-full py-16 sm:py-24 md:py-32 bg-black/60 backdrop-blur-md px-6 md:px-20">
       <div className="max-w-4xl mx-auto">
         <RevealAnimation>
           <h2 className="mb-8 sm:mb-12 md:mb-20 text-2xl sm:text-3xl md:text-4xl font-bold text-white">FAQ</h2>
