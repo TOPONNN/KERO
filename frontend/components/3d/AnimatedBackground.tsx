@@ -95,6 +95,8 @@ const AnimatedBackground = () => {
         playPressSound();
         setSelectedSkill(skill);
         selectedSkillRef.current = skill;
+        splineApp.setVariable("heading", skill.label);
+        splineApp.setVariable("desc", skill.shortDescription);
       }
     });
 
@@ -322,23 +324,19 @@ const AnimatedBackground = () => {
     const textMobileDark = splineApp.findObjectByName("text-mobile-dark");
     const textMobileLight = splineApp.findObjectByName("text-mobile");
 
-    if (!textDesktopDark || !textDesktopLight || !textMobileDark || !textMobileLight) return;
+    if (textDesktopDark) textDesktopDark.visible = false;
+    if (textDesktopLight) textDesktopLight.visible = false;
+    if (textMobileDark) textMobileDark.visible = false;
+    if (textMobileLight) textMobileLight.visible = false;
 
-    const hideAll = () => {
-      textDesktopDark.visible = false;
-      textDesktopLight.visible = false;
-      textMobileDark.visible = false;
-      textMobileLight.visible = false;
-    };
-
-    if (activeSection !== "skills") {
-      hideAll();
-    } else if (isMobile) {
-      hideAll();
-      textMobileLight.visible = true;
-    } else {
-      hideAll();
-      textDesktopLight.visible = true;
+    if (activeSection === "skills") {
+      if (isMobile) {
+        if (textMobileLight) textMobileLight.visible = true;
+        else if (textMobileDark) textMobileDark.visible = true;
+      } else {
+        if (textDesktopLight) textDesktopLight.visible = true;
+        else if (textDesktopDark) textDesktopDark.visible = true;
+      }
     }
   }, [activeSection, splineApp, isMobile]);
 
