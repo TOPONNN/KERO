@@ -85,7 +85,10 @@ export default function HeroSection() {
   const scrollToContent = useCallback(() => {
     const heroHeight = containerRef.current?.offsetHeight || window.innerHeight;
     if (lenis) {
-      lenis.scrollTo(heroHeight, { duration: 1.2 });
+      lenis.start();
+      setTimeout(() => {
+        lenis.scrollTo(heroHeight, { duration: 1.2 });
+      }, 50);
     } else {
       window.scrollTo({ top: heroHeight, behavior: 'smooth' });
     }
@@ -116,7 +119,6 @@ export default function HeroSection() {
         setIsReadyToScroll(true);
         lastScrollTime.current = now;
       } else {
-        if (lenis) lenis.start();
         scrollToContent();
         setHasExitedHero(true);
       }
@@ -139,11 +141,11 @@ export default function HeroSection() {
       setActiveMode(prev => prev - 1);
       lastScrollTime.current = now;
     }
-  }, [hasExitedHero, activeMode, isReadyToScroll, scrollToContent, lenis]);
+  }, [hasExitedHero, activeMode, isReadyToScroll, scrollToContent]);
 
   useEffect(() => {
-    window.addEventListener('wheel', handleWheel, { passive: false });
-    return () => window.removeEventListener('wheel', handleWheel);
+    window.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+    return () => window.removeEventListener('wheel', handleWheel, { capture: true });
   }, [handleWheel]);
 
   const currentMode = modes[activeMode];
