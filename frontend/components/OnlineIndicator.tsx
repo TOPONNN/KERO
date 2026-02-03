@@ -29,10 +29,11 @@ export default function OnlineIndicator() {
 
   return (
     <motion.div
-      className="absolute bottom-6 right-6 z-30 cursor-pointer"
+      className="absolute bottom-6 right-6 z-50 cursor-pointer"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       onClick={() => setExpanded(!expanded)}
+      data-online-indicator
     >
       <motion.div
         className="flex items-center gap-3 px-4 py-2.5 bg-black/60 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl hover:bg-black/80 transition-colors"
@@ -75,6 +76,8 @@ export default function OnlineIndicator() {
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             className="absolute bottom-full right-0 mb-2 w-72 bg-black/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
+            onWheel={(e) => e.stopPropagation()}
+            data-scroll-container
           >
             <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
               <div className="flex items-center gap-2">

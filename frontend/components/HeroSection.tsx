@@ -105,9 +105,8 @@ export default function HeroSection() {
   };
 
   const handleWheel = useCallback((e: WheelEvent) => {
-    // Don't interfere with scrollable containers (e.g., OnlineIndicator)
     const target = e.target as HTMLElement;
-    if (target.closest('[data-scroll-container]')) return;
+    if (target.closest('[data-scroll-container]') || target.closest('[data-online-indicator]')) return;
     
     if (hasExitedHero || window.scrollY > 10 || window.innerWidth < 768) return;
     
