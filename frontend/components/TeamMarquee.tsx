@@ -15,7 +15,7 @@ export default function TeamMarquee() {
       
       <div className="relative z-10 flex flex-col items-center gap-8">
         <RevealAnimation>
-          <h2 className="text-4xl md:text-7xl font-bold text-center text-white">MEET THE TEAM</h2>
+          <h2 className="font-display text-4xl md:text-7xl font-bold text-center text-white">MEET THE TEAM</h2>
         </RevealAnimation>
         
         <div className="flex w-full overflow-hidden whitespace-nowrap">
