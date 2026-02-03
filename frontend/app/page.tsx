@@ -32,8 +32,8 @@ export default function Home() {
           <section id="hero">
             <HeroSection />
           </section>
-          <section id="keyboard-intro" className="relative h-[130vh]">
-            <div className="absolute bottom-24 left-0 right-0">
+          <section id="keyboard-intro" className="relative h-screen">
+            <div className="absolute bottom-16 left-0 right-0">
               <TeamMarquee />
             </div>
           </section>

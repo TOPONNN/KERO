@@ -409,10 +409,7 @@ const AnimatedBackground = () => {
         selectedSkillRef.current = null;
       }
 
-      if (activeSection === "hero") {
-        rotateKeyboard?.pause();
-        teardownKeyboard?.pause();
-      } else if (activeSection === "cta" || activeSection === "faq") {
+      if (activeSection === "cta" || activeSection === "faq") {
         rotateKeyboard?.pause();
       } else {
         rotateKeyboard?.play();
