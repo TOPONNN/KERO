@@ -55,3 +55,8 @@ backend/cookies/
 livekit/livekit.yaml
 !livekit/livekit.yaml.example
 ai-worker/scripts/authorized_keys
+
+# Test/verification files
+*.png
+!frontend/public/**/*.png
+verification_report.md
