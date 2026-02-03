@@ -155,12 +155,13 @@ export default function HeroSection() {
         const heroHeight = containerRef.current?.offsetHeight || window.innerHeight;
         const scrollY = window.scrollY;
         
-        // Trigger zone: from just below hero (50px) to 1.5x hero height
-        const inTriggerZone = scrollY > 50 && scrollY < heroHeight * 1.5;
+        // Trigger zone: keyboard-intro section (from 80% of hero to 2x hero height)
+        // Skip to Content lands at scrollY = heroHeight, so this covers that area
+        const inTriggerZone = scrollY > heroHeight * 0.8 && scrollY < heroHeight * 2;
         
-        if (inTriggerZone && e.deltaY < -30) { // Significant upward scroll
+        if (inTriggerZone && e.deltaY < -15) { // Upward scroll (lowered threshold)
           const now = Date.now();
-          if (now - lastScrollTime.current < 200) return; // Reduced debounce
+          if (now - lastScrollTime.current < 150) return; // Faster response
           lastScrollTime.current = now;
           
           e.preventDefault();
@@ -171,7 +172,7 @@ export default function HeroSection() {
           setIsReadyToScroll(false);
           
           if (lenis) {
-            lenis.scrollTo(0, { duration: 0.8 });
+            lenis.scrollTo(0, { duration: 0.6 });
           }
         }
       };
