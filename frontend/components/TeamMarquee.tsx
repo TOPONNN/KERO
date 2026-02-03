@@ -10,7 +10,7 @@ export default function TeamMarquee() {
   return (
     <SectionWrapper
       id="team"
-      className="w-full py-12 sm:py-16 md:py-24 mb-32 md:mb-48 overflow-hidden"
+      className="w-full py-12 sm:py-16 md:py-24 overflow-hidden"
     >
       
       <div className="relative z-10 flex flex-col items-center gap-8">
