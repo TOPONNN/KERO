@@ -29,13 +29,13 @@ export default function OnlineIndicator() {
 
   return (
     <motion.div
-      className="absolute bottom-6 right-6 z-30"
+      className="absolute bottom-6 right-6 z-30 cursor-pointer"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
+      onClick={() => setExpanded(!expanded)}
     >
       <motion.div
-        onClick={() => setExpanded(!expanded)}
-        className="cursor-pointer flex items-center gap-3 px-4 py-2.5 bg-black/60 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl hover:bg-black/80 transition-colors"
+        className="flex items-center gap-3 px-4 py-2.5 bg-black/60 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl hover:bg-black/80 transition-colors"
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
       >
@@ -74,6 +74,7 @@ export default function OnlineIndicator() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             className="absolute bottom-full right-0 mb-2 w-72 bg-black/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -85,7 +86,12 @@ export default function OnlineIndicator() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-             <div className="max-h-64 overflow-y-auto p-2 space-y-1" onWheel={(e) => e.stopPropagation()}>
+             <div 
+              className="max-h-64 overflow-y-auto p-2 space-y-1" 
+              data-scroll-container
+              onWheel={(e) => e.stopPropagation()}
+              onTouchMove={(e) => e.stopPropagation()}
+            >
               {onlineData.users.map((user, i) => (
                 <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors">
                   {user.profileImage ? (
