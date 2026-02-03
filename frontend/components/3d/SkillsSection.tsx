@@ -9,14 +9,16 @@ const SkillsSection = () => {
       id="skills"
       className="w-full h-screen md:h-[150dvh] pointer-events-none"
     >
-      <div className="sticky top-[70px] z-20 flex flex-col items-center pt-16 md:pt-24 text-center">
+      <div className="sticky top-[70px] z-20 mb-96 flex flex-col items-center pt-16 md:pt-24 text-center">
         <RevealAnimation>
-          <h2 className="text-4xl md:text-7xl font-bold text-center text-white">
+          <h2 className="text-4xl text-center md:text-7xl font-bold text-white">
             Tech Stack
           </h2>
         </RevealAnimation>
         <RevealAnimation delay={0.2}>
-          <p className="mt-4 text-base text-white/50 text-center">(hint: press a key)</p>
+          <p className="mx-auto mt-4 max-w-3xl text-base text-center text-white/50">
+            (hint: press a key)
+          </p>
         </RevealAnimation>
       </div>
     </SectionWrapper>
