@@ -22,7 +22,7 @@ interface StartGameData {
   songId: string;
 }
 
-const onlineUsers = new Map<string, { nickname: string; profileImage: string | null; currentPage: string; connectedAt: number }>();
+const onlineUsers = new Map<string, { nickname: string; profileImage: string | null; currentPage: string; connectedAt: number; posX: number; posY: number; color: string }>();
 
 export function initializeSocket(httpServer: HttpServer): Server {
   const io = new Server(httpServer, {
@@ -50,25 +50,47 @@ export function initializeSocket(httpServer: HttpServer): Server {
     io.on("connection", (socket: Socket) => {
       console.log(`Client connected: ${socket.id}`);
 
-      socket.on("presence:join", (data: { nickname?: string; profileImage?: string | null; currentPage?: string }) => {
-        onlineUsers.set(socket.id, {
-          nickname: data.nickname || "게스트",
-          profileImage: data.profileImage || null,
-          currentPage: data.currentPage || "/",
-          connectedAt: Date.now(),
-        });
-        broadcastPresence();
-      });
+       socket.on("presence:join", (data: { nickname?: string; profileImage?: string | null; currentPage?: string }) => {
+         const randomColor = `hsl(${Math.random() * 360}, 70%, 50%)`;
+         onlineUsers.set(socket.id, {
+           nickname: data.nickname || "게스트",
+           profileImage: data.profileImage || null,
+           currentPage: data.currentPage || "/",
+           connectedAt: Date.now(),
+           posX: 0,
+           posY: 0,
+           color: randomColor,
+         });
+         broadcastPresence();
+       });
 
-      socket.on("presence:page", (data: { currentPage: string }) => {
-        const user = onlineUsers.get(socket.id);
-        if (user) {
-          user.currentPage = data.currentPage;
-          broadcastPresence();
-        }
-      });
+       socket.on("presence:page", (data: { currentPage: string }) => {
+         const user = onlineUsers.get(socket.id);
+         if (user) {
+           user.currentPage = data.currentPage;
+           broadcastPresence();
+         }
+       });
 
-     socket.on("room:join", async (data: JoinRoomData) => {
+       socket.on("cursor:move", (data: { x: number; y: number }) => {
+         const user = onlineUsers.get(socket.id);
+         if (user) {
+           user.posX = data.x;
+           user.posY = data.y;
+           socket.broadcast.emit("cursor:update", {
+             socketId: socket.id,
+             nickname: user.nickname,
+             profileImage: user.profileImage,
+             currentPage: user.currentPage,
+             connectedAt: user.connectedAt,
+             posX: data.x,
+             posY: data.y,
+             color: user.color,
+           });
+         }
+       });
+
+      socket.on("room:join", async (data: JoinRoomData) => {
       try {
         const room = await roomService.getRoomByCode(data.code);
         if (!room) {

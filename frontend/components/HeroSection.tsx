@@ -55,18 +55,38 @@ export default function HeroSection() {
   const scale = useTransform(scrollYProgress, [0, 1], [1, 1.2]);
 
   useEffect(() => {
+    let lastScrollY = window.scrollY;
+    let isSnapping = false;
+    
     const handleScroll = () => {
-      if (window.scrollY > 100) {
-        setHasExitedHero(true);
-      } else if (window.scrollY === 0) {
+      if (isSnapping) return;
+      
+      const heroHeight = containerRef.current?.offsetHeight || window.innerHeight;
+      const currentScrollY = window.scrollY;
+      const scrollingUp = currentScrollY < lastScrollY;
+      
+      if (currentScrollY > heroHeight * 0.5) {
+        if (!hasExitedHero) setHasExitedHero(true);
+      } else if (hasExitedHero && scrollingUp && currentScrollY < heroHeight * 0.4) {
+        isSnapping = true;
+        setHasExitedHero(false);
+        setActiveMode(0);
+        setIsReadyToScroll(false);
+        if (lenis) {
+          lenis.scrollTo(0, { duration: 0.5 });
+        }
+        setTimeout(() => { isSnapping = false; }, 600);
+      } else if (currentScrollY === 0) {
         setHasExitedHero(false);
         setActiveMode(0);
         setIsReadyToScroll(false);
       }
+      
+      lastScrollY = currentScrollY;
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [hasExitedHero, lenis]);
 
   useEffect(() => {
     if (!lenis) return;
@@ -148,31 +168,7 @@ export default function HeroSection() {
      return () => window.removeEventListener('wheel', handleWheel, { capture: true });
    }, [handleWheel]);
 
-    useEffect(() => {
-      if (!lenis || !hasExitedHero) return;
-      
-      const heroHeight = containerRef.current?.offsetHeight || window.innerHeight;
-      let isSnapping = false;
-      
-      const handleLenisScroll = ({ scroll, direction }: { scroll: number; direction: number }) => {
-        if (isSnapping) return;
-        
-        const nearSkipToContentLanding = scroll > heroHeight * 0.8 && scroll < heroHeight * 1.15;
-        const scrollingUp = direction === -1;
-        
-        if (nearSkipToContentLanding && scrollingUp) {
-          isSnapping = true;
-          setActiveMode(0);
-          setHasExitedHero(false);
-          setIsReadyToScroll(false);
-          lenis.scrollTo(0, { duration: 0.6 });
-          setTimeout(() => { isSnapping = false; }, 700);
-        }
-      };
-      
-      lenis.on('scroll', handleLenisScroll);
-      return () => lenis.off('scroll', handleLenisScroll);
-    }, [lenis, hasExitedHero]);
+
 
    const currentMode = modes[activeMode];
   const Icon = currentMode.icon;
