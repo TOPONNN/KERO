@@ -22,10 +22,14 @@ export default function FAQ() {
   return (
     <SectionWrapper id="faq" className="w-full py-16 sm:py-24 md:py-32 px-6 md:px-20">
       <div className="max-w-4xl mx-auto">
-        <RevealAnimation>
-          <h2 className="text-4xl md:text-7xl font-bold text-white">FAQ</h2>
-          <p className="mt-4 mb-8 sm:mb-12 md:mb-20 text-base text-white/50">자주 묻는 질문들</p>
-        </RevealAnimation>
+        <div className="sticky top-[70px] z-20 mb-20">
+          <RevealAnimation>
+            <h2 className="text-4xl text-center md:text-7xl font-bold text-white">FAQ</h2>
+          </RevealAnimation>
+          <RevealAnimation delay={0.2}>
+            <p className="mx-auto mt-4 max-w-3xl text-base text-center text-white/50">자주 묻는 질문들</p>
+          </RevealAnimation>
+        </div>
         <div className="flex flex-col divide-y divide-white/10">
           {FAQS.map((faq, i) => (
             <RevealAnimation key={i} delay={i * 0.08} className="py-6">

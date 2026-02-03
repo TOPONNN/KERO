@@ -71,14 +71,14 @@ const ArchitectureSection = () => {
     <SectionWrapper id="architecture" className="min-h-[120vh] py-16 sm:py-24 md:py-32">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="mb-16 md:mb-24">
+        <div className="sticky top-[70px] z-20 mb-96">
           <RevealAnimation>
-            <h2 className="text-4xl font-bold text-white md:text-7xl">
+            <h2 className="text-4xl text-center font-bold text-white md:text-7xl">
               Architecture
             </h2>
           </RevealAnimation>
           <RevealAnimation delay={0.2}>
-            <p className="mt-6 max-w-2xl text-base text-white/50 md:text-xl">
+            <p className="mx-auto mt-4 max-w-3xl text-base text-center text-white/50">
               실시간 노래방 경험을 완성하는 3단계 기술 파이프라인.
               <br className="hidden md:block" />
               미디어 처리부터 AI 분석까지 끊김 없는 데이터 흐름을 설계했습니다.
