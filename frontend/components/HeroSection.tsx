@@ -129,10 +129,13 @@ export default function HeroSection() {
      
      if (target.closest('[data-scroll-container]') || target.closest('[data-online-indicator]')) return;
      
-     const heroHeight = containerRef.current?.offsetHeight || window.innerHeight;
-     if (hasExitedHero || window.scrollY > heroHeight * 0.3 || window.innerWidth < 768) return;
+     if (hasExitedHero || window.innerWidth < 768) return;
     
     e.preventDefault();
+    
+    if (window.scrollY > 0) {
+      window.scrollTo(0, 0);
+    }
     
     const isLastMode = activeMode === modes.length - 1;
     const isFirstMode = activeMode === 0;
