@@ -60,6 +60,8 @@ const AnimatedBackground = () => {
 
    const handleMouseHover = (e: SplineEvent) => {
      if (!splineApp || selectedSkillRef.current?.name === e.target.name) return;
+     // Disable sounds only in hero section (first viewport)
+     if (typeof window !== 'undefined' && window.scrollY < window.innerHeight * 0.5) return;
 
      if (e.target.name === "body" || e.target.name === "platform") {
        if (selectedSkillRef.current) playReleaseSound();
@@ -96,14 +98,16 @@ const AnimatedBackground = () => {
     };
 
      splineApp.addEventListener("keyUp", () => {
-       if (!splineApp || isInputFocused()) return;
+       const inHeroViewport = typeof window !== 'undefined' && window.scrollY < window.innerHeight * 0.5;
+       if (!splineApp || isInputFocused() || inHeroViewport) return;
        playReleaseSound();
        splineApp.setVariable("heading", "");
        splineApp.setVariable("desc", "");
      });
 
      splineApp.addEventListener("keyDown", (e) => {
-       if (!splineApp || isInputFocused()) return;
+       const inHeroViewport = typeof window !== 'undefined' && window.scrollY < window.innerHeight * 0.5;
+       if (!splineApp || isInputFocused() || inHeroViewport) return;
       const skill = findSkillFromObject(e.target);
       if (skill) {
         playPressSound();
@@ -406,7 +410,7 @@ const AnimatedBackground = () => {
       }
 
       if (activeSection === "hero") {
-        rotateKeyboard?.restart();
+        rotateKeyboard?.pause();
         teardownKeyboard?.pause();
       } else {
        rotateKeyboard?.pause();
@@ -448,7 +452,7 @@ const AnimatedBackground = () => {
   return (
     <Suspense fallback={<div>Loading...</div>}>
       <Spline
-        className="w-full h-full fixed inset-0"
+        className="w-full h-full fixed inset-0 z-0"
         onLoad={(app: Application) => {
           setSplineApp(app);
           bypassLoading();

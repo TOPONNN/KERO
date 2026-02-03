@@ -6,7 +6,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { 
-  Music, Target, MessageSquareText, Swords, ArrowLeft, Users, Copy, Check, 
+  Music, Target, MessageSquareText, ArrowLeft, Users, Copy, Check, 
   Loader2, Play, Plus, X, Disc3, AlertCircle, ListMusic, Trash2, SkipForward,
   Mic, MicOff, Video, CameraOff
 } from "lucide-react";
@@ -20,8 +20,6 @@ import { useSocket } from "@/hooks/useSocket";
 import NormalModeGame from "@/components/game/NormalModeGame";
 import PerfectScoreGame from "@/components/game/PerfectScoreGame";
 import LyricsQuizGame from "@/components/game/LyricsQuizGame";
-import BattleModeGame from "@/components/game/BattleModeGame";
-import DuetModeGame from "@/components/game/DuetModeGame";
 import KaraokeSongSearch from "@/components/KaraokeSongSearch";
 import dynamic from "next/dynamic";
 
@@ -53,18 +51,6 @@ const modeConfig = {
      color: "#FF6B6B",
      Component: LyricsQuizGame,
    },
-  battle: {
-    title: "배틀 모드",
-    icon: Swords,
-    color: "#FF4500",
-    Component: BattleModeGame,
-  },
-  duet: {
-    title: "듀엣 모드",
-    icon: Users,
-    color: "#9B59B6",
-    Component: DuetModeGame,
-  },
 };
 
 interface TJSong {
@@ -113,7 +99,7 @@ export default function RoomPage() {
     id: string;
     code: string;
     name: string;
-    gameMode: "normal" | "perfect_score" | "lyrics_quiz" | "battle" | "duet";
+    gameMode: "normal" | "perfect_score" | "lyrics_quiz";
     status: string;
     maxParticipants: number;
     hostId: string;

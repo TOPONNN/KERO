@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback } from "react";
 import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
-import { ChevronDown, Music, Target, MessageSquareText, Swords, Users } from "lucide-react";
+import { ChevronDown, Music, Target, MessageSquareText } from "lucide-react";
 import Link from "next/link";
 import { useLenis } from "lenis/react";
 import OnlineIndicator from "@/components/OnlineIndicator";
@@ -35,29 +35,12 @@ const modes = [
       accent: "#FF6B6B",
       href: "/lobby?mode=lyrics_quiz",
     },
-  {
-    id: "04",
-    title: "배틀",
-    subtitle: "실력을 겨루는 대결",
-    description: ["같은 노래를 부르고 점수로 승부하세요.", "누가 더 잘 부르는지 겨뤄보세요!"],
-    icon: Swords,
-    accent: "#FF4500",
-    href: "/lobby?mode=battle",
-  },
-  {
-    id: "05",
-    title: "듀엣",
-    subtitle: "함께 부르는 하모니",
-    description: ["파트를 나눠 함께 노래하세요.", "완벽한 듀엣을 만들어보세요!"],
-    icon: Users,
-    accent: "#9B59B6",
-    href: "/lobby?mode=duet",
-  },
 ];
 
 export default function HeroSection() {
   const [activeMode, setActiveMode] = useState(0);
   const [hasExitedHero, setHasExitedHero] = useState(false);
+  const [isReadyToScroll, setIsReadyToScroll] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const lastScrollTime = useRef(0);
   const lenis = useLenis();
@@ -78,36 +61,37 @@ export default function HeroSection() {
       } else if (window.scrollY === 0) {
         setHasExitedHero(false);
         setActiveMode(0);
+        setIsReadyToScroll(false);
       }
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Lock/unlock scroll using Lenis API
   useEffect(() => {
     if (!lenis) return;
     
-    if (!hasExitedHero && activeMode < modes.length - 1) {
-      lenis.stop();
-    } else {
+    const isLastMode = activeMode === modes.length - 1;
+    
+    if (hasExitedHero || (isLastMode && isReadyToScroll)) {
       lenis.start();
+    } else {
+      lenis.stop();
     }
     
     return () => {
-      lenis.start(); // Ensure scroll is enabled on unmount
+      lenis.start();
     };
-  }, [lenis, hasExitedHero, activeMode]);
+  }, [lenis, hasExitedHero, activeMode, isReadyToScroll]);
 
-  const scrollToContent = () => {
+  const scrollToContent = useCallback(() => {
     const heroHeight = containerRef.current?.offsetHeight || window.innerHeight;
     window.scrollTo({ top: heroHeight, behavior: 'smooth' });
-  };
+  }, []);
 
    const handleWheel = useCallback((e: WheelEvent) => {
      const target = e.target as HTMLElement;
      
-     // Check if OnlineIndicator panel is expanded
      const onlineIndicatorExpanded = document.querySelector('[data-online-indicator-expanded]');
      if (onlineIndicatorExpanded) return;
      
@@ -120,11 +104,27 @@ export default function HeroSection() {
     const scrollingDown = e.deltaY > 0;
     const scrollingUp = e.deltaY < 0;
     
-    if (scrollingDown && isLastMode) return;
-    if (scrollingUp && isFirstMode) return;
-    
     const now = Date.now();
     if (now - lastScrollTime.current < 400) return;
+    
+    if (scrollingDown && isLastMode) {
+      if (!isReadyToScroll) {
+        setIsReadyToScroll(true);
+        lastScrollTime.current = now;
+      } else {
+        scrollToContent();
+      }
+      return;
+    }
+    
+    if (scrollingUp) {
+      if (isReadyToScroll) {
+        setIsReadyToScroll(false);
+        lastScrollTime.current = now;
+        return;
+      }
+      if (isFirstMode) return;
+    }
     
     if (scrollingDown && activeMode < modes.length - 1) {
       setActiveMode(prev => prev + 1);
@@ -133,7 +133,7 @@ export default function HeroSection() {
       setActiveMode(prev => prev - 1);
       lastScrollTime.current = now;
     }
-  }, [hasExitedHero, activeMode]);
+  }, [hasExitedHero, activeMode, isReadyToScroll, scrollToContent]);
 
   useEffect(() => {
     window.addEventListener('wheel', handleWheel, { passive: true });

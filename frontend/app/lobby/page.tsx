@@ -5,8 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { 
-  Music, Target, MessageSquareText, Swords, Zap, ArrowLeft, Plus, Users, 
-  Search, Loader2, DoorOpen, Lock, Globe, RefreshCw, Trash2, Dices, ChevronRight
+  Music, Target, MessageSquareText, ArrowLeft, Plus, 
+  Loader2, DoorOpen, Lock, RefreshCw, Trash2, Dices, ChevronRight
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -14,15 +14,13 @@ const modeConfig = {
    normal: { title: "일반 모드", icon: Music, color: "#C0C0C0" },
    perfect_score: { title: "퍼펙트 스코어", icon: Target, color: "#FFD700" },
    lyrics_quiz: { title: "노래 퀴즈", icon: MessageSquareText, color: "#FF6B6B" },
-   battle: { title: "배틀 모드", icon: Swords, color: "#FF4500" },
-   duet: { title: "듀엣 모드", icon: Users, color: "#9B59B6" },
 };
 
 interface Room {
   id: string;
   code: string;
   name: string;
-  gameMode: "normal" | "perfect_score" | "lyrics_quiz" | "battle" | "duet";
+  gameMode: "normal" | "perfect_score" | "lyrics_quiz";
   status: string;
   hostId: string;
   isPrivate: boolean;
@@ -42,7 +40,7 @@ function LobbyContent() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const mode = searchParams.get("mode") as "normal" | "perfect_score" | "lyrics_quiz" | "battle" | "duet" | null;
+  const mode = searchParams.get("mode") as "normal" | "perfect_score" | "lyrics_quiz" | null;
   
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -57,7 +55,7 @@ function LobbyContent() {
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [roomName, setRoomName] = useState("");
   const [nickname, setNickname] = useState("");
-  const [selectedMode, setSelectedMode] = useState<"normal" | "perfect_score" | "lyrics_quiz" | "battle" | "duet">(mode || "normal");
+  const [selectedMode, setSelectedMode] = useState<"normal" | "perfect_score" | "lyrics_quiz">(mode || "normal");
   const [maxParticipants, setMaxParticipants] = useState(6);
   const [isPrivate, setIsPrivate] = useState(false);
   const [joinCode, setJoinCode] = useState("");

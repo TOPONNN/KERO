@@ -16,42 +16,43 @@ const avatarGradients = [
 export default function OnlineIndicator() {
   const onlineData = usePresence();
   const [expanded, setExpanded] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
   const panelRef = useRef<HTMLDivElement>(null);
-  const expandedPanelRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const panel = panelRef.current;
-    if (!panel || !expanded) return;
+    const handleScroll = () => {
+      setIsVisible(window.scrollY < 50);
+    };
+    
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const scrollArea = panelRef.current;
+    if (!scrollArea || !expanded) return;
 
     const handleWheel = (e: WheelEvent) => {
       e.stopPropagation();
-      const target = e.currentTarget as HTMLElement;
-      const { scrollTop, scrollHeight, clientHeight } = target;
-      const atTop = scrollTop === 0;
-      const atBottom = scrollTop + clientHeight >= scrollHeight - 1;
-      
-      if ((atTop && e.deltaY < 0) || (atBottom && e.deltaY > 0)) {
-        e.preventDefault();
-      }
     };
 
-    panel.addEventListener('wheel', handleWheel, { passive: false });
-    return () => panel.removeEventListener('wheel', handleWheel);
+    scrollArea.addEventListener('wheel', handleWheel, { passive: false });
+    return () => scrollArea.removeEventListener('wheel', handleWheel);
   }, [expanded]);
 
   useEffect(() => {
-    const expandedPanel = expandedPanelRef.current;
-    if (!expandedPanel || !expanded) return;
+    if (!expanded) return;
 
-    const handleWheelCapture = (e: WheelEvent) => {
-      // Stop the event from reaching window listeners (HeroSection)
-      e.stopPropagation();
-      e.stopImmediatePropagation();
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setExpanded(false);
+      }
     };
 
-    // Use capture: true to intercept before bubbling phase
-    expandedPanel.addEventListener('wheel', handleWheelCapture, { capture: true, passive: true });
-    return () => expandedPanel.removeEventListener('wheel', handleWheelCapture, { capture: true });
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [expanded]);
 
   const getPageName = (path: string) => {
@@ -64,18 +65,22 @@ export default function OnlineIndicator() {
     return '탐색 중';
   };
 
+  if (!isVisible) return null;
+
   return (
     <motion.div
-      className="absolute bottom-6 right-6 z-50 cursor-pointer"
+      ref={containerRef}
+      className="fixed bottom-6 right-6 z-[100] cursor-pointer pointer-events-auto"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      onClick={() => setExpanded(!expanded)}
+      exit={{ opacity: 0, y: 20 }}
       data-online-indicator
     >
       <motion.div
         className="flex items-center gap-3 px-4 py-2.5 bg-black/60 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl hover:bg-black/80 transition-colors"
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
+        onClick={() => setExpanded(!expanded)}
       >
         <div className="relative">
           <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
@@ -108,7 +113,6 @@ export default function OnlineIndicator() {
         <AnimatePresence>
           {expanded && (
             <motion.div
-              ref={expandedPanelRef}
               initial={{ opacity: 0, y: 10, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.95 }}

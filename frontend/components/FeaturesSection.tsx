@@ -3,7 +3,7 @@
 import React from "react";
 import SectionWrapper from "@/components/animations/SectionWrapper";
 import RevealAnimation from "@/components/animations/RevealAnimation";
-import { Music, Target, Mic, FileText, MessageSquareText, Swords } from "lucide-react";
+import { Music, Target, Mic, FileText, MessageSquareText } from "lucide-react";
 
 const FEATURES = [
   {
@@ -34,13 +34,7 @@ const FEATURES = [
     icon: MessageSquareText,
     title: "노래 퀴즈",
     description: "가사, 제목, 가수, 초성 등 6가지 유형의 퀴즈로 경쟁하세요. Kahoot 스타일 실시간 대결!",
-    accent: "#A855F7", // Purple (Changed from duplicate #FF6B6B to enhance visual distinction as per Designer persona)
-  },
-  {
-    icon: Swords,
-    title: "배틀 모드",
-    description: "같은 노래를 부르고 AI 점수로 승부합니다. 실력을 겨루는 실시간 노래 대결!",
-    accent: "#FF4500", // Orange Red
+    accent: "#A855F7",
   },
 ];
 
