@@ -68,7 +68,7 @@ const Connector = () => (
 
 const ArchitectureSection = () => {
   return (
-    <SectionWrapper id="architecture" className="min-h-screen py-16 sm:py-24 md:py-32">
+    <SectionWrapper id="architecture" className="min-h-[120vh] py-16 sm:py-24 md:py-32">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-16 md:mb-24">

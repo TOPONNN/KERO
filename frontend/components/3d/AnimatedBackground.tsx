@@ -156,9 +156,8 @@ const AnimatedBackground = () => {
       createSectionTimeline("#team", "team", "hero"),
       createSectionTimeline("#skills", "skills", "team"),
       createSectionTimeline("#architecture", "architecture", "skills"),
-      createSectionTimeline("#features", "features", "architecture"),
-      createSectionTimeline("#cta", "cta", "features"),
-      createSectionTimeline("#faq", "faq", "cta"),
+      createSectionTimeline("#features", "features", "architecture", "top 70%"),
+      createSectionTimeline("#cta", "cta", "features", "top 30%"),
     ].filter(Boolean) as gsap.core.Timeline[];
   };
 

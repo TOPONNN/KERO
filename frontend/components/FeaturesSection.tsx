@@ -48,7 +48,7 @@ const FeaturesSection = () => {
   return (
     <SectionWrapper
       id="features"
-      className="min-h-[130vh] py-16 sm:py-24 md:py-32 px-6 md:px-20 relative z-10"
+      className="md:h-[130vh] py-16 sm:py-24 md:py-32 px-6 md:px-20 relative z-10"
     >
       <div className="max-w-6xl mx-auto">
         {/* Header */}

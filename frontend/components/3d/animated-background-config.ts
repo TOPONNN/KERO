@@ -15,22 +15,14 @@ export const STATES = {
   },
   team: {
     desktop: {
-      scale: { x: 0.25, y: 0.25, z: 0.25 },
+      scale: { x: 0.4, y: 0.4, z: 0.4 },
       position: { x: 0, y: -40, z: 0 },
-      rotation: {
-        x: 0,
-        y: Math.PI / 12,
-        z: 0,
-      },
+      rotation: { x: 0, y: Math.PI / 12, z: 0 },
     },
     mobile: {
-      scale: { x: 0.3, y: 0.3, z: 0.3 },
+      scale: { x: 0.4, y: 0.4, z: 0.4 },
       position: { x: 0, y: -40, z: 0 },
-      rotation: {
-        x: 0,
-        y: Math.PI / 6,
-        z: 0,
-      },
+      rotation: { x: 0, y: Math.PI / 6, z: 0 },
     },
   },
     skills: {
@@ -55,42 +47,26 @@ export const STATES = {
     },
     architecture: {
       desktop: {
-        scale: { x: 0.2, y: 0.2, z: 0.2 },
-        position: { x: -300, y: -80, z: 0 },
-        rotation: {
-          x: Math.PI / 8,
-          y: -Math.PI / 6,
-          z: 0,
-        },
+        scale: { x: 0.25, y: 0.25, z: 0.25 },
+        position: { x: 0, y: -40, z: 0 },
+        rotation: { x: Math.PI / 12, y: -Math.PI / 4, z: 0 },
       },
       mobile: {
-        scale: { x: 0.25, y: 0.25, z: 0.25 },
-        position: { x: 0, y: -100, z: 0 },
-        rotation: {
-          x: Math.PI / 6,
-          y: Math.PI / 4,
-          z: 0,
-        },
+        scale: { x: 0.3, y: 0.3, z: 0.3 },
+        position: { x: 0, y: -40, z: 0 },
+        rotation: { x: Math.PI / 6, y: -Math.PI / 6, z: 0 },
       },
     },
     features: {
       desktop: {
-        scale: { x: 0.18, y: 0.18, z: 0.18 },
-        position: { x: 300, y: -150, z: 0 },
-        rotation: {
-          x: Math.PI / 6,
-          y: Math.PI / 4,
-          z: 0,
-        },
+        scale: { x: 0.25, y: 0.25, z: 0.25 },
+        position: { x: 0, y: -40, z: 0 },
+        rotation: { x: Math.PI, y: Math.PI / 3, z: Math.PI },
       },
       mobile: {
-        scale: { x: 0.2, y: 0.2, z: 0.2 },
-        position: { x: 0, y: 100, z: 0 },
-        rotation: {
-          x: Math.PI / 4,
-          y: Math.PI / 3,
-          z: 0,
-        },
+        scale: { x: 0.3, y: 0.3, z: 0.3 },
+        position: { x: 0, y: 150, z: 0 },
+        rotation: { x: Math.PI, y: Math.PI / 3, z: Math.PI },
       },
     },
     cta: {
