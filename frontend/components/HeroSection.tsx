@@ -56,48 +56,41 @@ export default function HeroSection() {
   const scale = useTransform(scrollYProgress, [0, 1], [1, 1.2]);
 
   useEffect(() => {
-    let lastScrollY = window.scrollY;
+    if (!lenis) return;
+    
     let isSnapping = false;
     
-    const handleScroll = () => {
+    const handleLenisScroll = ({ scroll, direction }: { scroll: number; direction: number }) => {
       if (isSnapping) return;
       
       const heroHeight = containerRef.current?.offsetHeight || window.innerHeight;
-      const currentScrollY = window.scrollY;
-      const scrollingUp = currentScrollY < lastScrollY;
+      const scrollingUp = direction === -1;
       
-      if (currentScrollY > heroHeight * 0.5 && !hasExitedHeroRef.current) {
+      if (scroll > heroHeight * 0.5 && !hasExitedHeroRef.current) {
         hasExitedHeroRef.current = true;
         setHasExitedHero(true);
       }
       
-      if (hasExitedHeroRef.current && scrollingUp) {
-        const inKeyboardIntroZone = currentScrollY < heroHeight * 1.5;
-        
-        if (inKeyboardIntroZone) {
-          isSnapping = true;
-          hasExitedHeroRef.current = false;
-          setHasExitedHero(false);
-          setActiveMode(0);
-          setIsReadyToScroll(false);
-          if (lenis) {
-            lenis.scrollTo(0, { duration: 0.5 });
-          }
-          setTimeout(() => { isSnapping = false; }, 600);
-        }
+      if (hasExitedHeroRef.current && scrollingUp && scroll < heroHeight * 2) {
+        isSnapping = true;
+        hasExitedHeroRef.current = false;
+        setHasExitedHero(false);
+        setActiveMode(0);
+        setIsReadyToScroll(false);
+        lenis.scrollTo(0, { duration: 0.5 });
+        setTimeout(() => { isSnapping = false; }, 600);
       }
       
-      if (currentScrollY === 0) {
+      if (scroll <= 0) {
         hasExitedHeroRef.current = false;
         setHasExitedHero(false);
         setActiveMode(0);
         setIsReadyToScroll(false);
       }
-      
-      lastScrollY = currentScrollY;
     };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    
+    lenis.on('scroll', handleLenisScroll);
+    return () => lenis.off('scroll', handleLenisScroll);
   }, [lenis]);
 
   useEffect(() => {
