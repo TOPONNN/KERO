@@ -18,6 +18,17 @@ import { Section, getKeyboardState } from "./animated-background-config";
 
 gsap.registerPlugin(ScrollTrigger);
 
+// Helper: traverse parent chain to find a matching skill
+const findSkillFromObject = (obj: { name: string; id: string } | null): Skill | null => {
+  let current: any = obj;
+  while (current) {
+    const skill = SKILLS[current.name as SkillNames];
+    if (skill) return skill;
+    current = current.parent || null;
+  }
+  return null;
+};
+
 const AnimatedBackground = () => {
   const isMobile = useMediaQuery("(max-width: 767px)");
   const [splineApp, setSplineApp] = useState<Application>();
@@ -58,16 +69,14 @@ const AnimatedBackground = () => {
       splineApp.setVariable("heading", "");
       splineApp.setVariable("desc", "");
     } else {
-      if (!selectedSkillRef.current || selectedSkillRef.current.name !== e.target.name) {
-        const skill = SKILLS[e.target.name as SkillNames];
-        if (skill) {
-          if (selectedSkillRef.current) playReleaseSound();
-          playPressSound();
-          setSelectedSkill(skill);
-          selectedSkillRef.current = skill;
-          splineApp.setVariable("heading", skill.label);
-          splineApp.setVariable("desc", skill.shortDescription);
-        }
+      const skill = findSkillFromObject(e.target);
+      if (skill && (!selectedSkillRef.current || selectedSkillRef.current.name !== skill.name)) {
+        if (selectedSkillRef.current) playReleaseSound();
+        playPressSound();
+        setSelectedSkill(skill);
+        selectedSkillRef.current = skill;
+        splineApp.setVariable("heading", skill.label);
+        splineApp.setVariable("desc", skill.shortDescription);
       }
     }
   };
@@ -92,7 +101,7 @@ const AnimatedBackground = () => {
 
     splineApp.addEventListener("keyDown", (e) => {
       if (!splineApp || isInputFocused() || activeSectionRef.current !== "skills") return;
-      const skill = SKILLS[e.target.name as SkillNames];
+      const skill = findSkillFromObject(e.target);
       if (skill) {
         playPressSound();
         setSelectedSkill(skill);
@@ -106,7 +115,7 @@ const AnimatedBackground = () => {
 
     splineApp.addEventListener("mouseDown", (e) => {
       if (!splineApp || activeSectionRef.current !== "skills") return;
-      const skill = SKILLS[e.target.name as SkillNames];
+      const skill = findSkillFromObject(e.target);
       if (skill) {
         playPressSound();
         setSelectedSkill(skill);
