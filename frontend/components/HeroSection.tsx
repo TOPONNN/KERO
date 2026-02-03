@@ -101,6 +101,8 @@ export default function HeroSection() {
      
      if (hasExitedHero || window.scrollY > 10 || window.innerWidth < 768) return;
     
+    e.preventDefault();
+    
     const isLastMode = activeMode === modes.length - 1;
     const isFirstMode = activeMode === 0;
     const scrollingDown = e.deltaY > 0;
@@ -140,7 +142,7 @@ export default function HeroSection() {
   }, [hasExitedHero, activeMode, isReadyToScroll, scrollToContent, lenis]);
 
   useEffect(() => {
-    window.addEventListener('wheel', handleWheel, { passive: true });
+    window.addEventListener('wheel', handleWheel, { passive: false });
     return () => window.removeEventListener('wheel', handleWheel);
   }, [handleWheel]);
 
