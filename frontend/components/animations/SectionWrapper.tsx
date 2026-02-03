@@ -8,9 +8,10 @@ interface SectionWrapperProps {
   children: ReactNode;
   id?: string;
   className?: string;
+  disableScale?: boolean;
 }
 
-export default function SectionWrapper({ children, id, className }: SectionWrapperProps) {
+export default function SectionWrapper({ children, id, className, disableScale }: SectionWrapperProps) {
   const containerRef = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -22,7 +23,7 @@ export default function SectionWrapper({ children, id, className }: SectionWrapp
 
   return (
     <section id={id} ref={containerRef} className={cn("relative", className)}>
-      <motion.div style={{ opacity, scale }}>
+      <motion.div style={disableScale ? { opacity } : { opacity, scale }}>
         {children}
       </motion.div>
     </section>

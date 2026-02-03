@@ -8,6 +8,7 @@ const SkillsSection = () => {
     <SectionWrapper
       id="skills"
       className="w-full h-screen md:h-[150dvh] pointer-events-none"
+      disableScale
     >
       <div className="sticky top-[70px] z-20 flex flex-col items-center pt-16 md:pt-24 text-center">
         <RevealAnimation>

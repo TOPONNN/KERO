@@ -103,6 +103,18 @@ const AnimatedBackground = () => {
     });
 
     splineApp.addEventListener("mouseHover", handleMouseHover);
+
+    splineApp.addEventListener("mouseDown", (e) => {
+      if (!splineApp || activeSectionRef.current !== "skills") return;
+      const skill = SKILLS[e.target.name as SkillNames];
+      if (skill) {
+        playPressSound();
+        setSelectedSkill(skill);
+        selectedSkillRef.current = skill;
+        splineApp.setVariable("heading", skill.label);
+        splineApp.setVariable("desc", skill.shortDescription);
+      }
+    });
   };
 
   // --- Animation Setup Helpers ---
