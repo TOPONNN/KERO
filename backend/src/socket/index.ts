@@ -42,10 +42,13 @@ export function initializeSocket(httpServer: HttpServer): Server {
 
   redisPubSub.setSocketServer(io);
 
-  const broadcastPresence = () => {
-    const users = Array.from(onlineUsers.values());
-    io.emit("presence:update", { count: users.length, users });
-  };
+   const broadcastPresence = () => {
+     const users = Array.from(onlineUsers.entries()).map(([socketId, user]) => ({
+       socketId,
+       ...user,
+     }));
+     io.emit("presence:update", { count: users.length, users });
+   };
 
     io.on("connection", (socket: Socket) => {
       console.log(`Client connected: ${socket.id}`);

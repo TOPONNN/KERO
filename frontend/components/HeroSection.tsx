@@ -43,6 +43,7 @@ export default function HeroSection() {
   const [isReadyToScroll, setIsReadyToScroll] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const lastScrollTime = useRef(0);
+  const hasExitedHeroRef = useRef(false);
   const lenis = useLenis();
   
   const { scrollYProgress } = useScroll({
@@ -66,9 +67,13 @@ export default function HeroSection() {
       const scrollingUp = currentScrollY < lastScrollY;
       
       if (currentScrollY > heroHeight * 0.5) {
-        if (!hasExitedHero) setHasExitedHero(true);
-      } else if (hasExitedHero && scrollingUp && currentScrollY < heroHeight * 0.4) {
+        if (!hasExitedHeroRef.current) {
+          hasExitedHeroRef.current = true;
+          setHasExitedHero(true);
+        }
+      } else if (hasExitedHeroRef.current && scrollingUp && currentScrollY < heroHeight * 0.4) {
         isSnapping = true;
+        hasExitedHeroRef.current = false;
         setHasExitedHero(false);
         setActiveMode(0);
         setIsReadyToScroll(false);
@@ -77,6 +82,7 @@ export default function HeroSection() {
         }
         setTimeout(() => { isSnapping = false; }, 600);
       } else if (currentScrollY === 0) {
+        hasExitedHeroRef.current = false;
         setHasExitedHero(false);
         setActiveMode(0);
         setIsReadyToScroll(false);
@@ -86,7 +92,7 @@ export default function HeroSection() {
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [hasExitedHero, lenis]);
+  }, [lenis]);
 
   useEffect(() => {
     if (!lenis) return;
