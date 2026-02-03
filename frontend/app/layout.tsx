@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Archivo_Black } from "next/font/google";
+import { Archivo_Black, Black_Han_Sans } from "next/font/google";
 import PresenceProvider from "@/components/PresenceProvider";
 import { ReduxProvider } from "@/store/provider";
 import { Toaster } from "sonner";
@@ -15,6 +15,13 @@ const archivoBlack = Archivo_Black({
   display: "swap",
 });
 
+const blackHanSans = Black_Han_Sans({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-black-han-sans",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "KERO",
   description: "WebRTC Real-time Karaoke",
@@ -26,7 +33,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={archivoBlack.variable}>
+    <html lang="ko" className={`${archivoBlack.variable} ${blackHanSans.variable}`}>
       <body className="antialiased">
         <PresenceProvider>
           <RemoteCursors />

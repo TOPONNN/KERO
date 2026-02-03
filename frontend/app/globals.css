@@ -11,6 +11,7 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-display: var(--font-archivo-black);
+  --font-display-kr: var(--font-black-han-sans);
 }
 
 body {

@@ -348,37 +348,37 @@ const KeyboardShowcase = () => {
 
         {/* Text overlay - phase dependent */}
         <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-start pt-16 md:pt-24 z-10">
-          <motion.div
-            animate={{ opacity: phase === "skills" ? 1 : 0 }}
-            transition={{ duration: 0.5 }}
-            className="text-center"
-          >
-            <h2 className="text-4xl md:text-6xl font-bold text-white/90">
-              Tech Stack
-            </h2>
-            <p className="mt-4 text-lg text-white/50">(hint: press a key)</p>
-          </motion.div>
+           <motion.div
+             animate={{ opacity: phase === "skills" ? 1 : 0 }}
+             transition={{ duration: 0.5 }}
+             className="text-center"
+           >
+             <h2 className="text-4xl md:text-7xl font-bold text-white/90">
+               Tech Stack
+             </h2>
+             <p className="mt-4 text-base text-white/50">(hint: press a key)</p>
+           </motion.div>
 
-          <motion.div
-            animate={{ opacity: phase === "bongo" ? 1 : 0 }}
-            transition={{ duration: 0.5 }}
-            className="absolute top-16 md:top-24 text-center"
-          >
-            <h2 className="text-4xl md:text-6xl font-bold text-white/90">
-              Bongo Cat
-            </h2>
-            <p className="mt-4 text-lg text-white/50">keep scrolling...</p>
-          </motion.div>
+           <motion.div
+             animate={{ opacity: phase === "bongo" ? 1 : 0 }}
+             transition={{ duration: 0.5 }}
+             className="absolute top-16 md:top-24 text-center"
+           >
+             <h2 className="text-4xl md:text-7xl font-bold text-white/90">
+               Bongo Cat
+             </h2>
+             <p className="mt-4 text-base text-white/50">keep scrolling...</p>
+           </motion.div>
 
-          <motion.div
-            animate={{ opacity: phase === "teardown" ? 1 : 0 }}
-            transition={{ duration: 0.5 }}
-            className="absolute top-16 md:top-24 text-center"
-          >
-            <h2 className="text-4xl md:text-6xl font-bold text-white/90">
-              Floating Keys
-            </h2>
-          </motion.div>
+           <motion.div
+             animate={{ opacity: phase === "teardown" ? 1 : 0 }}
+             transition={{ duration: 0.5 }}
+             className="absolute top-16 md:top-24 text-center"
+           >
+             <h2 className="text-4xl md:text-7xl font-bold text-white/90">
+               Floating Keys
+             </h2>
+           </motion.div>
         </div>
 
          {/* Scroll progress indicator */}
