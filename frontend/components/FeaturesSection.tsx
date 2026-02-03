@@ -54,10 +54,10 @@ const FeaturesSection = () => {
         {/* Header */}
         <RevealAnimation>
           <div className="mb-8 md:mb-12">
-            <h2 className="text-4xl text-center md:text-7xl font-bold text-white">
+            <h2 className="font-display text-4xl text-center md:text-7xl font-bold text-white">
               Features
             </h2>
-            <p className="mx-auto mt-4 max-w-3xl text-base text-center text-white/50">
+            <p className="font-display mx-auto mt-4 max-w-3xl text-base text-center text-white/50">
               KERO가 제공하는 핵심 기능들. 최신 AI 기술과 실시간 통신 기술이 만나 새로운 노래방 경험을 선사합니다.
             </p>
           </div>

@@ -73,12 +73,12 @@ const ArchitectureSection = () => {
         {/* Header */}
         <div className="mb-8 md:mb-12">
           <RevealAnimation>
-            <h2 className="text-4xl text-center font-bold text-white md:text-7xl">
+            <h2 className="font-display text-4xl text-center font-bold text-white md:text-7xl">
               Architecture
             </h2>
           </RevealAnimation>
           <RevealAnimation delay={0.2}>
-            <p className="mx-auto mt-4 max-w-3xl text-base text-center text-white/50">
+            <p className="font-display mx-auto mt-4 max-w-3xl text-base text-center text-white/50">
               실시간 노래방 경험을 완성하는 3단계 기술 파이프라인.
               <br className="hidden md:block" />
               미디어 처리부터 AI 분석까지 끊김 없는 데이터 흐름을 설계했습니다.

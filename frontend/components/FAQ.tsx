@@ -24,10 +24,10 @@ export default function FAQ() {
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
           <RevealAnimation>
-            <h2 className="text-4xl text-center md:text-7xl font-bold text-white">FAQ</h2>
+            <h2 className="font-display text-4xl text-center md:text-7xl font-bold text-white">FAQ</h2>
           </RevealAnimation>
           <RevealAnimation delay={0.2}>
-            <p className="mx-auto mt-4 max-w-3xl text-base text-center text-white/50">자주 묻는 질문들</p>
+            <p className="font-display mx-auto mt-4 max-w-3xl text-base text-center text-white/50">자주 묻는 질문들</p>
           </RevealAnimation>
         </div>
         <div className="flex flex-col divide-y divide-white/10">
