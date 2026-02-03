@@ -136,7 +136,7 @@ export default function HeroSection() {
   const Icon = currentMode.icon;
 
   return (
-     <section ref={containerRef} className="relative min-h-screen md:h-screen w-full overflow-y-auto md:overflow-hidden bg-black/90">
+      <section ref={containerRef} className="relative min-h-screen md:h-screen w-full overflow-y-auto md:overflow-hidden bg-black">
        <motion.div style={{ y, scale, opacity }} className="absolute inset-0 z-0 hidden md:block">
          <video
            autoPlay
