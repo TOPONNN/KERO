@@ -5,6 +5,8 @@ torchaudio==2.8.0+cu126
 whisperx>=3.7.0
 faster-whisper>=1.0.0
 silero-vad>=5.1
+qwen-asr>=0.2.0
+soynlp>=0.0.493
 omegaconf>=2.3.0
 
 audio-separator>=0.40.0

@@ -25,6 +25,9 @@ LYRICS_API_URL = os.getenv("LYRICS_API_URL", "https://lyrics.lewdhutao.my.eu.org
 TEMP_DIR = os.getenv("TEMP_DIR", "/tmp/kero-ai")
 os.makedirs(TEMP_DIR, exist_ok=True)
 
+# Qwen3 ForcedAligner toggle
+USE_QWEN3_ALIGNER = os.getenv("USE_QWEN3_ALIGNER", "true").lower() == "true"
+
 QUEUE_NAMES = {
     "audio_process": "kero.audio.process",
     "lyrics_extract": "kero.lyrics.extract",

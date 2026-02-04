@@ -15,7 +15,7 @@ import requests
 import soundfile as sf
 
 from typing import List, Dict, Callable, Optional
-from src.config import TEMP_DIR, LYRICS_API_URL
+from src.config import TEMP_DIR, LYRICS_API_URL, USE_QWEN3_ALIGNER
 from src.services.s3_service import s3_service
 
 
@@ -23,6 +23,7 @@ class LyricsProcessor:
     def __init__(self):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self._whisperx_model = None
+        self._qwen3_aligner = None
 
     # ------------------------------------------------------------------
     # WhisperX model management
@@ -48,6 +49,19 @@ class LyricsProcessor:
             self._whisperx_model = None
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+
+    def _get_qwen3_aligner(self):
+        """Lazy-load Qwen3 Aligner wrapper."""
+        if self._qwen3_aligner is None:
+            from src.processors.qwen3_aligner import Qwen3Aligner
+            self._qwen3_aligner = Qwen3Aligner(device=self.device)
+        return self._qwen3_aligner
+
+    def _release_qwen3_aligner(self):
+        """Free Qwen3 model to reclaim GPU memory."""
+        if self._qwen3_aligner is not None:
+            self._qwen3_aligner.release_model()
+            self._qwen3_aligner = None
 
     # ------------------------------------------------------------------
     # Kept verbatim from previous implementation
@@ -670,6 +684,115 @@ class LyricsProcessor:
             print(f"[Refine] Energy onset refinement failed: {e}")
             return segments
 
+    def _refine_with_pitch_and_energy_onsets(self, segments: List[Dict], vocals_path: str) -> List[Dict]:
+        """Post-process: snap word start times to combined energy + pitch onsets.
+        
+        Combines librosa energy onsets with FCPE pitch transition points
+        for more accurate word boundary detection.
+        """
+        try:
+            print(f"[Refine] Loading vocals for combined energy+pitch onset detection...")
+            y, sr = librosa.load(vocals_path, sr=16000)
+
+            # --- Energy onsets (same as _refine_with_energy_onsets) ---
+            onset_env = librosa.onset.onset_strength(y=y, sr=sr, hop_length=256)
+            onset_frames = librosa.onset.onset_detect(
+                onset_envelope=onset_env, sr=sr, hop_length=256,
+                backtrack=True, units='frames'
+            )
+            energy_onset_times = librosa.frames_to_time(onset_frames, sr=sr, hop_length=256)
+
+            # --- Pitch onsets via FCPE ---
+            audio_tensor = torch.from_numpy(y).float().unsqueeze(0).unsqueeze(-1).to(self.device)
+            if not hasattr(self, '_fcpe_model'):
+                self._fcpe_model = spawn_bundled_infer_model(device=self.device)
+
+            f0 = self._fcpe_model.infer(
+                audio_tensor, sr=sr, decoder_mode="local_argmax",
+                threshold=0.006, f0_min=65, f0_max=987.77, interp_uv=False
+            )
+            f0_values = f0.squeeze().cpu().numpy()
+            # FCPE outputs at 10ms intervals, downsample to 20ms
+            f0_values = f0_values[::2]
+            f0_times = np.arange(len(f0_values)) * 320 / sr  # 20ms per frame
+
+            # Detect pitch transition points
+            pitch_onset_times = []
+            for i in range(1, len(f0_values)):
+                prev_f0 = f0_values[i - 1]
+                curr_f0 = f0_values[i]
+                # Voice onset: unvoiced → voiced
+                if prev_f0 <= 0 and curr_f0 > 0:
+                    pitch_onset_times.append(float(f0_times[i]))
+                # Rapid pitch change: >50Hz jump between voiced frames
+                elif prev_f0 > 0 and curr_f0 > 0 and abs(curr_f0 - prev_f0) > 50:
+                    pitch_onset_times.append(float(f0_times[i]))
+
+            pitch_onset_times = np.array(pitch_onset_times) if pitch_onset_times else np.array([])
+
+            # Clean up GPU memory
+            del audio_tensor, f0
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
+            # --- Combine energy and pitch onsets (union) ---
+            if len(pitch_onset_times) > 0 and len(energy_onset_times) > 0:
+                combined_onsets = np.sort(np.unique(np.concatenate([
+                    energy_onset_times, pitch_onset_times
+                ])))
+            elif len(energy_onset_times) > 0:
+                combined_onsets = energy_onset_times
+            elif len(pitch_onset_times) > 0:
+                combined_onsets = pitch_onset_times
+            else:
+                print("[Refine] No onsets detected, skipping refinement")
+                return segments
+
+            print(f"[Refine] Detected {len(energy_onset_times)} energy + {len(pitch_onset_times)} pitch = {len(combined_onsets)} combined onsets")
+
+            # --- RMS for silence detection ---
+            rms = librosa.feature.rms(y=y, frame_length=1024, hop_length=256)[0]
+            rms_times = librosa.times_like(rms, sr=sr, hop_length=256)
+            rms_max = float(rms.max()) if len(rms) > 0 else 1.0
+            silence_threshold = rms_max * 0.05
+
+            # --- Snap word start times to nearest combined onset ---
+            tolerance = 0.15  # ±150ms snap window
+            total_snapped = 0
+            total_words = 0
+
+            for segment in segments:
+                words = segment.get("words", [])
+                line_start = segment["start_time"]
+                line_end = segment["end_time"]
+
+                for i, word in enumerate(words):
+                    total_words += 1
+                    start = word["start_time"]
+
+                    if len(combined_onsets) > 0:
+                        diffs = np.abs(combined_onsets - start)
+                        min_idx = np.argmin(diffs)
+                        if diffs[min_idx] <= tolerance:
+                            new_start = float(combined_onsets[min_idx])
+                            prev_end = words[i - 1]["end_time"] if i > 0 else line_start
+                            if new_start >= prev_end:
+                                word["start_time"] = round(new_start, 3)
+                                total_snapped += 1
+
+                # After snapping starts, adjust end times to be seamless
+                for i in range(len(words) - 1):
+                    words[i]["end_time"] = words[i + 1]["start_time"]
+                if words:
+                    words[-1]["end_time"] = round(line_end, 3)
+
+            print(f"[Refine] Snapped {total_snapped}/{total_words} word starts to combined energy+pitch onsets")
+            return segments
+
+        except Exception as e:
+            print(f"[Refine] Combined onset refinement failed: {e}")
+            return segments
+
     def _map_lines_to_audio(self, lyrics_text: str, whisperx_segments: List[Dict]) -> List[Dict]:
         """Map API lyric lines to audio timing using DP syllable alignment."""
         api_lines = [l.strip() for l in lyrics_text.split("\n") if l.strip()]
@@ -1008,82 +1131,151 @@ class LyricsProcessor:
             progress_callback(15)
 
         # ==============================================================
-        # Stage 2: WhisperX Transcription (rough timing only)
+        # Determine alignment method
         # ==============================================================
-        print("=" * 60)
-        print("[Stage 2: WhisperX] Transcribing for rough timing...")
-        print("=" * 60)
-
-        whisperx_segments = self._whisperx_transcribe(audio_path, detected_language)
-
-        if progress_callback:
-            progress_callback(50)
-
-        # ==============================================================
-        # Stage 3: Map API lyrics lines to audio regions (DP)
-        # ==============================================================
-        print("=" * 60)
-        print("[Stage 3: Mapping] Mapping API lines onto audio timing...")
-        print("=" * 60)
-
-        def _build_even_line_segments(text: str, total_duration: float) -> List[Dict]:
-            lines = [l.strip() for l in text.split("\n") if l.strip()]
-            if not lines:
-                return []
-            if total_duration <= 0:
-                total_duration = max(len(lines) * 0.5, 1.0)
-            per_line = total_duration / len(lines)
-            segments = []
-            for i, line in enumerate(lines):
-                start = i * per_line
-                end = start + per_line
-                segments.append({
-                    "start": round(float(start), 3),
-                    "end": round(float(end), 3),
-                    "text": line,
-                })
-            return segments
-
-        if whisperx_segments:
-            api_line_segments = self._map_lines_to_audio(lyrics_text, whisperx_segments)
-            print(f"[Mapping] {len(api_line_segments)} lines mapped to audio regions")
+        use_qwen3 = False
+        qwen3_lang: Optional[str] = None
+        lyrics_lines: List[Dict] = []
+        if USE_QWEN3_ALIGNER:
+            from src.processors.qwen3_aligner import Qwen3Aligner
+            qwen3_lang = Qwen3Aligner.SUPPORTED_LANGUAGES.get(detected_language)
+            if qwen3_lang:
+                use_qwen3 = True
+                print(f"[Pipeline] Using Qwen3-ForcedAligner for {qwen3_lang}")
+            else:
+                print(f"[Pipeline] Language '{detected_language}' not supported by Qwen3, using WhisperX")
         else:
-            print("[Mapping] WhisperX failed — using even line distribution")
-            api_line_segments = _build_even_line_segments(lyrics_text, duration)
+            print("[Pipeline] Qwen3 disabled (USE_QWEN3_ALIGNER=false), using WhisperX")
 
-        if progress_callback:
-            progress_callback(55)
+        if use_qwen3:
+            # ==============================================================
+            # Qwen3 Path: Direct forced alignment (replaces Stages 2-4)
+            # ==============================================================
+            try:
+                print("=" * 60)
+                print("[Stage 2-4: Qwen3] Direct forced alignment...")
+                print("=" * 60)
+
+                aligner = self._get_qwen3_aligner()
+                api_lines = [l.strip() for l in lyrics_text.split("\n") if l.strip()]
+                assert qwen3_lang is not None
+                full_words = aligner.align_words(audio_path, lyrics_text, qwen3_lang)
+
+                lyrics_lines = []
+                word_idx = 0
+                for line_text in api_lines:
+                    line_words_text = line_text.split()
+                    line_word_timings = []
+                    for _ in line_words_text:
+                        if word_idx < len(full_words):
+                            line_word_timings.append(full_words[word_idx])
+                            word_idx += 1
+                    if line_word_timings:
+                        line_start = line_word_timings[0]["start_time"]
+                        line_end = line_word_timings[-1]["end_time"]
+                    else:
+                        line_start = lyrics_lines[-1]["end_time"] if lyrics_lines else 0.0
+                        line_end = line_start + 0.5
+                    lyrics_lines.append({
+                        "start_time": round(line_start, 3),
+                        "end_time": round(line_end, 3),
+                        "text": line_text,
+                        "words": line_word_timings,
+                    })
+
+                self._release_qwen3_aligner()
+                if progress_callback:
+                    progress_callback(60)
+                lyrics_lines = self._clean_lyrics(lyrics_lines, detected_language)
+                print(f"[Clean] {len(lyrics_lines)} lines after cleaning")
+                print("[Pipeline] Qwen3 alignment successful")
+
+            except Exception as e:
+                print(f"[Pipeline] Qwen3 alignment failed: {e}, falling back to WhisperX")
+                self._release_qwen3_aligner()
+                use_qwen3 = False
+
+        if not use_qwen3:
+            # ==============================================================
+            # WhisperX Path (existing pipeline)
+            # ==============================================================
+
+            # ==============================================================
+            # Stage 2: WhisperX Transcription (rough timing only)
+            # ==============================================================
+            print("=" * 60)
+            print("[Stage 2: WhisperX] Transcribing for rough timing...")
+            print("=" * 60)
+
+            whisperx_segments = self._whisperx_transcribe(audio_path, detected_language)
+
+            if progress_callback:
+                progress_callback(50)
+
+            # ==============================================================
+            # Stage 3: Map API lyrics lines to audio regions (DP)
+            # ==============================================================
+            print("=" * 60)
+            print("[Stage 3: Mapping] Mapping API lines onto audio timing...")
+            print("=" * 60)
+
+            def _build_even_line_segments(text: str, total_duration: float) -> List[Dict]:
+                lines = [l.strip() for l in text.split("\n") if l.strip()]
+                if not lines:
+                    return []
+                if total_duration <= 0:
+                    total_duration = max(len(lines) * 0.5, 1.0)
+                per_line = total_duration / len(lines)
+                segments = []
+                for i, line in enumerate(lines):
+                    start = i * per_line
+                    end = start + per_line
+                    segments.append({
+                        "start": round(float(start), 3),
+                        "end": round(float(end), 3),
+                        "text": line,
+                    })
+                return segments
+
+            if whisperx_segments:
+                api_line_segments = self._map_lines_to_audio(lyrics_text, whisperx_segments)
+                print(f"[Mapping] {len(api_line_segments)} lines mapped to audio regions")
+            else:
+                print("[Mapping] WhisperX failed — using even line distribution")
+                api_line_segments = _build_even_line_segments(lyrics_text, duration)
+
+            if progress_callback:
+                progress_callback(55)
+
+            # ==============================================================
+            # Stage 4: WhisperX Forced Alignment (wav2vec2)
+            # ==============================================================
+            print("=" * 60)
+            print("[Stage 4: Alignment] Forcing API text alignment...")
+            print("=" * 60)
+
+            aligned_segments = None
+            if api_line_segments:
+                aligned_segments = self._whisperx_align_segments(audio_path, api_line_segments, detected_language)
+            else:
+                print("[Alignment] No line segments available for alignment")
+
+            lyrics_lines = self._build_lyrics_from_aligned(api_line_segments, aligned_segments)
+
+            if progress_callback:
+                progress_callback(60)
+
+            lyrics_lines = self._clean_lyrics(lyrics_lines, detected_language)
+            print(f"[Clean] {len(lyrics_lines)} lines after cleaning")
 
         # ==============================================================
-        # Stage 4: WhisperX Forced Alignment (wav2vec2)
+        # Stage 5: Pitch + energy onset refinement
         # ==============================================================
         print("=" * 60)
-        print("[Stage 4: Alignment] Forcing API text alignment...")
+        print("[Stage 5: Refine] Snapping word times to pitch + energy onsets...")
         print("=" * 60)
 
-        aligned_segments = None
-        if api_line_segments:
-            aligned_segments = self._whisperx_align_segments(audio_path, api_line_segments, detected_language)
-        else:
-            print("[Alignment] No line segments available for alignment")
-
-        lyrics_lines = self._build_lyrics_from_aligned(api_line_segments, aligned_segments)
-
-        if progress_callback:
-            progress_callback(60)
-
-        # Clean lyrics
-        lyrics_lines = self._clean_lyrics(lyrics_lines, detected_language)
-        print(f"[Clean] {len(lyrics_lines)} lines after cleaning")
-
-        # ==============================================================
-        # Stage 5: Energy onset refinement (snap word starts to audio)
-        # ==============================================================
-        print("=" * 60)
-        print("[Stage 5: Refine] Snapping word times to energy onsets...")
-        print("=" * 60)
-
-        lyrics_lines = self._refine_with_energy_onsets(lyrics_lines, audio_path)
+        lyrics_lines = self._refine_with_pitch_and_energy_onsets(lyrics_lines, audio_path)
 
         # ==============================================================
         # Stage 6: Energy analysis
