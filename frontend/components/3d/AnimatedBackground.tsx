@@ -29,6 +29,33 @@ const findSkillFromObject = (obj: { name: string; id: string } | null): Skill | 
   return null;
 };
 
+// Apply brand colors to all keycap-desktop objects at runtime
+const applyBrandColors = (app: Application) => {
+  try {
+    const allObjects = app.getAllObjects();
+    const keycapDesktops = allObjects.filter((o: SPEObject) => o.name === 'keycap-desktop');
+    
+    keycapDesktops.forEach((keycap: SPEObject) => {
+      // Traverse parent chain to find the skill name
+      let current: any = keycap;
+      while (current) {
+        const skill = SKILLS[current.name as SkillNames];
+        if (skill) {
+          try {
+            keycap.color = skill.color;
+          } catch (e) {
+            // Some objects may not support color setting
+          }
+          break;
+        }
+        current = current.parent || null;
+      }
+    });
+  } catch (e) {
+    console.warn('Failed to apply brand colors:', e);
+  }
+};
+
 const AnimatedBackground = () => {
   const isMobile = useMediaQuery("(max-width: 767px)");
   const [splineApp, setSplineApp] = useState<Application>();
@@ -451,22 +478,23 @@ const AnimatedBackground = () => {
 
   return (
     <Suspense fallback={<div>Loading...</div>}>
-      <Spline
-        className="w-full h-full fixed inset-0 z-0"
-        onLoad={(app: Application) => {
-          setSplineApp(app);
-          bypassLoading();
-          try {
-            const renderer = (app as any)._renderer;
-            if (renderer && renderer.setPixelRatio) {
-              renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            }
-          } catch (e) {
-            // ignore
-          }
-        }}
-        scene="/assets/skills-keyboard.spline"
-      />
+       <Spline
+         className="w-full h-full fixed inset-0 z-0"
+         onLoad={(app: Application) => {
+           setSplineApp(app);
+           bypassLoading();
+           applyBrandColors(app);
+           try {
+             const renderer = (app as any)._renderer;
+             if (renderer && renderer.setPixelRatio) {
+               renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+             }
+           } catch (e) {
+             // ignore
+           }
+         }}
+         scene="/assets/skills-keyboard.spline"
+       />
     </Suspense>
   );
 };
