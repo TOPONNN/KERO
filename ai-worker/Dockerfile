@@ -51,7 +51,7 @@ RUN uv venv /app/venv && \
 # Set environment for PyTorch bundled cuDNN
 ENV PATH="/app/venv/bin:${PATH}"
 ENV PYTHONPATH="/app/venv/lib/python3.12/site-packages"
-ENV LD_LIBRARY_PATH="/app/venv/lib/python3.12/site-packages/nvidia/cudnn/lib:/app/venv/lib/python3.12/site-packages/nvidia/cublas/lib:/app/venv/lib/python3.12/site-packages/nvidia/cufft/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+ENV LD_LIBRARY_PATH="/app/venv/lib/python3.12/site-packages/nvidia/cudnn/lib:/app/venv/lib/python3.12/site-packages/nvidia/cublas/lib:/app/venv/lib/python3.12/site-packages/nvidia/cufft/lib:/app/venv/lib/python3.12/site-packages/nvidia/curand/lib:/app/venv/lib/python3.12/site-packages/nvidia/cusolver/lib:/app/venv/lib/python3.12/site-packages/nvidia/cusparse/lib:/app/venv/lib/python3.12/site-packages/nvidia/cuda_runtime/lib:/app/venv/lib/python3.12/site-packages/nvidia/cuda_cupti/lib:/app/venv/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib:/app/venv/lib/python3.12/site-packages/nvidia/nvjitlink/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 
 # Pre-download MelBand Roformer model so it's baked into the image
 RUN python -c "from audio_separator.separator import Separator; s = Separator(); s.load_model('mel_band_roformer_kim_ft3_unwa.ckpt')"

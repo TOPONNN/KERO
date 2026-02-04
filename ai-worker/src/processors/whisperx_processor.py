@@ -1116,21 +1116,78 @@ class LyricsProcessor:
         if api_line_segments:
             if USE_SOFA_ALIGNER:
                 try:
-                    from src.processors.sofa_aligner import SOFAAligner
-
-                    full_text = "\n".join(seg["text"] for seg in api_line_segments)
+                    from src.processors.sofa_aligner import SOFAAligner, _SOFA_SAMPLE_RATE
 
                     sofa = SOFAAligner(
                         model_path=SOFA_MODEL_PATH or None,
                         device=self.device,
                     )
-                    sofa_words = sofa.align_words(audio_path, full_text, language=detected_language)
-                    sofa.release_model()
 
-                    if sofa_words:
-                        lyrics_lines = self._build_lyrics_from_sofa(api_line_segments, sofa_words)
-                        print(f"[SOFA] Aligned {len(sofa_words)} words across {len(lyrics_lines)} lines")
-                    else:
+                    # Load audio once, then align per-segment
+                    waveform = sofa._load_audio(audio_path)
+                    total_samples = len(waveform)
+                    padding_sec = 2.0
+                    padding_samples = int(padding_sec * _SOFA_SAMPLE_RATE)
+                    total_words = 0
+
+                    for seg in api_line_segments:
+                        seg_text = seg.get("text", "").strip()
+                        if not seg_text:
+                            continue
+
+                        seg_start = seg.get("start", 0.0)
+                        seg_end = seg.get("end", 0.0)
+                        if seg_end <= seg_start:
+                            # No valid timing — skip SOFA for this segment
+                            lyrics_lines.append({
+                                "text": seg_text,
+                                "start_time": round(seg_start, 3),
+                                "end_time": round(seg_end, 3),
+                                "words": [{"text": w, "start_time": round(seg_start, 3), "end_time": round(seg_end, 3)} for w in seg_text.split()],
+                            })
+                            continue
+
+                        # Extract audio chunk with padding
+                        chunk_start_sample = max(0, int(seg_start * _SOFA_SAMPLE_RATE) - padding_samples)
+                        chunk_end_sample = min(total_samples, int(seg_end * _SOFA_SAMPLE_RATE) + padding_samples)
+                        chunk_waveform = waveform[chunk_start_sample:chunk_end_sample]
+                        time_offset = chunk_start_sample / _SOFA_SAMPLE_RATE
+
+                        try:
+                            seg_words = sofa._align_single(chunk_waveform, seg_text)
+                        except Exception as seg_e:
+                            print(f"[SOFA] Segment error for '{seg_text[:30]}...': {seg_e}")
+                            seg_words = []
+
+                        if seg_words:
+                            # Offset timestamps by chunk start position
+                            line_words = []
+                            for w in seg_words:
+                                line_words.append({
+                                    "text": w["text"],
+                                    "start_time": round(w["start_time"] + time_offset, 3),
+                                    "end_time": round(w["end_time"] + time_offset, 3),
+                                })
+                            lyrics_lines.append({
+                                "text": seg_text,
+                                "start_time": line_words[0]["start_time"],
+                                "end_time": line_words[-1]["end_time"],
+                                "words": line_words,
+                            })
+                            total_words += len(line_words)
+                        else:
+                            # Fallback: use segment timing without word-level detail
+                            lyrics_lines.append({
+                                "text": seg_text,
+                                "start_time": round(seg_start, 3),
+                                "end_time": round(seg_end, 3),
+                                "words": [{"text": w, "start_time": round(seg_start, 3), "end_time": round(seg_end, 3)} for w in seg_text.split()],
+                            })
+
+                    sofa.release_model()
+                    print(f"[SOFA] Aligned {total_words} words across {len(lyrics_lines)} lines (per-segment)")
+
+                    if not lyrics_lines:
                         print("[SOFA] No alignment results — falling back to WhisperX")
                         aligned_segments = self._whisperx_align_segments(audio_path, api_line_segments, detected_language)
                         lyrics_lines = self._build_lyrics_from_aligned(api_line_segments, aligned_segments)
