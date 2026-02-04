@@ -1,0 +1,33 @@
+# SOFA Korean Training Config
+# Transfer learning from Japanese pretrained model
+# Optimized for CSD dataset (~2h Korean singing)
+
+# Reduce steps for transfer learning (default is 100k)
+total_steps: 50000
+
+# Slightly lower LR for fine-tuning
+optimizer:
+  lr: 0.0003
+  weight_decay: 0.1
+
+# Audio settings (must match SOFA defaults)
+audio:
+  sample_rate: 44100
+  hop_length: 512
+
+# Batch settings
+batch_max_length: 100  # seconds per batch
+
+# Dictionary path (relative to SOFA repo root)
+dictionary_path: dictionary/korean.txt
+
+# G2P module
+g2p_module: korean_g2p
+
+# Logging
+log_interval: 100
+val_interval: 1000
+save_interval: 5000
+
+# Mixed precision for faster training
+precision: bf16-mixed

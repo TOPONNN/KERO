@@ -15,7 +15,7 @@ import requests
 import soundfile as sf
 
 from typing import List, Dict, Callable, Optional
-from src.config import TEMP_DIR, LYRICS_API_URL
+from src.config import TEMP_DIR, LYRICS_API_URL, USE_SOFA_ALIGNER, SOFA_MODEL_PATH
 from src.services.s3_service import s3_service
 
 
@@ -958,6 +958,54 @@ class LyricsProcessor:
         return result
 
 
+    def _build_lyrics_from_sofa(self, api_segments: List[Dict], sofa_words: List[Dict]) -> List[Dict]:
+        """Map SOFA flat word list back to original line structure from api_segments."""
+        if not sofa_words or not api_segments:
+            return []
+
+        lyrics_lines = []
+        word_idx = 0
+
+        for seg in api_segments:
+            line_text = seg.get("text", "").strip()
+            if not line_text:
+                continue
+
+            expected_words = line_text.split()
+            line_words = []
+
+            for expected_word in expected_words:
+                if word_idx < len(sofa_words):
+                    w = sofa_words[word_idx]
+                    line_words.append({
+                        "text": expected_word,
+                        "start_time": round(w["start_time"], 3),
+                        "end_time": round(w["end_time"], 3),
+                    })
+                    word_idx += 1
+                else:
+                    if line_words:
+                        last_end = line_words[-1]["end_time"]
+                    elif lyrics_lines and lyrics_lines[-1]["words"]:
+                        last_end = lyrics_lines[-1]["words"][-1]["end_time"]
+                    else:
+                        last_end = 0.0
+                    line_words.append({
+                        "text": expected_word,
+                        "start_time": round(last_end, 3),
+                        "end_time": round(last_end + 0.5, 3),
+                    })
+
+            if line_words:
+                lyrics_lines.append({
+                    "text": line_text,
+                    "start_time": line_words[0]["start_time"],
+                    "end_time": line_words[-1]["end_time"],
+                    "words": line_words,
+                })
+
+        return lyrics_lines
+
     # ------------------------------------------------------------------
     # Main entry point
     # ------------------------------------------------------------------
@@ -1055,19 +1103,46 @@ class LyricsProcessor:
             progress_callback(55)
 
         # ==============================================================
-        # Stage 4: WhisperX Forced Alignment (wav2vec2)
+        # Stage 4: Forced Alignment (SOFA or WhisperX)
         # ==============================================================
         print("=" * 60)
-        print("[Stage 4: Alignment] Forcing API text alignment...")
+        if USE_SOFA_ALIGNER:
+            print("[Stage 4: SOFA] Singing-oriented forced alignment...")
+        else:
+            print("[Stage 4: WhisperX] Forced alignment (wav2vec2)...")
         print("=" * 60)
 
-        aligned_segments = None
+        lyrics_lines = []
         if api_line_segments:
-            aligned_segments = self._whisperx_align_segments(audio_path, api_line_segments, detected_language)
+            if USE_SOFA_ALIGNER:
+                try:
+                    from src.processors.sofa_aligner import SOFAAligner
+
+                    full_text = "\n".join(seg["text"] for seg in api_line_segments)
+
+                    sofa = SOFAAligner(
+                        model_path=SOFA_MODEL_PATH or None,
+                        device=self.device,
+                    )
+                    sofa_words = sofa.align_words(audio_path, full_text, language=detected_language)
+                    sofa.release_model()
+
+                    if sofa_words:
+                        lyrics_lines = self._build_lyrics_from_sofa(api_line_segments, sofa_words)
+                        print(f"[SOFA] Aligned {len(sofa_words)} words across {len(lyrics_lines)} lines")
+                    else:
+                        print("[SOFA] No alignment results — falling back to WhisperX")
+                        aligned_segments = self._whisperx_align_segments(audio_path, api_line_segments, detected_language)
+                        lyrics_lines = self._build_lyrics_from_aligned(api_line_segments, aligned_segments)
+                except Exception as e:
+                    print(f"[SOFA] Error: {e} — falling back to WhisperX")
+                    aligned_segments = self._whisperx_align_segments(audio_path, api_line_segments, detected_language)
+                    lyrics_lines = self._build_lyrics_from_aligned(api_line_segments, aligned_segments)
+            else:
+                aligned_segments = self._whisperx_align_segments(audio_path, api_line_segments, detected_language)
+                lyrics_lines = self._build_lyrics_from_aligned(api_line_segments, aligned_segments)
         else:
             print("[Alignment] No line segments available for alignment")
-
-        lyrics_lines = self._build_lyrics_from_aligned(api_line_segments, aligned_segments)
 
         if progress_callback:
             progress_callback(60)

@@ -30,3 +30,7 @@ QUEUE_NAMES = {
     "lyrics_extract": "kero.lyrics.extract",
     "pitch_analyze": "kero.pitch.analyze",
 }
+
+# SOFA (Singing-Oriented Forced Aligner) settings
+USE_SOFA_ALIGNER = os.getenv("USE_SOFA_ALIGNER", "false").lower() == "true"
+SOFA_MODEL_PATH = os.getenv("SOFA_MODEL_PATH", "")
