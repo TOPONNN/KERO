@@ -103,16 +103,25 @@ export default function NormalModeGame() {
     // 첫 번째 가사 시작 전: 첫 번째 가사를 미리 보여줌 (인덱스 0 반환)
     if (time < lyrics[0].startTime) return 0;
     
+    // Defensive: find the LATEST line whose range covers current time
+    // (handles any residual overlap in data)
+    let bestMatch = -1;
+    
+    for (let i = 0; i < lyrics.length; i++) {
+      const line = lyrics[i];
+      
+      if (time >= line.startTime && time <= line.endTime) {
+        bestMatch = i;  // Keep updating — last match wins (latest startTime)
+      }
+    }
+    
+    if (bestMatch >= 0) return bestMatch;
+    
+    // No direct match — check gap logic
     for (let i = 0; i < lyrics.length; i++) {
       const line = lyrics[i];
       const nextLine = lyrics[i + 1];
       
-      // 현재 라인 범위 내
-      if (time >= line.startTime && time <= line.endTime) {
-        return i;
-      }
-      
-      // 현재 라인 끝났지만 다음 라인 시작 전 (갭 구간)
       if (time > line.endTime) {
         // 다음 라인이 있는 경우
         if (nextLine && time < nextLine.startTime) {

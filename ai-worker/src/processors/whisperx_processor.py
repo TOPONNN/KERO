@@ -659,9 +659,13 @@ class LyricsProcessor:
                 # After snapping starts, adjust end times to be seamless
                 for i in range(len(words) - 1):
                     words[i]["end_time"] = words[i + 1]["start_time"]
-                # Last word ends at line end
+                # Last word: keep its own end_time (don't override with original segment boundary)
+                # This prevents line/word end_time divergence
+
+                # Recompute line boundaries from the finalized words
                 if words:
-                    words[-1]["end_time"] = round(line_end, 3)
+                    segment["start_time"] = words[0]["start_time"]
+                    segment["end_time"] = words[-1]["end_time"]
 
             print(f"[Refine] Snapped {total_snapped}/{total_words} word starts to energy onsets")
             return segments
@@ -1006,6 +1010,71 @@ class LyricsProcessor:
 
         return lyrics_lines
 
+    def _enforce_monotonic_lines(self, lyrics_lines: List[Dict]) -> List[Dict]:
+        """Ensure all line boundaries are monotonically increasing (no overlaps).
+
+        For each line in order:
+        1. Recompute line start/end from its words
+        2. Clamp line.start >= prev_line.end
+        3. Proportionally redistribute words if line was compressed
+        """
+        if not lyrics_lines:
+            return lyrics_lines
+
+        prev_end = 0.0
+        overlap_count = 0
+
+        for idx, line in enumerate(lyrics_lines):
+            words = line.get("words", [])
+
+            # Recompute line boundaries from word data
+            if words:
+                line["start_time"] = words[0]["start_time"]
+                line["end_time"] = words[-1]["end_time"]
+
+            line_start = line["start_time"]
+            line_end = line["end_time"]
+
+            # Detect overlap
+            if line_start < prev_end:
+                overlap_count += 1
+                old_start = line_start
+                line_start = prev_end
+                line["start_time"] = round(line_start, 3)
+
+                # If end is also before prev_end, push it forward
+                if line_end <= line_start:
+                    # Preserve original duration as much as possible
+                    original_dur = max(line_end - old_start, 0.5)
+                    line_end = line_start + original_dur
+                    line["end_time"] = round(line_end, 3)
+
+                # Redistribute words within the new boundaries
+                if words:
+                    line_dur = max(line_end - line_start, 0.1)
+                    total_chars = sum(max(1, self._count_chars(w["text"])) for w in words)
+                    current = line_start
+                    for w in words:
+                        chars = max(1, self._count_chars(w["text"]))
+                        w_dur = line_dur * (chars / total_chars)
+                        w["start_time"] = round(current, 3)
+                        w["end_time"] = round(current + w_dur, 3)
+                        current += w_dur
+
+            # Ensure end > start minimum
+            if line_end <= line_start:
+                line_end = line_start + 0.5
+                line["end_time"] = round(line_end, 3)
+
+            prev_end = line_end
+
+        if overlap_count > 0:
+            print(f"[Monotonic] Fixed {overlap_count} overlapping line boundaries")
+        else:
+            print("[Monotonic] No overlaps detected — lines are clean")
+
+        return lyrics_lines
+
     # ------------------------------------------------------------------
     # Main entry point
     # ------------------------------------------------------------------
@@ -1161,13 +1230,27 @@ class LyricsProcessor:
 
                         if seg_words:
                             # Offset timestamps by chunk start position
+                            # and clamp to the Stage 3 segment window
+                            # to prevent padding bleed into adjacent lines
                             line_words = []
                             for w in seg_words:
+                                ws = max(seg_start, round(w["start_time"] + time_offset, 3))
+                                we = min(seg_end, round(w["end_time"] + time_offset, 3))
+                                # Skip words that land entirely outside the segment
+                                if we <= seg_start or ws >= seg_end:
+                                    continue
+                                # Ensure minimum word duration after clamping
+                                if we - ws < 0.01:
+                                    we = ws + 0.01
                                 line_words.append({
                                     "text": w["text"],
-                                    "start_time": round(w["start_time"] + time_offset, 3),
-                                    "end_time": round(w["end_time"] + time_offset, 3),
+                                    "start_time": round(ws, 3),
+                                    "end_time": round(we, 3),
                                 })
+                            if not line_words:
+                                # All words were outside the window — use segment bounds with proportional split
+                                line_words = [{"text": w, "start_time": round(seg_start, 3), "end_time": round(seg_end, 3)} for w in seg_text.split()]
+
                             lyrics_lines.append({
                                 "text": seg_text,
                                 "start_time": line_words[0]["start_time"],
@@ -1216,6 +1299,15 @@ class LyricsProcessor:
         print("=" * 60)
 
         lyrics_lines = self._refine_with_energy_onsets(lyrics_lines, audio_path)
+
+        # ==============================================================
+        # Stage 5b: Enforce monotonic line boundaries (no overlaps)
+        # ==============================================================
+        print("=" * 60)
+        print("[Stage 5b: Monotonic] Enforcing non-overlapping line boundaries...")
+        print("=" * 60)
+
+        lyrics_lines = self._enforce_monotonic_lines(lyrics_lines)
 
         # ==============================================================
         # Stage 6: Energy analysis
