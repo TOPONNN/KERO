@@ -27,7 +27,7 @@ interface LyricsLine {
 
 // 노래방 싱크 설정 상수
 const SYNC_CONFIG = {
-  WORD_LEAD_TIME: 0.3,          // 단어 하이라이트가 미리 시작하는 시간 (초)
+  WORD_LEAD_TIME: 0,            // 단어 하이라이트가 미리 시작하는 시간 (초)
   NEXT_LINE_PREVIEW: 0.5,      // 다음 가사 미리보기 시간 (초)
   LINE_HOLD_AFTER_END: 0.5,    // 가사가 끝난 후 유지 시간 (초)
 };
@@ -65,6 +65,9 @@ export default function NormalModeGame() {
 
   const animationFrameRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
+  // 시간 보간용: audio.currentTime은 저해상도(~4-10Hz)이므로 performance.now() 기반으로 보간
+  const lastPerfTimeRef = useRef<number>(0);
+  const lastAudioTimeRef = useRef<number>(0);
   
   const duration = audioDuration || currentSong?.duration || 0;
 
@@ -86,14 +89,12 @@ export default function NormalModeGame() {
        return (lyrics[0].startTime - localTime) > 10;
     }
 
-    // 2. Interlude (Ganju): Between lyrics
     if (currentLyricIndex !== -1) return false;
-    // Find next upcoming lyric
     const nextIdx = lyrics.findIndex(l => l.startTime > localTime);
     if (nextIdx <= 0) return false;
     const prevLine = lyrics[nextIdx - 1];
     const nextLine = lyrics[nextIdx];
-    return (nextLine.startTime - prevLine.endTime) > 5;
+    return (nextLine.startTime - prevLine.endTime) > 5.0;
   }, [gamePhase, currentLyricIndex, lyrics, localTime]);
 
   // Current pitch from current word
@@ -114,44 +115,45 @@ export default function NormalModeGame() {
       return -1;
     }
     
+    // 겹치는 라인이 있을 수 있으므로, 현재 시간에 해당하는 가장 늦은(최신) 라인을 찾음
+    let lastActiveIdx = -1;
+    
     for (let i = 0; i < lyrics.length; i++) {
       const line = lyrics[i];
-      const nextLine = lyrics[i + 1];
       
-      // 현재 라인 범위 내
       if (time >= line.startTime && time <= line.endTime) {
-        return i;
+        lastActiveIdx = i;
       }
       
-      // 현재 라인 끝났지만 다음 라인 시작 전 (갭 구간)
-      if (time > line.endTime) {
-        // 다음 라인이 있는 경우
-        if (nextLine && time < nextLine.startTime) {
-           const gapDuration = nextLine.startTime - line.endTime;
-           
-           // 라인이 끝나고 잠시 유지 (LINE_HOLD_AFTER_END)
-           if (time <= line.endTime + SYNC_CONFIG.LINE_HOLD_AFTER_END) {
-             return i;
-           }
-           
-           // 짧은 갭 (3초 이하): 다음 가사를 미리 보여줌 (Preview)
-           if (gapDuration <= 3.0) {
-             return i + 1;
-           }
-           
-           // 긴 갭 (> 3초, 간주 등): 점 3개 애니메이션 표시
-           return -1;
-        }
-        
-        // 마지막 라인인 경우
-        if (!nextLine) {
-          // 끝난 후 2초까지만 마지막 라인 표시
-          if (time <= line.endTime + 2.0) {
-            return i;
-          }
-          return -1;
-        }
+      if (line.startTime > time) break;
+    }
+    
+    if (lastActiveIdx >= 0) return lastActiveIdx;
+    
+    // 활성 라인이 없는 경우: 갭 구간 처리
+    // 현재 시간 직전에 끝난 라인과 직후에 시작할 라인을 찾음
+    let prevIdx = -1;
+    for (let i = lyrics.length - 1; i >= 0; i--) {
+      if (lyrics[i].endTime <= time) { prevIdx = i; break; }
+    }
+    const nextIdx = lyrics.findIndex(l => l.startTime > time);
+    
+    if (prevIdx >= 0 && time <= lyrics[prevIdx].endTime + SYNC_CONFIG.LINE_HOLD_AFTER_END) {
+      return prevIdx;
+    }
+    
+    if (nextIdx >= 0 && prevIdx >= 0) {
+      const gapDuration = lyrics[nextIdx].startTime - lyrics[prevIdx].endTime;
+      if (gapDuration <= 5.0) {
+        return nextIdx;
       }
+      return -1;
+    }
+    
+    // 마지막 라인 이후
+    if (prevIdx >= 0 && nextIdx < 0) {
+      if (time <= lyrics[prevIdx].endTime + 2.0) return prevIdx;
+      return -1;
     }
     
     return -1;
@@ -210,12 +212,20 @@ export default function NormalModeGame() {
     const updateTime = () => {
       if (!audioRef.current || !isPlaying) return;
       
-      const time = audioRef.current.currentTime;
+      const rawTime = audioRef.current.currentTime;
+      const now = performance.now() / 1000;
       
-      // 시간이 변했을 때만 업데이트 (성능 최적화)
-      if (Math.abs(time - lastTimeRef.current) > 0.016) { // ~60fps
-        // Redux 업데이트는 덜 자주 (성능) - must check BEFORE updating lastTimeRef
-        if (Math.floor(time * 10) !== Math.floor(lastTimeRef.current * 10)) {
+      // audio.currentTime이 바뀌었으면 기준점 갱신
+      if (Math.abs(rawTime - lastAudioTimeRef.current) > 0.001) {
+        lastAudioTimeRef.current = rawTime;
+        lastPerfTimeRef.current = now;
+      }
+      
+      // performance.now() 기반 보간으로 60fps 스무딩
+      const elapsed = now - lastPerfTimeRef.current;
+      const time = lastAudioTimeRef.current + elapsed;
+      
+      if (Math.floor(time * 10) !== Math.floor(lastTimeRef.current * 10)) {
           dispatch(updateCurrentTime(time));
         }
         
@@ -277,7 +287,7 @@ export default function NormalModeGame() {
             }
           }
         }
-      }
+      
 
       animationFrameRef.current = requestAnimationFrame(updateTime);
     };
