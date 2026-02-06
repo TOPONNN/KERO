@@ -239,7 +239,7 @@ class SOFAAligner:
                 logger.warning("Phoneme %r not in vocabulary — skipping", ph)
 
         if len(valid_ph_seq) < 2:
-            logger.warning("Too few phonemes (%d) for alignment", len(valid_ph_seq))
+            logger.debug("Too few phonemes (%d) for alignment — skipping (likely non-Korean text)", len(valid_ph_seq))
             return []
 
         # Run ONNX inference → list of (phoneme, start_sec, end_sec)
