@@ -27,7 +27,8 @@ interface LyricsLine {
 
 // 노래방 싱크 설정 상수
 const SYNC_CONFIG = {
-  WORD_LEAD_TIME: 0,            // 단어 하이라이트가 미리 시작하는 시간 (초)
+  WORD_LEAD_TIME: 0.2,          // 단어 하이라이트가 미리 시작하는 시간 (초)
+  WORD_FILL_SPEED: 1.2,         // 단어/라인 채움 속도 배수 (1.0 = 원본)
   NEXT_LINE_PREVIEW: 0.5,      // 다음 가사 미리보기 시간 (초)
   LINE_HOLD_AFTER_END: 0.5,    // 가사가 끝난 후 유지 시간 (초)
 };
@@ -108,54 +109,48 @@ export default function NormalModeGame() {
 
   const findCurrentLyricIndex = useCallback((time: number): number => {
     if (lyrics.length === 0) return -1;
-    
-    // 첫 번째 가사 시작 전: 10초 전부터만 미리 보여줌
+
     if (time < lyrics[0].startTime) {
       if (time >= lyrics[0].startTime - 10) return 0;
       return -1;
     }
-    
-    // 겹치는 라인이 있을 수 있으므로, 현재 시간에 해당하는 가장 늦은(최신) 라인을 찾음
-    let lastActiveIdx = -1;
-    
+
+    let firstActiveIdx = -1;
     for (let i = 0; i < lyrics.length; i++) {
       const line = lyrics[i];
-      
       if (time >= line.startTime && time <= line.endTime) {
-        lastActiveIdx = i;
+        firstActiveIdx = i;
+        break;
       }
-      
       if (line.startTime > time) break;
     }
-    
-    if (lastActiveIdx >= 0) return lastActiveIdx;
-    
-    // 활성 라인이 없는 경우: 갭 구간 처리
-    // 현재 시간 직전에 끝난 라인과 직후에 시작할 라인을 찾음
+
+    if (firstActiveIdx >= 0) return firstActiveIdx;
+
     let prevIdx = -1;
     for (let i = lyrics.length - 1; i >= 0; i--) {
-      if (lyrics[i].endTime <= time) { prevIdx = i; break; }
+      if (lyrics[i].endTime <= time) {
+        prevIdx = i;
+        break;
+      }
     }
     const nextIdx = lyrics.findIndex(l => l.startTime > time);
-    
+
     if (prevIdx >= 0 && time <= lyrics[prevIdx].endTime + SYNC_CONFIG.LINE_HOLD_AFTER_END) {
       return prevIdx;
     }
-    
+
     if (nextIdx >= 0 && prevIdx >= 0) {
       const gapDuration = lyrics[nextIdx].startTime - lyrics[prevIdx].endTime;
-      if (gapDuration <= 5.0) {
-        return nextIdx;
-      }
+      if (gapDuration <= 5.0) return nextIdx;
       return -1;
     }
-    
-    // 마지막 라인 이후
+
     if (prevIdx >= 0 && nextIdx < 0) {
       if (time <= lyrics[prevIdx].endTime + 2.0) return prevIdx;
       return -1;
     }
-    
+
     return -1;
   }, [lyrics]);
 
@@ -209,6 +204,10 @@ export default function NormalModeGame() {
       return;
     }
 
+    lastAudioTimeRef.current = audioRef.current.currentTime;
+    lastPerfTimeRef.current = performance.now() / 1000;
+    lastTimeRef.current = lastAudioTimeRef.current;
+
     const updateTime = () => {
       if (!audioRef.current || !isPlaying) return;
       
@@ -232,59 +231,64 @@ export default function NormalModeGame() {
         lastTimeRef.current = time;
         setLocalTime(time);
         
-        // 가사 인덱스 업데이트
         const newIndex = findCurrentLyricIndex(time);
         if (newIndex !== currentLyricIndex) {
           setCurrentLyricIndex(newIndex);
         }
-        
-        // Score: award points for active lyrics
-        const lineIdx = newIndex >= 0 ? newIndex : currentLyricIndex;
-        if (lineIdx >= 0) {
+
+        const activeLineIndices: number[] = [];
+        for (let i = 0; i < lyrics.length; i++) {
+          const line = lyrics[i];
+          if (time < line.startTime) break;
+          if (time >= line.startTime && time <= line.endTime) {
+            activeLineIndices.push(i);
+          }
+        }
+
+        for (const lineIdx of activeLineIndices) {
           const line = lyrics[lineIdx];
-          if (line) {
-            // Word-level scoring (if words available)
-            if (line.words && line.words.length > 0) {
-              const wordIdx = line.words.findIndex(w => time >= w.startTime && time <= w.endTime);
-              if (wordIdx >= 0) {
-                const wordKey = `${lineIdx}-${wordIdx}`;
-                if (!scoredWordsRef.current.has(wordKey)) {
-                  scoredWordsRef.current.add(wordKey);
-                  if (isMicOnRef.current) {
-                    const word = line.words[wordIdx];
-                    const energy = word.energy ?? 0.5;
-                    const comboMult = Math.min(2, 1 + comboRef.current * 0.1);
-                    const points = Math.round(10 * energy * comboMult);
-                    comboRef.current += 1;
-                    scoreRef.current += points;
-                    setScore(scoreRef.current);
-                    setCombo(comboRef.current);
-                    setLastScorePopup({ points, key: Date.now() });
-                  } else {
-                    comboRef.current = 0;
-                    setCombo(0);
-                  }
-                }
-              }
+          if (!line) continue;
+
+          if (line.words && line.words.length > 0) {
+            const wordIdx = line.words.findIndex(w => time >= w.startTime && time <= w.endTime);
+            if (wordIdx < 0) continue;
+
+            const wordKey = `${lineIdx}-${wordIdx}`;
+            if (scoredWordsRef.current.has(wordKey)) continue;
+
+            scoredWordsRef.current.add(wordKey);
+            if (isMicOnRef.current) {
+              const word = line.words[wordIdx];
+              const energy = word.energy ?? 0.5;
+              const comboMult = Math.min(2, 1 + comboRef.current * 0.1);
+              const points = Math.round(10 * energy * comboMult);
+              comboRef.current += 1;
+              scoreRef.current += points;
+              setScore(scoreRef.current);
+              setCombo(comboRef.current);
+              setLastScorePopup({ points, key: Date.now() });
             } else {
-              // Line-level fallback: score once per line when time is within line range
-              const lineKey = `line-${lineIdx}`;
-              if (time >= line.startTime && time <= line.endTime && !scoredWordsRef.current.has(lineKey)) {
-                scoredWordsRef.current.add(lineKey);
-                if (isMicOnRef.current) {
-                  const comboMult = Math.min(2, 1 + comboRef.current * 0.1);
-                  const points = Math.round(50 * comboMult); // 50 base points per line
-                  comboRef.current += 1;
-                  scoreRef.current += points;
-                  setScore(scoreRef.current);
-                  setCombo(comboRef.current);
-                  setLastScorePopup({ points, key: Date.now() });
-                } else {
-                  comboRef.current = 0;
-                  setCombo(0);
-                }
-              }
+              comboRef.current = 0;
+              setCombo(0);
             }
+            continue;
+          }
+
+          const lineKey = `line-${lineIdx}`;
+          if (scoredWordsRef.current.has(lineKey)) continue;
+
+          scoredWordsRef.current.add(lineKey);
+          if (isMicOnRef.current) {
+            const comboMult = Math.min(2, 1 + comboRef.current * 0.1);
+            const points = Math.round(50 * comboMult);
+            comboRef.current += 1;
+            scoreRef.current += points;
+            setScore(scoreRef.current);
+            setCombo(comboRef.current);
+            setLastScorePopup({ points, key: Date.now() });
+          } else {
+            comboRef.current = 0;
+            setCombo(0);
           }
         }
       
@@ -300,7 +304,7 @@ export default function NormalModeGame() {
         animationFrameRef.current = null;
       }
     };
-  }, [isPlaying, findCurrentLyricIndex, currentLyricIndex, dispatch]);
+  }, [isPlaying, findCurrentLyricIndex, currentLyricIndex, dispatch, lyrics]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -400,19 +404,20 @@ export default function NormalModeGame() {
      if (localTime < wordStart) return 0;
      if (localTime >= wordEnd) return 100;
      
-     // Simple linear progress — most accurate for karaoke sync
-     const t = (localTime - wordStart) / wordDuration;
+     const t = ((localTime - wordStart) / wordDuration) * SYNC_CONFIG.WORD_FILL_SPEED;
      return Math.min(100, Math.max(0, t * 100));
    }, [localTime]);
 
   // 라인 전체 진행률 (단어가 없을 때 사용)
   const getLineProgress = useCallback((line: LyricsLine): number => {
     const adjustedStart = line.startTime;
+    const lineDuration = line.endTime - adjustedStart;
+    if (lineDuration <= 0) return localTime >= adjustedStart ? 100 : 0;
     
     if (localTime < adjustedStart) return 0;
     if (localTime >= line.endTime) return 100;
     
-    return ((localTime - adjustedStart) / (line.endTime - adjustedStart)) * 100;
+    return Math.min(100, Math.max(0, ((localTime - adjustedStart) / lineDuration) * SYNC_CONFIG.WORD_FILL_SPEED * 100));
   }, [localTime]);
 
   if (!currentSong) {
