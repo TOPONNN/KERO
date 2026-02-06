@@ -5,6 +5,8 @@ import gc
 import uuid
 import torch
 
+# WhisperX uses Silero VAD (not Pyannote) to avoid torch.load compatibility issues
+
 import numpy as np
 import librosa
 from torchfcpe import spawn_bundled_infer_model
@@ -19,6 +21,32 @@ from src.services.s3_service import s3_service
 class LyricsProcessor:
     def __init__(self):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self._whisperx_model = None
+
+    # ------------------------------------------------------------------
+    # WhisperX model management
+    # ------------------------------------------------------------------
+
+    def _get_whisperx_model(self):
+        """Lazy-load WhisperX model (large-v3, float16 on CUDA)."""
+        if self._whisperx_model is None:
+            import whisperx
+            print("[WhisperX] Loading large-v3 model...")
+            compute = "float16" if self.device == "cuda" else "int8"
+            self._whisperx_model = whisperx.load_model(
+                "large-v3", self.device, compute_type=compute,
+                vad_method="silero"
+            )
+            print("[WhisperX] Model loaded")
+        return self._whisperx_model
+
+    def _release_whisperx_model(self):
+        """Free WhisperX model to reclaim GPU memory."""
+        if self._whisperx_model is not None:
+            del self._whisperx_model
+            self._whisperx_model = None
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
     # ------------------------------------------------------------------
     # Lyrics fetching and language detection
@@ -311,48 +339,34 @@ class LyricsProcessor:
             return segments
 
     # ------------------------------------------------------------------
-    # Stage 2: Detect voiced audio range using energy-based VAD
+    # WhisperX transcription (Stage 2)
     # ------------------------------------------------------------------
 
-    def _detect_vocal_range(self, audio_path: str) -> tuple[float, float]:
-        """Detect the start and end of vocal activity using RMS energy.
-
-        Returns (voice_start_sec, voice_end_sec). Falls back to (0, duration)
-        if detection fails.
-        """
+    def _whisperx_transcribe(self, audio_path: str, language: Optional[str] = None) -> Optional[List[Dict]]:
+        """Transcribe audio with WhisperX for rough segment timing only."""
         try:
-            y, sr = librosa.load(audio_path, sr=16000)
-            duration = len(y) / sr
+            import whisperx
 
-            # RMS energy with small frames for precision
-            rms = librosa.feature.rms(y=y, frame_length=2048, hop_length=512)[0]
-            times = librosa.times_like(rms, sr=sr, hop_length=512)
+            model = self._get_whisperx_model()
+            audio = whisperx.load_audio(audio_path)
 
-            # Threshold: 10% of peak RMS — frames above this are "voiced"
-            threshold = float(rms.max()) * 0.10
-            voiced_mask = rms > threshold
-            voiced_indices = np.where(voiced_mask)[0]
+            kwargs: Dict = {"batch_size": 16}
+            if language:
+                kwargs["language"] = language
+            result = model.transcribe(audio, **kwargs)
+            detected_lang = result.get("language", language or "en")
+            print(f"[WhisperX] Detected language: {detected_lang}")
+            print(f"[WhisperX] Got {len(result.get('segments', []))} segments")
 
-            if len(voiced_indices) == 0:
-                print(f"[VAD] No voiced frames detected — using full duration")
-                return (0.0, duration)
-
-            voice_start = float(times[voiced_indices[0]])
-            voice_end = float(times[voiced_indices[-1]])
-
-            print(f"[VAD] Vocal range: {voice_start:.1f}s — {voice_end:.1f}s (duration: {duration:.1f}s)")
-            return (voice_start, voice_end)
-
+            self._release_whisperx_model()
+            return result.get("segments", [])
         except Exception as e:
-            print(f"[VAD] Energy detection failed: {e}")
-            try:
-                info = sf.info(audio_path)
-                return (0.0, info.duration)
-            except Exception:
-                return (0.0, 0.0)
+            print(f"[WhisperX] Transcription failed: {e}")
+            self._release_whisperx_model()
+            return None
 
     # ------------------------------------------------------------------
-    # Stage 3: Proportional line-to-audio mapping
+    # Stage 3: Simple line-to-audio mapping (replaces DP algorithm)
     # ------------------------------------------------------------------
 
     @staticmethod
@@ -367,16 +381,15 @@ class LyricsProcessor:
                 count += 1
         return max(count, 1)
 
-    def _map_lines_proportional(self, lyrics_text: str, audio_start: float, audio_end: float) -> List[Dict]:
+    def _map_lines_simple(self, lyrics_text: str, whisperx_segments: List[Dict]) -> List[Dict]:
         """Map API lyric lines to audio timing using proportional character distribution.
 
-        Distributes lyrics lines across the detected vocal range proportionally
-        by character count.
+        Uses WhisperX transcription segments to determine the total voiced audio range,
+        then distributes lyrics lines proportionally by character count.
 
         Args:
             lyrics_text: Full lyrics text with newline-separated lines.
-            audio_start: Start of vocal activity in seconds.
-            audio_end: End of vocal activity in seconds.
+            whisperx_segments: WhisperX transcription segments with start/end timing.
 
         Returns:
             List of dicts with keys: "start", "end", "text".
@@ -384,6 +397,20 @@ class LyricsProcessor:
         api_lines = [l.strip() for l in lyrics_text.split("\n") if l.strip()]
         if not api_lines:
             return []
+
+        # Determine total audio range from WhisperX segments
+        if whisperx_segments:
+            audio_start = min(
+                seg.get("start", seg.get("start_time", 0.0))
+                for seg in whisperx_segments
+            )
+            audio_end = max(
+                seg.get("end", seg.get("end_time", 0.0))
+                for seg in whisperx_segments
+            )
+        else:
+            audio_start = 0.0
+            audio_end = 0.0
 
         total_duration = max(audio_end - audio_start, 0.5)
 
@@ -522,13 +549,13 @@ class LyricsProcessor:
             progress_callback(15)
 
         # ==============================================================
-        # Stage 2: Detect vocal range (energy-based VAD)
+        # Stage 2: WhisperX Transcription (rough timing only)
         # ==============================================================
         print("=" * 60)
-        print("[Stage 2: VAD] Detecting vocal range from audio energy...")
+        print("[Stage 2: WhisperX] Transcribing for rough timing...")
         print("=" * 60)
 
-        audio_start, audio_end = self._detect_vocal_range(audio_path)
+        whisperx_segments = self._whisperx_transcribe(audio_path, detected_language)
 
         if progress_callback:
             progress_callback(50)
@@ -540,23 +567,30 @@ class LyricsProcessor:
         print("[Stage 3: Mapping] Mapping API lines onto audio timing...")
         print("=" * 60)
 
-        if audio_end > audio_start:
-            api_line_segments = self._map_lines_proportional(lyrics_text, audio_start, audio_end)
+        def _build_even_line_segments(text: str, total_duration: float) -> List[Dict]:
+            lines = [l.strip() for l in text.split("\n") if l.strip()]
+            if not lines:
+                return []
+            if total_duration <= 0:
+                total_duration = max(len(lines) * 0.5, 1.0)
+            per_line = total_duration / len(lines)
+            segments = []
+            for i, line in enumerate(lines):
+                start = i * per_line
+                end = start + per_line
+                segments.append({
+                    "start": round(float(start), 3),
+                    "end": round(float(end), 3),
+                    "text": line,
+                })
+            return segments
+
+        if whisperx_segments:
+            api_line_segments = self._map_lines_simple(lyrics_text, whisperx_segments)
             print(f"[Mapping] {len(api_line_segments)} lines mapped to audio regions")
         else:
-            print("[Mapping] VAD failed — using even line distribution")
-            lines = [l.strip() for l in lyrics_text.split("\n") if l.strip()]
-            if lines and duration > 0:
-                per_line = duration / len(lines)
-                api_line_segments = [
-                    {"start": round(i * per_line, 3), "end": round((i + 1) * per_line, 3), "text": line}
-                    for i, line in enumerate(lines)
-                ]
-            else:
-                api_line_segments = [
-                    {"start": 0.0, "end": 0.5, "text": line}
-                    for line in (lines or [])
-                ]
+            print("[Mapping] WhisperX failed — using even line distribution")
+            api_line_segments = _build_even_line_segments(lyrics_text, duration)
 
         if progress_callback:
             progress_callback(55)
