@@ -34,6 +34,7 @@ services:
       - PROCESSING_SECRET=${PROCESSING_SECRET}
       - BACKEND_API_URL=${BACKEND_API_URL:-https://kero.ooo}
       - TEMP_DIR=${TEMP_DIR:-/tmp/kero-ai}
+      - USE_SOFA_ALIGNER=${USE_SOFA_ALIGNER:-false}
       - SOFA_MODEL_PATH=${SOFA_MODEL_PATH:-}
       - LD_LIBRARY_PATH=/app/venv/lib/python3.12/site-packages/nvidia/cudnn/lib:/app/venv/lib/python3.12/site-packages/nvidia/cublas/lib:/app/venv/lib/python3.12/site-packages/nvidia/cufft/lib:/app/venv/lib/python3.12/site-packages/nvidia/curand/lib:/app/venv/lib/python3.12/site-packages/nvidia/cusolver/lib:/app/venv/lib/python3.12/site-packages/nvidia/cusparse/lib:/app/venv/lib/python3.12/site-packages/nvidia/cuda_runtime/lib:/app/venv/lib/python3.12/site-packages/nvidia/cuda_cupti/lib:/app/venv/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib:/app/venv/lib/python3.12/site-packages/nvidia/nvjitlink/lib
     logging:

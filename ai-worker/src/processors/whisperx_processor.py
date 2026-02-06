@@ -4,6 +4,7 @@ import re
 import gc
 import uuid
 import torch
+import unicodedata
 
 # WhisperX uses Silero VAD (not Pyannote) to avoid torch.load compatibility issues
 
@@ -14,7 +15,7 @@ import requests
 import soundfile as sf
 
 from typing import List, Dict, Callable, Optional
-from src.config import TEMP_DIR, LYRICS_API_URL, SOFA_MODEL_PATH
+from src.config import TEMP_DIR, LYRICS_API_URL, USE_SOFA_ALIGNER, SOFA_MODEL_PATH
 from src.services.s3_service import s3_service
 
 
@@ -49,7 +50,7 @@ class LyricsProcessor:
             torch.cuda.empty_cache()
 
     # ------------------------------------------------------------------
-    # Lyrics fetching and language detection
+    # Kept verbatim from previous implementation
     # ------------------------------------------------------------------
 
     def _fetch_lyrics_from_api(self, title: Optional[str], artist: Optional[str]) -> Optional[str]:
@@ -160,10 +161,6 @@ class LyricsProcessor:
                 cleaned.append(segment)
         
         return cleaned
-
-    # ------------------------------------------------------------------
-    # Energy and pitch analysis (Stages 5-7)
-    # ------------------------------------------------------------------
 
     def _add_energy_to_words(self, vocals_path: str, segments: List[Dict]) -> List[Dict]:
         """Add RMS energy values (0.0-1.0) to each word based on vocal intensity"""
@@ -338,9 +335,6 @@ class LyricsProcessor:
                     word["midi"] = 0
             return segments
 
-    # ------------------------------------------------------------------
-    # WhisperX transcription (Stage 2)
-    # ------------------------------------------------------------------
 
     def _whisperx_transcribe(self, audio_path: str, language: Optional[str] = None) -> Optional[List[Dict]]:
         """Transcribe audio with WhisperX for rough segment timing only."""
@@ -365,78 +359,255 @@ class LyricsProcessor:
             self._release_whisperx_model()
             return None
 
-    # ------------------------------------------------------------------
-    # Stage 3: Simple line-to-audio mapping (replaces DP algorithm)
-    # ------------------------------------------------------------------
+    def _whisperx_align_segments(self, audio_path: str, segments: List[Dict], language: Optional[str]) -> Optional[Dict]:
+        """Align provided text segments to audio using wav2vec2 forced alignment."""
+        if not segments:
+            return None
 
-    @staticmethod
-    def _count_line_chars(text: str) -> int:
-        """Count meaningful characters in a line for proportional timing.
-        Korean syllables count as 1, other alphanumeric chars count as 1."""
-        count = 0
-        for char in text:
-            if '\uac00' <= char <= '\ud7a3':  # Hangul syllable
-                count += 1
+        try:
+            import whisperx
+
+            audio = whisperx.load_audio(audio_path)
+            model_a, metadata = whisperx.load_align_model(
+                language_code=language or "en", device=self.device
+            )
+            align_segments = []
+            for seg in segments:
+                text = seg.get("text", "")
+                start = seg.get("start", seg.get("start_time", 0.0))
+                end = seg.get("end", seg.get("end_time", start))
+                align_segments.append({
+                    "text": text,
+                    "start": float(start),
+                    "end": float(end),
+                })
+            result = whisperx.align(
+                align_segments, model_a, metadata,
+                audio, self.device, return_char_alignments=True
+            )
+            print(f"[WhisperX] Aligned {len(result.get('segments', []))} segments")
+            del model_a
+            torch.cuda.empty_cache()
+            return result
+        except Exception as e:
+            print(f"[WhisperX] Alignment failed: {e}")
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            return None
+
+    def _is_hangul_syllable(self, char: str) -> bool:
+        return "\uac00" <= char <= "\ud7a3"
+
+    def _strip_for_match(self, text: str) -> str:
+        normalized = unicodedata.normalize("NFKC", text or "")
+        stripped = []
+        for char in normalized:
+            if char.isspace():
+                continue
+            category = unicodedata.category(char)
+            if category.startswith("P") or category.startswith("S"):
+                continue
+            stripped.append(char)
+        return "".join(stripped)
+
+    def _extract_syllables(self, text: str) -> List[str]:
+        stripped = self._strip_for_match(text)
+        syllables = []
+        for char in stripped:
+            if self._is_hangul_syllable(char):
+                syllables.append(char)
             elif char.isalnum():
-                count += 1
-        return max(count, 1)
+                syllables.append(char.lower())
+        return syllables
 
-    def _map_lines_simple(self, lyrics_text: str, whisperx_segments: List[Dict]) -> List[Dict]:
-        """Map API lyric lines to audio timing using proportional character distribution.
+    def _count_chars(self, text: str) -> int:
+        return len(self._extract_syllables(text))
 
-        Uses WhisperX transcription segments to determine the total voiced audio range,
-        then distributes lyrics lines proportionally by character count.
+    def _build_syllable_stream(self, segments: List[Dict]) -> List[Dict]:
+        stream = []
+        for seg in segments or []:
+            words = seg.get("words", []) or []
+            if not words and seg.get("text", "").strip():
+                words = [{
+                    "start": seg.get("start", 0.0),
+                    "end": seg.get("end", seg.get("start", 0.0)),
+                    "word": seg.get("text", ""),
+                }]
 
-        Args:
-            lyrics_text: Full lyrics text with newline-separated lines.
-            whisperx_segments: WhisperX transcription segments with start/end timing.
+            for word in words:
+                start = word.get("start", word.get("start_time", 0.0))
+                end = word.get("end", word.get("end_time", start))
+                text = word.get("word", word.get("text", "")).strip()
+                syllables = self._extract_syllables(text)
+                if not syllables:
+                    continue
+                duration = max(end - start, 0.001)
+                step = duration / len(syllables)
+                for idx, syl in enumerate(syllables):
+                    stream.append({
+                        "syl": syl,
+                        "start_time": start + idx * step,
+                        "end_time": start + (idx + 1) * step,
+                    })
+        stream.sort(key=lambda item: item["start_time"])
+        return stream
 
-        Returns:
-            List of dicts with keys: "start", "end", "text".
-        """
-        api_lines = [l.strip() for l in lyrics_text.split("\n") if l.strip()]
-        if not api_lines:
+    def _build_word_timings(self, line_text: str, line_start: float, line_end: float) -> List[Dict]:
+        words = line_text.split()
+        if not words:
             return []
 
-        # Determine total audio range from WhisperX segments
-        if whisperx_segments:
-            audio_start = min(
-                seg.get("start", seg.get("start_time", 0.0))
-                for seg in whisperx_segments
-            )
-            audio_end = max(
-                seg.get("end", seg.get("end_time", 0.0))
-                for seg in whisperx_segments
-            )
-        else:
-            audio_start = 0.0
-            audio_end = 0.0
-
-        total_duration = max(audio_end - audio_start, 0.5)
-
-        # Calculate character counts for proportional distribution
-        char_counts = [self._count_line_chars(line) for line in api_lines]
+        char_counts = [max(1, self._count_chars(word)) for word in words]
         total_chars = sum(char_counts)
-
-        # Distribute lines proportionally
-        result = []
-        current_time = audio_start
-        for line, chars in zip(api_lines, char_counts):
-            line_duration = total_duration * (chars / total_chars)
-            line_start = current_time
-            line_end = current_time + line_duration
-            result.append({
-                "start": round(float(line_start), 3),
-                "end": round(float(line_end), 3),
-                "text": line,
+        duration = max(line_end - line_start, 0.5)
+        word_timings = []
+        char_offset = 0
+        for word, chars in zip(words, char_counts):
+            start = line_start + (char_offset / total_chars) * duration
+            end = line_start + ((char_offset + chars) / total_chars) * duration
+            word_timings.append({
+                "start_time": round(start, 3),
+                "end_time": round(end, 3),
+                "text": word,
             })
-            current_time = line_end
+            char_offset += chars
+        return word_timings
 
-        return result
+    def _interpolate_unmatched_words(self, word_timings: List[Dict], line_start: float, line_end: float) -> None:
+        if not word_timings:
+            return
 
-    # ------------------------------------------------------------------
-    # Stage 5: Energy onset refinement
-    # ------------------------------------------------------------------
+        matched_indices = [
+            idx for idx, word in enumerate(word_timings)
+            if word.get("start_time") is not None and word.get("end_time") is not None
+        ]
+        if not matched_indices:
+            char_counts = [max(1, self._count_chars(w["text"])) for w in word_timings]
+            total_chars = sum(char_counts)
+            duration = max(line_end - line_start, 0.5)
+            current = line_start
+            for idx, word in enumerate(word_timings):
+                word_dur = duration * (char_counts[idx] / total_chars)
+                word["start_time"] = current
+                word["end_time"] = current + word_dur
+                current += word_dur
+            return
+
+        first_idx = matched_indices[0]
+        if first_idx > 0:
+            start = line_start
+            end = word_timings[first_idx]["start_time"]
+            gap = first_idx
+            char_counts = [
+                max(1, self._count_chars(word_timings[offset]["text"]))
+                for offset in range(gap)
+            ]
+            total_chars = sum(char_counts)
+            gap_duration = end - start
+            current = start
+            for offset in range(gap):
+                word = word_timings[offset]
+                word_dur = gap_duration * (char_counts[offset] / total_chars) if total_chars > 0 else 0.0
+                word["start_time"] = current
+                word["end_time"] = current + word_dur
+                current += word_dur
+
+        for left_idx, right_idx in zip(matched_indices, matched_indices[1:]):
+            gap = right_idx - left_idx - 1
+            if gap <= 0:
+                continue
+            start = word_timings[left_idx]["end_time"]
+            end = word_timings[right_idx]["start_time"]
+            char_counts = [
+                max(1, self._count_chars(word_timings[left_idx + 1 + k]["text"]))
+                for k in range(gap)
+            ]
+            total_chars = sum(char_counts)
+            gap_duration = end - start
+            current = start
+            for offset in range(gap):
+                word = word_timings[left_idx + 1 + offset]
+                word_dur = gap_duration * (char_counts[offset] / total_chars) if total_chars > 0 else gap_duration / gap
+                word["start_time"] = current
+                word["end_time"] = current + word_dur
+                current += word_dur
+
+        last_idx = matched_indices[-1]
+        if last_idx < len(word_timings) - 1:
+            start = word_timings[last_idx]["end_time"]
+            end = line_end
+            gap = len(word_timings) - 1 - last_idx
+            char_counts = [
+                max(1, self._count_chars(word_timings[last_idx + 1 + offset]["text"]))
+                for offset in range(gap)
+            ]
+            total_chars = sum(char_counts)
+            gap_duration = end - start
+            current = start
+            for offset in range(gap):
+                word = word_timings[last_idx + 1 + offset]
+                word_dur = gap_duration * (char_counts[offset] / total_chars) if total_chars > 0 else 0.0
+                word["start_time"] = current
+                word["end_time"] = current + word_dur
+                current += word_dur
+
+    def _enforce_monotonic(self, word_timings: List[Dict], min_word_dur: float, base_start: float) -> None:
+        prev_end = base_start
+        for word in word_timings:
+            start = float(word.get("start_time") or prev_end)
+            end = float(word.get("end_time") or start)
+            if start < prev_end:
+                start = prev_end
+            if end < start + min_word_dur:
+                end = start + min_word_dur
+            word["start_time"] = start
+            word["end_time"] = end
+            prev_end = end
+
+    def _check_line_alignment_quality(self, word_timings: List[Dict], line_start: float, line_end: float) -> bool:
+        """Check if word-level alignment within a line is reasonable.
+        Returns True if quality is acceptable, False if redistribution needed."""
+        if not word_timings or len(word_timings) <= 1:
+            return True
+
+        line_duration = max(line_end - line_start, 0.5)
+        total_syllables = sum(max(1, self._count_chars(w["text"])) for w in word_timings)
+
+        for word in word_timings:
+            duration = word["end_time"] - word["start_time"]
+            syllables = max(1, self._count_chars(word["text"]))
+            expected = line_duration * (syllables / total_syllables)
+
+            if expected > 0.01:
+                ratio = duration / expected
+                # Word takes 3x more or 5x less time than expected by syllable count
+                if ratio > 3.0 or ratio < 0.2:
+                    return False
+
+        # Also check: any word with less than 80ms per syllable
+        for word in word_timings:
+            duration = word["end_time"] - word["start_time"]
+            syllables = max(1, self._count_chars(word["text"]))
+            if duration < syllables * 0.08:
+                return False
+
+        return True
+
+    def _redistribute_words_proportional(self, word_timings: List[Dict], line_start: float, line_end: float) -> None:
+        """Redistribute ALL words in a line proportionally by syllable count."""
+        if not word_timings:
+            return
+
+        total_syllables = sum(max(1, self._count_chars(w["text"])) for w in word_timings)
+        duration = max(line_end - line_start, 0.5)
+
+        current_time = line_start
+        for word in word_timings:
+            syllables = max(1, self._count_chars(word["text"]))
+            word_duration = duration * (syllables / total_syllables)
+            word["start_time"] = round(current_time, 3)
+            word["end_time"] = round(current_time + word_duration, 3)
+            current_time += word_duration
 
     def _refine_with_energy_onsets(self, segments: List[Dict], vocals_path: str) -> List[Dict]:
         """Post-process: snap word start times to actual vocal energy onsets."""
@@ -498,6 +669,342 @@ class LyricsProcessor:
         except Exception as e:
             print(f"[Refine] Energy onset refinement failed: {e}")
             return segments
+
+    def _map_lines_to_audio(self, lyrics_text: str, whisperx_segments: List[Dict]) -> List[Dict]:
+        """Map API lyric lines to audio timing using DP syllable alignment."""
+        api_lines = [l.strip() for l in lyrics_text.split("\n") if l.strip()]
+        if not api_lines:
+            return []
+
+        wx_syllables = self._build_syllable_stream(whisperx_segments)
+        if not wx_syllables:
+            return [{"start": 0.0, "end": 0.0, "text": line} for line in api_lines]
+
+        line_ranges = []
+        api_tokens = []
+        line_break = "<LB>"
+        for idx, line in enumerate(api_lines):
+            line_syllables = self._extract_syllables(line)
+            start_idx = len(api_tokens)
+            api_tokens.extend(line_syllables)
+            end_idx = len(api_tokens)
+            line_ranges.append((start_idx, end_idx))
+            if idx < len(api_lines) - 1:
+                api_tokens.append(line_break)
+
+        if not api_tokens:
+            total_start = wx_syllables[0]["start_time"]
+            total_end = wx_syllables[-1]["end_time"]
+            total_duration = max(total_end - total_start, 0.5)
+            per_line = total_duration / len(api_lines)
+            result = []
+            for i, line in enumerate(api_lines):
+                start_time = total_start + i * per_line
+                end_time = start_time + per_line
+                result.append({
+                    "start": round(start_time, 3),
+                    "end": round(end_time, 3),
+                    "text": line,
+                })
+            return result
+
+        match_score = 2.0
+        mismatch_penalty = -1.0
+        gap_penalty = -0.5
+        neg_inf = -1e9
+
+        n = len(api_tokens)
+        m = len(wx_syllables)
+        score = [[0.0] * (m + 1) for _ in range(n + 1)]
+        trace = [[0] * (m + 1) for _ in range(n + 1)]
+
+        for i in range(1, n + 1):
+            gap = 0.0 if api_tokens[i - 1] == line_break else gap_penalty
+            score[i][0] = score[i - 1][0] + gap
+            trace[i][0] = 1
+
+        for j in range(1, m + 1):
+            score[0][j] = score[0][j - 1] + gap_penalty
+            trace[0][j] = 2
+
+        for i in range(1, n + 1):
+            api_token = api_tokens[i - 1]
+            for j in range(1, m + 1):
+                if api_token == line_break:
+                    diag = neg_inf
+                    up = score[i - 1][j]
+                    left = score[i][j - 1] + gap_penalty
+                else:
+                    wx_token = wx_syllables[j - 1]["syl"]
+                    match = match_score if api_token == wx_token else mismatch_penalty
+                    diag = score[i - 1][j - 1] + match
+                    up = score[i - 1][j] + gap_penalty
+                    left = score[i][j - 1] + gap_penalty
+
+                best = diag
+                direction = 0
+                if up > best:
+                    best = up
+                    direction = 1
+                if left > best:
+                    best = left
+                    direction = 2
+                score[i][j] = best
+                trace[i][j] = direction
+
+        aligned_indices = [-1] * n
+        i = n
+        j = m
+        while i > 0 or j > 0:
+            if i > 0 and j > 0 and trace[i][j] == 0:
+                if api_tokens[i - 1] != line_break:
+                    aligned_indices[i - 1] = j - 1
+                i -= 1
+                j -= 1
+            elif i > 0 and (trace[i][j] == 1 or j == 0):
+                i -= 1
+            else:
+                j -= 1
+
+        line_timings = []
+        for line_idx, (start_idx, end_idx) in enumerate(line_ranges):
+            aligned = [aligned_indices[k] for k in range(start_idx, end_idx)
+                       if aligned_indices[k] >= 0]
+            if aligned:
+                min_idx = min(aligned)
+                max_idx = max(aligned)
+                start_time = wx_syllables[min_idx]["start_time"]
+                end_time = wx_syllables[max_idx]["end_time"]
+            else:
+                start_time = None
+                end_time = None
+            line_timings.append({
+                "start_time": start_time,
+                "end_time": end_time,
+                "text": api_lines[line_idx],
+            })
+
+        next_with_time: List[int] = [-1] * len(line_timings)
+        next_idx = -1
+        for idx in range(len(line_timings) - 1, -1, -1):
+            if line_timings[idx]["start_time"] is not None:
+                next_idx = idx
+            next_with_time[idx] = next_idx
+
+        prev_idx: Optional[int] = None
+        for idx, line in enumerate(line_timings):
+            if line["start_time"] is not None:
+                prev_idx = idx
+                continue
+
+            next_idx = next_with_time[idx]
+            prev_line = line_timings[prev_idx] if prev_idx is not None else None
+            next_line = line_timings[next_idx] if next_idx >= 0 else None
+
+            if prev_line is not None and next_line is not None and prev_idx is not None:
+                gap = next_idx - prev_idx
+                ratio = (idx - prev_idx) / gap if gap else 1.0
+                line["start_time"] = prev_line["start_time"] + (next_line["start_time"] - prev_line["start_time"]) * ratio
+                line["end_time"] = prev_line["end_time"] + (next_line["end_time"] - prev_line["end_time"]) * ratio
+            elif next_line is not None and prev_line is None:
+                gap = next_idx + 1
+                ratio = (idx + 1) / gap if gap else 1.0
+                line["start_time"] = next_line["start_time"] * ratio
+                line["end_time"] = next_line["end_time"] * ratio
+            elif prev_line is not None and next_line is None and prev_idx is not None:
+                offset = idx - prev_idx
+                line["start_time"] = prev_line["end_time"] + 0.5 * offset
+                line["end_time"] = line["start_time"] + 0.5
+            else:
+                line["start_time"] = 0.0
+                line["end_time"] = 0.5
+
+        for idx in range(len(line_timings)):
+            lt = line_timings[idx]
+            if lt["start_time"] is None or lt["end_time"] is None:
+                continue
+            dur = lt["end_time"] - lt["start_time"]
+            if dur < 1.5 and idx > 0:
+                prev_lt = line_timings[idx - 1]
+                if prev_lt["start_time"] is not None and prev_lt["end_time"] is not None:
+                    prev_dur = prev_lt["end_time"] - prev_lt["start_time"]
+                    if prev_dur > 6.0:
+                        prev_chars = max(1, len(self._extract_syllables(prev_lt["text"])))
+                        curr_chars = max(1, len(self._extract_syllables(lt["text"])))
+                        total_dur = prev_dur + dur
+                        total_chars = prev_chars + curr_chars
+                        new_prev_dur = total_dur * (prev_chars / total_chars)
+                        new_prev_dur = max(new_prev_dur, 2.0)
+                        new_boundary = prev_lt["start_time"] + new_prev_dur
+                        prev_lt["end_time"] = round(new_boundary, 3)
+                        lt["start_time"] = round(new_boundary, 3)
+                        lt["end_time"] = round(new_boundary + (total_dur - new_prev_dur), 3)
+
+            if dur > 6.0 and idx < len(line_timings) - 1:
+                next_lt = line_timings[idx + 1]
+                if next_lt["start_time"] is not None and next_lt["end_time"] is not None:
+                    next_dur = next_lt["end_time"] - next_lt["start_time"]
+                    if next_dur < 1.5:
+                        curr_chars = max(1, len(self._extract_syllables(lt["text"])))
+                        next_chars = max(1, len(self._extract_syllables(next_lt["text"])))
+                        total_dur = dur + next_dur
+                        total_chars = curr_chars + next_chars
+                        new_curr_dur = total_dur * (curr_chars / total_chars)
+                        new_curr_dur = max(new_curr_dur, 2.0)
+                        new_boundary = lt["start_time"] + new_curr_dur
+                        lt["end_time"] = round(new_boundary, 3)
+                        next_lt["start_time"] = round(new_boundary, 3)
+                        next_lt["end_time"] = round(new_boundary + (total_dur - new_curr_dur), 3)
+
+        result = []
+        for line in line_timings:
+            start_time = line["start_time"]
+            end_time = line["end_time"]
+            if start_time is None or end_time is None:
+                start_time = 0.0 if start_time is None else start_time
+                end_time = start_time + 0.5 if end_time is None else end_time
+            result.append({
+                "start": round(float(start_time), 3),
+                "end": round(float(end_time), 3),
+                "text": line["text"],
+            })
+        return result
+
+    def _build_lyrics_from_aligned(self, api_segments: List[Dict], aligned_result: Optional[Dict]) -> List[Dict]:
+        """Convert whisperx aligned output to our lyrics format."""
+        aligned_segments: List[Dict] = []
+        if isinstance(aligned_result, dict):
+            aligned_segments = aligned_result.get("segments", []) or []
+        elif isinstance(aligned_result, list):
+            aligned_segments = aligned_result
+
+        result = []
+        prev_end = 0.0
+        min_word_dur = 0.06
+
+        for idx, api_seg in enumerate(api_segments):
+            aligned_seg = aligned_segments[idx] if idx < len(aligned_segments) else {}
+            words_data = aligned_seg.get("words") or []
+
+            word_timings: List[Dict] = []
+            for word in words_data:
+                w_start = word.get("start", word.get("start_time"))
+                w_end = word.get("end", word.get("end_time"))
+                w_text = word.get("word", word.get("text", "")).strip()
+                if not w_text:
+                    continue
+                word_timings.append({
+                    "start_time": None if w_start is None else float(w_start),
+                    "end_time": None if w_end is None else float(w_end),
+                    "text": w_text,
+                })
+
+            line_start = float(api_seg.get("start", prev_end))
+            line_end = float(api_seg.get("end", line_start + 1.0))
+
+            if line_start < prev_end:
+                line_start = prev_end
+            if line_end < line_start:
+                line_end = line_start + 0.5
+
+            duration = line_end - line_start
+            if duration < 1.0:
+                line_end = line_start + 1.0
+            if duration > 15.0:
+                line_end = line_start + 15.0
+
+            if word_timings:
+                # Step A: Detect badly-aligned words (too short for their syllable count)
+                # and nullify them so they get redistributed
+                for wt in word_timings:
+                    if wt["start_time"] is not None and wt["end_time"] is not None:
+                        dur = wt["end_time"] - wt["start_time"]
+                        syllables = max(1, self._count_chars(wt["text"]))
+                        min_expected = syllables * 0.08  # 80ms per syllable
+                        if dur < min_expected:
+                            wt["start_time"] = None
+                            wt["end_time"] = None
+
+                # Step B: Interpolate unmatched words (proportional)
+                self._interpolate_unmatched_words(word_timings, line_start, line_end)
+                self._enforce_monotonic(word_timings, min_word_dur, line_start)
+
+                # Step C: Check overall line alignment quality
+                if not self._check_line_alignment_quality(word_timings, line_start, line_end):
+                    # Full proportional redistribution for poorly-aligned lines
+                    self._redistribute_words_proportional(word_timings, line_start, line_end)
+
+                for word in word_timings:
+                    word["start_time"] = round(float(word["start_time"]), 3)
+                    word["end_time"] = round(float(word["end_time"]), 3)
+            else:
+                word_timings = self._build_word_timings(api_seg["text"], line_start, line_end)
+
+            if word_timings:
+                line_start_final = word_timings[0]["start_time"]
+                line_end_final = word_timings[-1]["end_time"]
+            else:
+                line_start_final = round(float(line_start), 3)
+                line_end_final = round(float(line_end), 3)
+
+            result.append({
+                "start_time": round(float(line_start_final), 3),
+                "end_time": round(float(line_end_final), 3),
+                "text": api_seg["text"],
+                "words": word_timings,
+            })
+            prev_end = float(line_end_final)
+
+        return result
+
+
+    def _build_lyrics_from_sofa(self, api_segments: List[Dict], sofa_words: List[Dict]) -> List[Dict]:
+        """Map SOFA flat word list back to original line structure from api_segments."""
+        if not sofa_words or not api_segments:
+            return []
+
+        lyrics_lines = []
+        word_idx = 0
+
+        for seg in api_segments:
+            line_text = seg.get("text", "").strip()
+            if not line_text:
+                continue
+
+            expected_words = line_text.split()
+            line_words = []
+
+            for expected_word in expected_words:
+                if word_idx < len(sofa_words):
+                    w = sofa_words[word_idx]
+                    line_words.append({
+                        "text": expected_word,
+                        "start_time": round(w["start_time"], 3),
+                        "end_time": round(w["end_time"], 3),
+                    })
+                    word_idx += 1
+                else:
+                    if line_words:
+                        last_end = line_words[-1]["end_time"]
+                    elif lyrics_lines and lyrics_lines[-1]["words"]:
+                        last_end = lyrics_lines[-1]["words"][-1]["end_time"]
+                    else:
+                        last_end = 0.0
+                    line_words.append({
+                        "text": expected_word,
+                        "start_time": round(last_end, 3),
+                        "end_time": round(last_end + 0.5, 3),
+                    })
+
+            if line_words:
+                lyrics_lines.append({
+                    "text": line_text,
+                    "start_time": line_words[0]["start_time"],
+                    "end_time": line_words[-1]["end_time"],
+                    "words": line_words,
+                })
+
+        return lyrics_lines
 
     # ------------------------------------------------------------------
     # Main entry point
@@ -561,7 +1068,7 @@ class LyricsProcessor:
             progress_callback(50)
 
         # ==============================================================
-        # Stage 3: Map API lyrics lines to audio regions (proportional)
+        # Stage 3: Map API lyrics lines to audio regions (DP)
         # ==============================================================
         print("=" * 60)
         print("[Stage 3: Mapping] Mapping API lines onto audio timing...")
@@ -586,7 +1093,7 @@ class LyricsProcessor:
             return segments
 
         if whisperx_segments:
-            api_line_segments = self._map_lines_simple(lyrics_text, whisperx_segments)
+            api_line_segments = self._map_lines_to_audio(lyrics_text, whisperx_segments)
             print(f"[Mapping] {len(api_line_segments)} lines mapped to audio regions")
         else:
             print("[Mapping] WhisperX failed — using even line distribution")
@@ -596,165 +1103,101 @@ class LyricsProcessor:
             progress_callback(55)
 
         # ==============================================================
-        # Stage 4: SOFA Forced Alignment (per-segment)
+        # Stage 4: Forced Alignment (SOFA or WhisperX)
         # ==============================================================
         print("=" * 60)
-        print("[Stage 4: SOFA] Singing-oriented forced alignment...")
+        if USE_SOFA_ALIGNER:
+            print("[Stage 4: SOFA] Singing-oriented forced alignment...")
+        else:
+            print("[Stage 4: WhisperX] Forced alignment (wav2vec2)...")
         print("=" * 60)
 
         lyrics_lines = []
         if api_line_segments:
-            try:
-                from src.processors.sofa_aligner import SOFAAligner, _SOFA_SAMPLE_RATE
+            if USE_SOFA_ALIGNER:
+                try:
+                    from src.processors.sofa_aligner import SOFAAligner, _SOFA_SAMPLE_RATE
 
-                sofa = SOFAAligner(
-                    model_path=SOFA_MODEL_PATH or None,
-                    device=self.device,
-                )
+                    sofa = SOFAAligner(
+                        model_path=SOFA_MODEL_PATH or None,
+                        device=self.device,
+                    )
 
-                # Load audio once, then align per-segment
-                waveform = sofa._load_audio(audio_path)
-                total_samples = len(waveform)
-                padding_sec = 2.0
-                padding_samples = int(padding_sec * _SOFA_SAMPLE_RATE)
-                total_words = 0
+                    # Load audio once, then align per-segment
+                    waveform = sofa._load_audio(audio_path)
+                    total_samples = len(waveform)
+                    padding_sec = 2.0
+                    padding_samples = int(padding_sec * _SOFA_SAMPLE_RATE)
+                    total_words = 0
 
-                for seg in api_line_segments:
-                    seg_text = seg.get("text", "").strip()
-                    if not seg_text:
-                        continue
+                    for seg in api_line_segments:
+                        seg_text = seg.get("text", "").strip()
+                        if not seg_text:
+                            continue
 
-                    seg_start = seg.get("start", 0.0)
-                    seg_end = seg.get("end", 0.0)
-
-                    # Check if segment contains Korean text — SOFA only handles Korean
-                    has_korean = any('\uac00' <= c <= '\ud7a3' for c in seg_text)
-                    if not has_korean:
-                        # Non-Korean segment (e.g. English lyrics) — use proportional timing
-                        words = seg_text.split()
-                        n_words = len(words)
-                        seg_duration = max(seg_end - seg_start, 0.5)
-                        char_counts = [max(1, sum(1 for c in w if c.isalnum())) for w in words]
-                        total_ch = sum(char_counts)
-                        line_words = []
-                        cur = seg_start
-                        for w, cc in zip(words, char_counts):
-                            w_dur = seg_duration * (cc / total_ch)
-                            line_words.append({
-                                "text": w,
-                                "start_time": round(cur, 3),
-                                "end_time": round(cur + w_dur, 3),
+                        seg_start = seg.get("start", 0.0)
+                        seg_end = seg.get("end", 0.0)
+                        if seg_end <= seg_start:
+                            # No valid timing — skip SOFA for this segment
+                            lyrics_lines.append({
+                                "text": seg_text,
+                                "start_time": round(seg_start, 3),
+                                "end_time": round(seg_end, 3),
+                                "words": [{"text": w, "start_time": round(seg_start, 3), "end_time": round(seg_end, 3)} for w in seg_text.split()],
                             })
-                            cur += w_dur
-                        lyrics_lines.append({
-                            "text": seg_text,
-                            "start_time": round(seg_start, 3),
-                            "end_time": round(seg_end, 3),
-                            "words": line_words,
-                        })
-                        continue
+                            continue
 
-                    if seg_end <= seg_start:
-                        # No valid timing — use proportional word timing
-                        words = seg_text.split()
-                        n_words = len(words)
-                        word_dur = max(seg_end - seg_start, 0.5) / max(n_words, 1)
-                        line_words = []
-                        for wi, w in enumerate(words):
-                            line_words.append({
-                                "text": w,
-                                "start_time": round(seg_start + wi * word_dur, 3),
-                                "end_time": round(seg_start + (wi + 1) * word_dur, 3),
+                        # Extract audio chunk with padding
+                        chunk_start_sample = max(0, int(seg_start * _SOFA_SAMPLE_RATE) - padding_samples)
+                        chunk_end_sample = min(total_samples, int(seg_end * _SOFA_SAMPLE_RATE) + padding_samples)
+                        chunk_waveform = waveform[chunk_start_sample:chunk_end_sample]
+                        time_offset = chunk_start_sample / _SOFA_SAMPLE_RATE
+
+                        try:
+                            seg_words = sofa._align_single(chunk_waveform, seg_text)
+                        except Exception as seg_e:
+                            print(f"[SOFA] Segment error for '{seg_text[:30]}...': {seg_e}")
+                            seg_words = []
+
+                        if seg_words:
+                            # Offset timestamps by chunk start position
+                            line_words = []
+                            for w in seg_words:
+                                line_words.append({
+                                    "text": w["text"],
+                                    "start_time": round(w["start_time"] + time_offset, 3),
+                                    "end_time": round(w["end_time"] + time_offset, 3),
+                                })
+                            lyrics_lines.append({
+                                "text": seg_text,
+                                "start_time": line_words[0]["start_time"],
+                                "end_time": line_words[-1]["end_time"],
+                                "words": line_words,
                             })
-                        lyrics_lines.append({
-                            "text": seg_text,
-                            "start_time": round(seg_start, 3),
-                            "end_time": round(seg_end, 3),
-                            "words": line_words,
-                        })
-                        continue
-
-                    # Extract audio chunk with padding
-                    chunk_start_sample = max(0, int(seg_start * _SOFA_SAMPLE_RATE) - padding_samples)
-                    chunk_end_sample = min(total_samples, int(seg_end * _SOFA_SAMPLE_RATE) + padding_samples)
-                    chunk_waveform = waveform[chunk_start_sample:chunk_end_sample]
-                    time_offset = chunk_start_sample / _SOFA_SAMPLE_RATE
-
-                    try:
-                        seg_words = sofa._align_single(chunk_waveform, seg_text)
-                    except Exception as seg_e:
-                        print(f"[SOFA] Segment error for '{seg_text[:30]}...': {seg_e}")
-                        seg_words = []
-
-                    if seg_words:
-                        # Offset timestamps by chunk start position
-                        line_words = []
-                        for w in seg_words:
-                            line_words.append({
-                                "text": w["text"],
-                                "start_time": round(w["start_time"] + time_offset, 3),
-                                "end_time": round(w["end_time"] + time_offset, 3),
+                            total_words += len(line_words)
+                        else:
+                            # Fallback: use segment timing without word-level detail
+                            lyrics_lines.append({
+                                "text": seg_text,
+                                "start_time": round(seg_start, 3),
+                                "end_time": round(seg_end, 3),
+                                "words": [{"text": w, "start_time": round(seg_start, 3), "end_time": round(seg_end, 3)} for w in seg_text.split()],
                             })
-                        lyrics_lines.append({
-                            "text": seg_text,
-                            "start_time": line_words[0]["start_time"],
-                            "end_time": line_words[-1]["end_time"],
-                            "words": line_words,
-                        })
-                        total_words += len(line_words)
-                    else:
-                        # Fallback: proportional word timing within segment bounds
-                        words = seg_text.split()
-                        n_words = len(words)
-                        seg_duration = max(seg_end - seg_start, 0.5)
-                        char_counts = [max(1, sum(1 for c in w if '\uac00' <= c <= '\ud7a3' or c.isalnum())) for w in words]
-                        total_ch = sum(char_counts)
-                        line_words = []
-                        cur = seg_start
-                        for w, cc in zip(words, char_counts):
-                            w_dur = seg_duration * (cc / total_ch)
-                            line_words.append({
-                                "text": w,
-                                "start_time": round(cur, 3),
-                                "end_time": round(cur + w_dur, 3),
-                            })
-                            cur += w_dur
-                        lyrics_lines.append({
-                            "text": seg_text,
-                            "start_time": round(seg_start, 3),
-                            "end_time": round(seg_end, 3),
-                            "words": line_words,
-                        })
 
-                sofa.release_model()
-                print(f"[SOFA] Aligned {total_words} words across {len(lyrics_lines)} lines (per-segment)")
+                    sofa.release_model()
+                    print(f"[SOFA] Aligned {total_words} words across {len(lyrics_lines)} lines (per-segment)")
 
-            except Exception as e:
-                print(f"[SOFA] Error: {e} — using proportional timing fallback")
-                # Fallback: proportional word timing for all lines
-                for seg in api_line_segments:
-                    seg_text = seg.get("text", "").strip()
-                    if not seg_text:
-                        continue
-                    seg_start = seg.get("start", 0.0)
-                    seg_end = seg.get("end", 0.0)
-                    words = seg_text.split()
-                    n_words = len(words)
-                    seg_duration = max(seg_end - seg_start, 0.5)
-                    word_dur = seg_duration / max(n_words, 1)
-                    line_words = []
-                    for wi, w in enumerate(words):
-                        line_words.append({
-                            "text": w,
-                            "start_time": round(seg_start + wi * word_dur, 3),
-                            "end_time": round(seg_start + (wi + 1) * word_dur, 3),
-                        })
-                    lyrics_lines.append({
-                        "text": seg_text,
-                        "start_time": round(seg_start, 3),
-                        "end_time": round(seg_end, 3),
-                        "words": line_words,
-                    })
+                    if not lyrics_lines:
+                        print("[SOFA] No alignment results — falling back to WhisperX")
+                        aligned_segments = self._whisperx_align_segments(audio_path, api_line_segments, detected_language)
+                        lyrics_lines = self._build_lyrics_from_aligned(api_line_segments, aligned_segments)
+                except Exception as e:
+                    print(f"[SOFA] Error: {e} — falling back to WhisperX")
+                    aligned_segments = self._whisperx_align_segments(audio_path, api_line_segments, detected_language)
+                    lyrics_lines = self._build_lyrics_from_aligned(api_line_segments, aligned_segments)
+            else:
+                aligned_segments = self._whisperx_align_segments(audio_path, api_line_segments, detected_language)
+                lyrics_lines = self._build_lyrics_from_aligned(api_line_segments, aligned_segments)
         else:
             print("[Alignment] No line segments available for alignment")
 
