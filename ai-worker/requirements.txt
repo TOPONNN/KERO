@@ -2,6 +2,7 @@
 torch==2.8.0+cu126
 torchaudio==2.8.0+cu126
 
+silero-vad>=5.1
 omegaconf>=2.3.0
 
 audio-separator>=0.40.0

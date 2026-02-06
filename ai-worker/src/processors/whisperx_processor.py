@@ -311,45 +311,58 @@ class LyricsProcessor:
             return segments
 
     # ------------------------------------------------------------------
-    # Stage 2: Detect voiced audio range using energy-based VAD
+    # Stage 2: Detect voiced audio range using Silero VAD
     # ------------------------------------------------------------------
 
     def _detect_vocal_range(self, audio_path: str) -> tuple[float, float]:
-        """Detect the start and end of vocal activity using RMS energy.
+        """Detect the start and end of vocal activity using Silero VAD.
 
         Returns (voice_start_sec, voice_end_sec). Falls back to (0, duration)
         if detection fails.
         """
         try:
-            y, sr = librosa.load(audio_path, sr=16000)
-            duration = len(y) / sr
+            from silero_vad import load_silero_vad, read_audio, get_speech_timestamps
 
-            # RMS energy with small frames for precision
-            rms = librosa.feature.rms(y=y, frame_length=2048, hop_length=512)[0]
-            times = librosa.times_like(rms, sr=sr, hop_length=512)
+            model = load_silero_vad(onnx=True)
+            wav = read_audio(audio_path)
+            duration = len(wav) / 16000
 
-            # Threshold: 10% of peak RMS — frames above this are "voiced"
-            threshold = float(rms.max()) * 0.10
-            voiced_mask = rms > threshold
-            voiced_indices = np.where(voiced_mask)[0]
+            # threshold=0.35: 노래는 speech보다 감지 어려우므로 낮춤
+            speech_ts = get_speech_timestamps(
+                wav, model,
+                threshold=0.35,
+                min_speech_duration_ms=200,
+                return_seconds=True,
+            )
 
-            if len(voiced_indices) == 0:
-                print(f"[VAD] No voiced frames detected — using full duration")
+            if not speech_ts:
+                print(f"[VAD] No speech detected — using full duration")
                 return (0.0, duration)
 
-            voice_start = float(times[voiced_indices[0]])
-            voice_end = float(times[voiced_indices[-1]])
+            voice_start = speech_ts[0]["start"]
+            voice_end = speech_ts[-1]["end"]
 
-            print(f"[VAD] Vocal range: {voice_start:.1f}s — {voice_end:.1f}s (duration: {duration:.1f}s)")
+            print(f"[VAD] Silero detected {len(speech_ts)} segments: {voice_start:.1f}s — {voice_end:.1f}s (duration: {duration:.1f}s)")
             return (voice_start, voice_end)
 
         except Exception as e:
-            print(f"[VAD] Energy detection failed: {e}")
+            print(f"[VAD] Silero VAD failed: {e} — falling back to energy-based")
             try:
-                info = sf.info(audio_path)
-                return (0.0, info.duration)
+                y, sr = librosa.load(audio_path, sr=16000)
+                duration = len(y) / sr
+                rms = librosa.feature.rms(y=y, frame_length=2048, hop_length=512)[0]
+                times = librosa.times_like(rms, sr=sr, hop_length=512)
+                threshold = float(rms.max()) * 0.10
+                voiced = np.where(rms > threshold)[0]
+                if len(voiced) == 0:
+                    return (0.0, duration)
+                return (float(times[voiced[0]]), float(times[voiced[-1]]))
             except Exception:
-                return (0.0, 0.0)
+                try:
+                    info = sf.info(audio_path)
+                    return (0.0, info.duration)
+                except Exception:
+                    return (0.0, 0.0)
 
     # ------------------------------------------------------------------
     # Stage 3: Proportional line-to-audio mapping
