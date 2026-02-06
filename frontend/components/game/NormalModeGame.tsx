@@ -27,7 +27,7 @@ interface LyricsLine {
 
 // 노래방 싱크 설정 상수
 const SYNC_CONFIG = {
-  WORD_LEAD_TIME: 0,            // 단어 하이라이트가 미리 시작하는 시간 (초)
+  WORD_LEAD_TIME: 0.3,          // 단어 하이라이트가 미리 시작하는 시간 (초)
   NEXT_LINE_PREVIEW: 0.5,      // 다음 가사 미리보기 시간 (초)
   LINE_HOLD_AFTER_END: 0.5,    // 가사가 끝난 후 유지 시간 (초)
 };
@@ -79,6 +79,14 @@ export default function NormalModeGame() {
   // Interlude detection
   const isInterlude = useMemo(() => {
     if (gamePhase !== 'singing') return false;
+
+    // 1. Prelude (Jeonju): After banner but before first lyric
+    if (lyrics.length > 0 && localTime < lyrics[0].startTime) {
+       // Show interlude if more than 10s remains until start
+       return (lyrics[0].startTime - localTime) > 10;
+    }
+
+    // 2. Interlude (Ganju): Between lyrics
     if (currentLyricIndex !== -1) return false;
     // Find next upcoming lyric
     const nextIdx = lyrics.findIndex(l => l.startTime > localTime);
@@ -100,8 +108,11 @@ export default function NormalModeGame() {
   const findCurrentLyricIndex = useCallback((time: number): number => {
     if (lyrics.length === 0) return -1;
     
-    // 첫 번째 가사 시작 전: 첫 번째 가사를 미리 보여줌 (인덱스 0 반환)
-    if (time < lyrics[0].startTime) return 0;
+    // 첫 번째 가사 시작 전: 10초 전부터만 미리 보여줌
+    if (time < lyrics[0].startTime) {
+      if (time >= lyrics[0].startTime - 10) return 0;
+      return -1;
+    }
     
     for (let i = 0; i < lyrics.length; i++) {
       const line = lyrics[i];
@@ -637,9 +648,9 @@ export default function NormalModeGame() {
              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30"
            >
               <div className="bg-black/40 backdrop-blur-sm px-10 py-4 rounded-full border border-white/20">
-                 <span className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-cyan-300 animate-pulse tracking-widest drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">
-                   ♪ 간 주 중 ♪
-                 </span>
+                  <span className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-cyan-300 animate-pulse tracking-widest drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">
+                    {lyrics.length > 0 && localTime < lyrics[0].startTime ? "♪ 전 주 ♪" : "♪ 간 주 중 ♪"}
+                  </span>
               </div>
            </motion.div>
         )}
