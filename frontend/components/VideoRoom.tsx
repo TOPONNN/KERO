@@ -25,7 +25,7 @@ export default function VideoRoom({ roomCode, participantName, participantId, hi
   const [error, setError] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(true);
 
-  const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || "wss://kero.ooo";
+  const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || "wss://plyst.info";
 
   useEffect(() => {
     const getToken = async () => {
