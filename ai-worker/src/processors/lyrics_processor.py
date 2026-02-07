@@ -1,5 +1,3 @@
-import os
-import json
 import re
 import gc
 import torch
@@ -12,8 +10,7 @@ import requests
 import soundfile as sf
 
 from typing import List, Dict, Callable, Optional
-from src.config import TEMP_DIR, LYRICS_API_URL, SOFA_MODEL_PATH
-from src.services.s3_service import s3_service
+from src.config import LYRICS_API_URL, SOFA_MODEL_PATH
 
 
 class LyricsProcessor:
@@ -302,9 +299,6 @@ class LyricsProcessor:
                     word["midi"] = 0
             return segments
 
-
-
-
     def _is_hangul_syllable(self, char: str) -> bool:
         return "\uac00" <= char <= "\ud7a3"
 
@@ -333,8 +327,6 @@ class LyricsProcessor:
     def _count_chars(self, text: str) -> int:
         return len(self._extract_syllables(text))
 
-
-
     def _build_word_timings(self, line_text: str, line_start: float, line_end: float) -> List[Dict]:
         words = line_text.split()
         if not words:
@@ -356,8 +348,6 @@ class LyricsProcessor:
             char_offset += chars
         return word_timings
 
-
-
     def _refine_with_energy_onsets(self, segments: List[Dict], vocals_path: str) -> List[Dict]:
         """Post-process: snap word start times to actual vocal energy onsets."""
         try:
@@ -371,14 +361,6 @@ class LyricsProcessor:
                 backtrack=True, units='frames'
             )
             onset_times = librosa.frames_to_time(onset_frames, sr=sr, hop_length=256)
-
-            # Compute RMS for silence detection
-            rms = librosa.feature.rms(y=y, frame_length=1024, hop_length=256)[0]
-            rms_times = librosa.times_like(rms, sr=sr, hop_length=256)
-
-            # Silence threshold: frames below 5% of max RMS are silence
-            rms_max = float(rms.max()) if len(rms) > 0 else 1.0
-            silence_threshold = rms_max * 0.05
 
             tolerance = 0.15  # ±150ms snap window
             total_snapped = 0
@@ -558,9 +540,6 @@ class LyricsProcessor:
                        title: Optional[str] = None,
                        artist: Optional[str] = None,
                        progress_callback: Optional[Callable[[int], None]] = None) -> Dict:
-        if folder_name is None:
-            folder_name = song_id
-
         if progress_callback:
             progress_callback(5)
 
@@ -697,30 +676,12 @@ class LyricsProcessor:
         if self.device == "cuda":
             torch.cuda.empty_cache()
 
-        # Save and upload
-        output_dir = os.path.join(TEMP_DIR, song_id)
-        os.makedirs(output_dir, exist_ok=True)
-
-        lyrics_path = os.path.join(output_dir, "lyrics.json")
-        with open(lyrics_path, "w", encoding="utf-8") as f:
-            json.dump(lyrics_lines, f, ensure_ascii=False, indent=2)
-
-        s3_key = f"songs/{folder_name}/lyrics.json"
-        lyrics_url = s3_service.upload_file(lyrics_path, s3_key)
-
-        os.remove(lyrics_path)
-        try:
-            os.rmdir(output_dir)
-        except OSError:
-            pass
-
         if progress_callback:
             progress_callback(100)
 
         full_text = " ".join([line["text"] for line in lyrics_lines])
 
         return {
-            "lyrics_url": lyrics_url,
             "lyrics": lyrics_lines,
             "full_text": full_text,
             "language": detected_language,

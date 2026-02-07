@@ -827,7 +827,7 @@ export default function RoomPage() {
                               <span className="text-xs text-yellow-400 font-bold">
                                 {song.processingStep === "download" && "다운로드"}
                                 {song.processingStep === "separation" && "음원 분리"}
-                                 {song.processingStep === "whisperx" && "자막 생성"}
+                                 {song.processingStep === "lyrics" && "자막 생성"}
                                  {song.processingStep === "fcpe" && "음정 분석"}
                                 {!song.processingStep && "준비 중"}
                               </span>

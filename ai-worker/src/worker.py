@@ -8,7 +8,7 @@ from src.config import REDIS_HOST, REDIS_PORT, QUEUE_NAMES, TEMP_DIR, BACKEND_AP
 from src.services.rabbitmq_service import rabbitmq_service
 from src.services.s3_service import s3_service
 from src.processors.separator_processor import separator_processor
-from src.processors.whisperx_processor import lyrics_processor as whisperx_processor
+from src.processors.lyrics_processor import lyrics_processor
 from src.processors.fcpe_processor import fcpe_processor
 
 # Validate required environment variables at module load time
@@ -130,7 +130,7 @@ class AIWorker:
                     local_audio_path = vocals_path
 
             if "lyrics" in tasks:
-                self._update_status(song_id, "processing", "가사 추출 중...", step="whisperx", progress=0)
+                self._update_status(song_id, "processing", "가사 추출 중...", step="lyrics", progress=0)
                 vocals_path = results.get("separation", {}).get("vocals_url")
                 audio_for_lyrics = local_audio_path
 
@@ -139,14 +139,14 @@ class AIWorker:
                     s3_service.download_file(f"songs/{folder_name}/vocals.flac", temp_vocals)
                     audio_for_lyrics = temp_vocals
 
-                lyrics_result = whisperx_processor.extract_lyrics(
+                lyrics_result = lyrics_processor.extract_lyrics(
                     audio_for_lyrics,
                     song_id,
                     language=message.get("language"),  # None = auto-detect
                     folder_name=folder_name,
                     title=title,
                     artist=artist,
-                    progress_callback=lambda p: self._update_status(song_id, "processing", f"가사 추출 중... {p}%", step="whisperx", progress=p)
+                    progress_callback=lambda p: self._update_status(song_id, "processing", f"가사 추출 중... {p}%", step="lyrics", progress=p)
                 )
                 results["lyrics"] = lyrics_result
 
