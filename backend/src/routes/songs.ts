@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import multer from "multer";
 import { songService } from "../services/SongService";
 import { youtubeService } from "../services/YouTubeService";
+import { japaneseService } from "../services/JapaneseService";
 import { ProcessingStatus } from "../entities";
 import { redis } from "../config/redis";
 import { v4 as uuidv4 } from "uuid";
@@ -133,6 +134,19 @@ router.get("/quiz/generate", async (req: Request, res: Response) => {
     }
     
     res.json({ success: true, data: { questions } });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.post("/lyrics/pronunciation", async (req: Request, res: Response) => {
+  try {
+    const { lines } = req.body;
+    if (!lines || !Array.isArray(lines)) {
+      return res.status(400).json({ success: false, message: "lines 배열이 필요합니다." });
+    }
+    const result = await japaneseService.convertLyricsLines(lines);
+    res.json({ success: true, data: result });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

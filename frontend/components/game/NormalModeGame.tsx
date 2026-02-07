@@ -66,7 +66,47 @@ export default function NormalModeGame() {
 
   const lyrics: LyricsLine[] = currentSong?.lyrics || [];
 
-  // Initialize total words count
+  const [pronunciationMap, setPronunciationMap] = useState<Map<number, { text: string; words?: { text: string; pronunciation: string }[] }>>(new Map());
+  const pronunciationFetchedRef = useRef<string | null>(null);
+
+  const isJapanese = useMemo(() => {
+    const jpPattern = /[\u3040-\u309F\u30A0-\u30FF]/;
+    const sample = lyrics.slice(0, 5).map((l) => l.text).join("");
+    return jpPattern.test(sample);
+  }, [lyrics]);
+
+  useEffect(() => {
+    if (!isJapanese || lyrics.length === 0) return;
+    const songId = currentSong?.id || currentSong?.title || "";
+    if (pronunciationFetchedRef.current === songId) return;
+    pronunciationFetchedRef.current = songId;
+
+    const fetchPronunciation = async () => {
+      try {
+        const payload = lyrics.map((l) => ({
+          text: l.text,
+          words: l.words?.map((w) => ({ text: w.text })),
+        }));
+        const res = await fetch("/api/songs/lyrics/pronunciation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lines: payload }),
+        });
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data)) {
+          const map = new Map<number, { text: string; words?: { text: string; pronunciation: string }[] }>();
+          data.data.forEach((item: { text: string; pronunciation: string; words?: { text: string; pronunciation: string }[] }, idx: number) => {
+            map.set(idx, { text: item.pronunciation, words: item.words });
+          });
+          setPronunciationMap(map);
+        }
+      } catch (e) {
+        console.error("[NormalModeGame] Failed to fetch pronunciation:", e);
+      }
+    };
+    fetchPronunciation();
+  }, [isJapanese, lyrics, currentSong]);
+
   useEffect(() => {
     if (lyrics.length > 0) {
       let count = 0;
@@ -621,56 +661,72 @@ export default function NormalModeGame() {
        <AnimatePresence>
          {gamePhase === 'singing' && !isInterlude && (
            <div className="absolute bottom-[20%] sm:bottom-[25%] left-0 right-0 z-20 px-4 sm:px-8 md:px-16 flex flex-col gap-6 sm:gap-8 md:gap-12 w-full max-w-7xl mx-auto will-change-transform">
-             {/* Current Line */}
-             <div className="self-start pl-2 sm:pl-4 md:pl-10 relative">
-               {currentLine && (
-                 <motion.div 
-                    key={`line-${currentLyricIndex}`}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    className="flex flex-wrap gap-x-4 leading-normal"
-                 >
-                   {(() => {
-                     const line = currentLine;
-                     if (line.words && line.words.length > 0) {
-                       return line.words.map((word, i) => {
-                         const progress = getWordProgressInLine(line, i);
+              {/* Current Line */}
+              <div className="self-start pl-2 sm:pl-4 md:pl-10 relative">
+                {currentLine && (
+                  <motion.div 
+                     key={`line-${currentLyricIndex}`}
+                     initial={{ opacity: 0, y: 20 }}
+                     animate={{ opacity: 1, y: 0 }}
+                     exit={{ opacity: 0, y: -20 }}
+                     className="flex flex-col gap-1"
+                  >
+                    {isJapanese && pronunciationMap.has(currentLyricIndex) && (
+                      <div className="text-sm sm:text-base md:text-lg lg:text-xl font-bold text-yellow-300/80" style={{ WebkitTextStroke: '1px rgba(0,0,0,0.6)', paintOrder: 'stroke fill' }}>
+                        {pronunciationMap.get(currentLyricIndex)?.words
+                          ? pronunciationMap.get(currentLyricIndex)!.words!.map((w, i) => <span key={i} className="mr-2">{w.pronunciation}</span>)
+                          : pronunciationMap.get(currentLyricIndex)?.text}
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-x-4 leading-normal">
+                    {(() => {
+                      const line = currentLine;
+                      if (line.words && line.words.length > 0) {
+                        return line.words.map((word, i) => {
+                          const progress = getWordProgressInLine(line, i);
+                          return (
+                             <span key={i} className="relative block text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-black">
+                                <span className="text-white relative z-10" style={{ WebkitTextStroke: '2px rgba(0,0,0,0.8)', paintOrder: 'stroke fill' }}>{word.text}</span>
+                                 <span className="absolute left-0 top-0 text-cyan-400 whitespace-nowrap z-20" style={{ clipPath: `inset(-0.25em ${100 - progress}% -0.25em 0)`, WebkitTextStroke: '2px rgba(0,0,0,0.8)', paintOrder: 'stroke fill' }}>{word.text}</span>
+                             </span>
+                          );
+                        });
+                      } else {
                          return (
-                            <span key={i} className="relative block text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-black">
-                               <span className="text-white relative z-10" style={{ WebkitTextStroke: '2px rgba(0,0,0,0.8)', paintOrder: 'stroke fill' }}>{word.text}</span>
-                                <span className="absolute left-0 top-0 text-cyan-400 whitespace-nowrap z-20" style={{ clipPath: `inset(-0.25em ${100 - progress}% -0.25em 0)`, WebkitTextStroke: '2px rgba(0,0,0,0.8)', paintOrder: 'stroke fill' }}>{word.text}</span>
-                            </span>
+                           <div className="relative text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-black">
+                              <span className="text-white" style={{ WebkitTextStroke: '2px rgba(0,0,0,0.8)', paintOrder: 'stroke fill' }}>{line.text}</span>
+                              <span className="absolute left-0 top-0 text-cyan-400 whitespace-nowrap" style={{ clipPath: `inset(-0.25em ${100 - getLineProgress(line)}% -0.25em 0)`, WebkitTextStroke: '2px rgba(0,0,0,0.8)', paintOrder: 'stroke fill' }}>{line.text}</span>
+                          </div>
                          );
-                       });
-                     } else {
-                        return (
-                          <div className="relative text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-black">
-                             <span className="text-white" style={{ WebkitTextStroke: '2px rgba(0,0,0,0.8)', paintOrder: 'stroke fill' }}>{line.text}</span>
-                             <span className="absolute left-0 top-0 text-cyan-400 whitespace-nowrap" style={{ clipPath: `inset(-0.25em ${100 - getLineProgress(line)}% -0.25em 0)`, WebkitTextStroke: '2px rgba(0,0,0,0.8)', paintOrder: 'stroke fill' }}>{line.text}</span>
-                         </div>
-                        );
-                     }
-                   })()}
-                 </motion.div>
-               )}
-             </div>
-
-             {/* Next Line */}
-             <div className="self-end pr-2 sm:pr-4 md:pr-10 opacity-70">
-                {nextLine && (
-                   <div 
-                     className="text-xl sm:text-2xl md:text-3xl lg:text-4xl md:text-5xl font-black text-white" 
-                     style={{ 
-                       WebkitTextStroke: '2px rgba(0,0,0,0.8)', 
-                       paintOrder: 'stroke fill',
-                       textShadow: '2px 2px 4px rgba(0,0,0,0.5)' 
-                     }}
-                   >
-                      {nextLine.text}
-                   </div>
+                      }
+                    })()}
+                    </div>
+                  </motion.div>
                 )}
-             </div>
+              </div>
+
+              {/* Next Line */}
+              <div className="self-end pr-2 sm:pr-4 md:pr-10 opacity-70">
+                 {nextLine && (
+                    <div className="flex flex-col gap-0.5 items-end">
+                      {isJapanese && pronunciationMap.has(currentLyricIndex + 1) && (
+                        <div className="text-xs sm:text-sm md:text-base font-bold text-yellow-300/60" style={{ WebkitTextStroke: '1px rgba(0,0,0,0.4)', paintOrder: 'stroke fill' }}>
+                          {pronunciationMap.get(currentLyricIndex + 1)?.text}
+                        </div>
+                      )}
+                      <div 
+                        className="text-xl sm:text-2xl md:text-3xl lg:text-4xl md:text-5xl font-black text-white" 
+                        style={{ 
+                          WebkitTextStroke: '2px rgba(0,0,0,0.8)', 
+                          paintOrder: 'stroke fill',
+                          textShadow: '2px 2px 4px rgba(0,0,0,0.5)' 
+                        }}
+                      >
+                         {nextLine.text}
+                      </div>
+                    </div>
+                 )}
+              </div>
           </div>
         )}
       </AnimatePresence>

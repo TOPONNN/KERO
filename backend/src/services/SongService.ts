@@ -5,6 +5,7 @@ import { publishMessage, QUEUES } from "../config/rabbitmq";
 import { v4 as uuidv4 } from "uuid";
 import { youtubeService } from "./YouTubeService";
 import { tjKaraokeService } from "./TJKaraokeService";
+import { japaneseService } from "./JapaneseService";
 import { redis } from "../config/redis";
 import axios from "axios";
 
@@ -551,9 +552,14 @@ export class SongService {
     };
     const pickRandom = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
-    // Strip parenthesized content from titles: "봄날 (Spring Day)" → "봄날"
     const cleanTitle = (title: string): string =>
       title.replace(/\s*[\(（\[【].*?[\)）\]】]/g, "").replace(/[\(（\[【\)）\]】]/g, "").trim();
+
+    const isJPN = cat === "JPN";
+    const translateArtist = (artist: string): string => {
+      if (!isJPN) return cleanTitle(artist);
+      return japaneseService.getKoreanArtistName(artist) || japaneseService.getKoreanArtistName(cleanTitle(artist)) || cleanTitle(artist);
+    };
 
     if (tjSongs.length >= 4) {
       const shuffledTJ = shuffle(tjSongs);
@@ -572,20 +578,20 @@ export class SongService {
           wrongAnswers: otherTitles,
           timeLimit: 60,
           points: 1000,
-          metadata: { source: "tj", tjNumber: song.number },
+          metadata: { source: "tj", tjNumber: song.number, artistKo: isJPN ? translateArtist(song.artist) : undefined },
         });
       }
 
       const artistCount = Math.ceil(count * 0.20);
       for (let i = titleCount; i < Math.min(titleCount + artistCount, shuffledTJ.length); i++) {
         const song = shuffledTJ[i];
-        const uniqueArtists = [...new Set(tjSongs.filter((s) => s.artist !== song.artist).map((s) => cleanTitle(s.artist)))];
-        const otherArtists = shuffle(uniqueArtists).slice(0, 5);
+        const translatedArtists = [...new Set(tjSongs.filter((s) => s.artist !== song.artist).map((s) => translateArtist(s.artist)))];
+        const otherArtists = shuffle(translatedArtists).slice(0, 5);
         if (otherArtists.length < 5) continue;
         tjQuestions.push({
           type: "artist_guess",
           questionText: `'${cleanTitle(song.title)}'을(를) 부른 가수는?`,
-          correctAnswer: cleanTitle(song.artist),
+          correctAnswer: translateArtist(song.artist),
           wrongAnswers: otherArtists,
           timeLimit: 60,
           points: 1000,
@@ -593,7 +599,7 @@ export class SongService {
         });
       }
 
-      const initialCount = Math.ceil(count * 0.15);
+      const initialCount = Math.ceil(count * (isJPN ? 0 : 0.15));
       const initialStart = titleCount + artistCount;
       for (let i = initialStart; i < Math.min(initialStart + initialCount, shuffledTJ.length); i++) {
         const song = shuffledTJ[i];
@@ -607,7 +613,7 @@ export class SongService {
           wrongAnswers: [],
           timeLimit: 90,
           points: 1000,
-          metadata: { source: "tj", tjNumber: song.number, hint: `${cleanTitle(song.artist)}의 노래, ${cleaned.length}글자` },
+          metadata: { source: "tj", tjNumber: song.number, hint: `${translateArtist(song.artist)}의 노래, ${cleaned.length}글자` },
         });
       }
     }
