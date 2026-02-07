@@ -14,7 +14,7 @@ import type { RootState } from "@/store";
 import { setRoom } from "@/store/slices/roomSlice";
 import { 
   setGameMode, setGameStatus, setCurrentSong, setQuizQuestions,
-  addToQueue, removeFromQueue, updateQueueItem, playNextInQueue, resetQuiz
+  addToQueue, removeFromQueue, updateQueueItem, playNextInQueue, resetQuiz, resetGame
 } from "@/store/slices/gameSlice";
 import { useSocket } from "@/hooks/useSocket";
 import NormalModeGame from "@/components/game/NormalModeGame";
@@ -122,7 +122,7 @@ export default function RoomPage() {
    const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
    useEffect(() => {
-    dispatch(resetQuiz());
+    dispatch(resetGame());
     const fetchRoom = async () => {
       try {
          const res = await fetch(`/api/rooms/${code}`);

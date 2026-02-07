@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { 
   Music, Target, MessageSquareText, ArrowLeft, Plus, 
-  Loader2, DoorOpen, Lock, RefreshCw, Trash2, Dices, ChevronRight
+  Loader2, DoorOpen, Lock, RefreshCw, Trash2, Dices
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -41,6 +41,12 @@ function LobbyContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mode = searchParams.get("mode") as "normal" | "perfect_score" | "lyrics_quiz" | null;
+
+  useEffect(() => {
+    if (!mode) {
+      router.replace("/lobby?mode=normal");
+    }
+  }, [mode, router]);
   
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -286,44 +292,6 @@ function LobbyContent() {
               코드로 입장
             </motion.button>
           </div>
-
-          {!mode && (
-            <div className="relative mb-8 group">
-              {/* Mobile Scroll Hints */}
-              <div className="absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-black via-black/50 to-transparent z-10 pointer-events-none md:hidden" />
-              <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-black via-black/50 to-transparent z-10 pointer-events-none md:hidden flex items-center justify-end pr-2">
-                <ChevronRight className="w-6 h-6 text-white/50 animate-pulse" />
-              </div>
-
-              <div className="flex overflow-x-auto pb-4 md:pb-0 px-4 md:px-0 md:justify-center gap-2 snap-x scrollbar-hide -mx-4 sm:-mx-6 md:mx-0">
-                <Link 
-                  href="/lobby" 
-                  className={`snap-center shrink-0 px-4 py-2.5 rounded-full transition-all border ${
-                    !mode 
-                      ? "bg-white text-black border-white font-bold" 
-                      : "bg-white/5 text-gray-400 border-white/5 hover:bg-white/10 hover:border-white/20"
-                  }`}
-                >
-                  전체
-                </Link>
-                {Object.entries(modeConfig).map(([key, cfg]) => (
-                  <Link 
-                    key={key}
-                    href={`/lobby?mode=${key}`}
-                    className="snap-center shrink-0 px-4 py-2.5 rounded-full bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all flex items-center gap-2 group/btn"
-                  >
-                    <div 
-                      className="w-2 h-2 rounded-full"
-                      style={{ backgroundColor: cfg.color }}
-                    />
-                    <span className="text-sm font-medium text-gray-300 group-hover/btn:text-white transition-colors">
-                      {cfg.title}
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
 
           {loading ? (
             <div className="flex justify-center py-20">

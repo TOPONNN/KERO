@@ -275,19 +275,19 @@ function VideoGrid({ layout = "grid" }: { layout?: "grid" | "row" | "column" }) 
         </div>
 
         {expandedTrack && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ animation: 'fadeIn 0.2s ease-out' }} onClick={() => setExpandedTrackSid(null)}>
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-            <div className="relative w-[480px] h-[360px] max-w-[70vw] max-h-[50vh]" onClick={e => e.stopPropagation()}>
-              <div className="relative w-full h-full bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/20">
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-8" style={{ animation: 'fadeIn 0.2s ease-out' }} onClick={() => setExpandedTrackSid(null)}>
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            <div className="relative w-full max-w-[560px] aspect-[4/3]" onClick={e => e.stopPropagation()}>
+              <div className="relative w-full h-full bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/20 ring-1 ring-white/10">
                 <VideoTrack
                   trackRef={expandedTrack}
                   className="w-full h-full object-cover"
                 />
                 
-                <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent pt-10">
+                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent pt-12">
                   <div className="flex items-center gap-2">
-                    <div className={`w-2.5 h-2.5 rounded-full ${expandedTrack.participant.isSpeaking ? 'bg-green-500 shadow-[0_0_8px_rgba(74,222,128,0.8)]' : 'bg-white/20'}`} />
-                    <span className="text-base font-bold text-white drop-shadow-md">
+                    <div className={`w-3 h-3 rounded-full ${expandedTrack.participant.isSpeaking ? 'bg-green-500 shadow-[0_0_8px_rgba(74,222,128,0.8)]' : 'bg-white/20'}`} />
+                    <span className="text-lg font-bold text-white drop-shadow-md">
                       {expandedTrack.participant.name || expandedTrack.participant.identity}
                     </span>
                   </div>
@@ -295,7 +295,7 @@ function VideoGrid({ layout = "grid" }: { layout?: "grid" | "row" | "column" }) 
 
                 <button
                   onClick={() => setExpandedTrackSid(null)}
-                  className="absolute top-2 right-2 p-2 rounded-full bg-black/50 hover:bg-white/20 text-white transition-colors backdrop-blur-md border border-white/10"
+                  className="absolute top-3 right-3 p-2.5 rounded-full bg-black/50 hover:bg-white/20 text-white transition-colors backdrop-blur-md border border-white/10"
                 >
                   <X className="w-5 h-5" />
                 </button>
