@@ -183,6 +183,17 @@ export function initializeSocket(httpServer: HttpServer): Server {
           }
         });
 
+        socket.on("soundboard:play", (data: { soundFile: string }) => {
+          const user = onlineUsers.get(socket.id);
+          if (user) {
+            socket.broadcast.emit("soundboard:played", {
+              socketId: socket.id,
+              nickname: user.nickname,
+              soundFile: data.soundFile,
+            });
+          }
+        });
+
        socket.on("room:join", async (data: JoinRoomData) => {
       try {
         const room = await roomService.getRoomByCode(data.code);

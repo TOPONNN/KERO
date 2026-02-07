@@ -24,6 +24,11 @@ export interface EmojiData {
   y: number;
 }
 
+export interface SoundData {
+  socketId: string;
+  soundFile: string;
+}
+
 interface PresenceData {
   count: number;
   users: OnlineUser[];
@@ -32,7 +37,9 @@ interface PresenceData {
 interface PresenceContextType extends PresenceData {
   socketId: string | null;
   emitEmoji: (emoji: string, x: number, y: number) => void;
+  emitSound: (soundFile: string) => void;
   registerEmojiListener: (callback: (data: EmojiData) => void) => () => void;
+  registerSoundListener: (callback: (data: SoundData) => void) => () => void;
 }
 
 const PresenceContext = createContext<PresenceContextType>({ 
@@ -40,7 +47,9 @@ const PresenceContext = createContext<PresenceContextType>({
   users: [], 
   socketId: null,
   emitEmoji: () => {},
+  emitSound: () => {},
   registerEmojiListener: () => () => {},
+  registerSoundListener: () => () => {},
 });
 
 export function usePresence() {
@@ -68,6 +77,7 @@ export default function PresenceProvider({ children }: { children: React.ReactNo
   const pathname = usePathname();
   const socketRef = useRef<Socket | null>(null);
   const emojiListenersRef = useRef<((data: EmojiData) => void)[]>([]);
+  const soundListenersRef = useRef<((data: SoundData) => void)[]>([]);
   const { x, y } = useMouse({ allowPage: true });
 
   const emitEmoji = useCallback((emoji: string, x: number, y: number) => {
@@ -80,6 +90,19 @@ export default function PresenceProvider({ children }: { children: React.ReactNo
     emojiListenersRef.current.push(callback);
     return () => {
       emojiListenersRef.current = emojiListenersRef.current.filter((cb) => cb !== callback);
+    };
+  }, []);
+
+  const emitSound = useCallback((soundFile: string) => {
+    if (socketRef.current?.connected) {
+      socketRef.current.emit("soundboard:play", { soundFile });
+    }
+  }, []);
+
+  const registerSoundListener = useCallback((callback: (data: SoundData) => void) => {
+    soundListenersRef.current.push(callback);
+    return () => {
+      soundListenersRef.current = soundListenersRef.current.filter((cb) => cb !== callback);
     };
   }, []);
 
@@ -140,6 +163,10 @@ export default function PresenceProvider({ children }: { children: React.ReactNo
       emojiListenersRef.current.forEach((listener) => listener(data));
     });
 
+    socket.on("soundboard:played", (data: SoundData) => {
+      soundListenersRef.current.forEach((listener) => listener(data));
+    });
+
     return () => {
       socket.disconnect();
     };
@@ -152,7 +179,9 @@ export default function PresenceProvider({ children }: { children: React.ReactNo
   }, [pathname]);
 
   return (
-    <PresenceContext.Provider value={{ ...data, socketId, emitEmoji, registerEmojiListener }}>
+    <PresenceContext.Provider
+      value={{ ...data, socketId, emitEmoji, emitSound, registerEmojiListener, registerSoundListener }}
+    >
       {children}
     </PresenceContext.Provider>
   );

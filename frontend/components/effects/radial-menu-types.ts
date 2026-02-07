@@ -9,3 +9,11 @@ export interface Position {
   x: number;
   y: number;
 }
+
+export interface SoundItem {
+  id: string;
+  label: string;
+  icon: string;
+  color: string;
+  soundFile: string;
+}
