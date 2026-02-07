@@ -81,24 +81,31 @@ export default function RadialMenu() {
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isOpenRef.current) return;
-    const currentPos = { x: e.clientX, y: e.clientY };
     const origin = menuPosRef.current;
-    const dist = Math.sqrt(Math.pow(currentPos.x - origin.x, 2) + Math.pow(currentPos.y - origin.y, 2));
+    const dx = e.clientX - origin.x;
+    const dy = e.clientY - origin.y;
 
-    if (dist < DEAD_ZONE) {
-      if (activeIndexRef.current !== null) setActiveIndex(null);
-      return;
+    const itemCount = activeTabRef.current === "emoji" ? MENU_ITEMS.length : SOUND_ITEMS.length;
+    const ITEM_RING_RADIUS = 100;
+    const HIT_RADIUS = 35;
+
+    let closestIndex: number | null = null;
+    let closestDist = Infinity;
+
+    for (let i = 0; i < itemCount; i++) {
+      const angleDeg = i * (360 / itemCount) - 90;
+      const angleRad = (angleDeg * Math.PI) / 180;
+      const itemX = Math.cos(angleRad) * ITEM_RING_RADIUS;
+      const itemY = Math.sin(angleRad) * ITEM_RING_RADIUS;
+      const distToItem = Math.sqrt((dx - itemX) ** 2 + (dy - itemY) ** 2);
+
+      if (distToItem < HIT_RADIUS && distToItem < closestDist) {
+        closestDist = distToItem;
+        closestIndex = i;
+      }
     }
 
-    const dx = currentPos.x - origin.x;
-    const dy = currentPos.y - origin.y;
-    let theta = (Math.atan2(dy, dx) * 180) / Math.PI;
-    const normalizedAngle = (theta + 90) % 360;
-    const positiveAngle = normalizedAngle < 0 ? normalizedAngle + 360 : normalizedAngle;
-    const itemCount = activeTabRef.current === "emoji" ? MENU_ITEMS.length : SOUND_ITEMS.length;
-    const index = Math.floor(positiveAngle / (360 / itemCount));
-
-    if (activeIndexRef.current !== index) setActiveIndex(index);
+    if (activeIndexRef.current !== closestIndex) setActiveIndex(closestIndex);
   }, []);
 
   const switchTab = useCallback(() => {
