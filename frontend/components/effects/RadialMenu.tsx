@@ -115,8 +115,13 @@ export default function RadialMenu() {
 
   const handleMouseDown = useCallback((e: MouseEvent) => {
     if (e.button === 0 && isOpenRef.current) {
-      e.preventDefault();
-      switchTab();
+      const dx = e.clientX - menuPosRef.current.x;
+      const dy = e.clientY - menuPosRef.current.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 50) {
+        e.preventDefault();
+        switchTab();
+      }
       return;
     }
     if (e.button === 2) {
