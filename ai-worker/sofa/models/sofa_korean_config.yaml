@@ -52,13 +52,15 @@ vocab:
   ui: 35
   wa: 36
   wae: 37
-  wi: 38
-  wo: 39
-  ya: 40
-  ye: 41
-  yeo: 42
-  yo: 43
-  yu: 44
+  we: 38
+  wi: 39
+  wo: 40
+  ya: 41
+  yae: 42
+  ye: 43
+  yeo: 44
+  yo: 45
+  yu: 46
   0: SP
   1: K
   2: L
@@ -97,14 +99,16 @@ vocab:
   35: ui
   36: wa
   37: wae
-  38: wi
-  39: wo
-  40: ya
-  41: ye
-  42: yeo
-  43: yo
-  44: yu
+  38: we
+  39: wi
+  40: wo
+  41: ya
+  42: yae
+  43: ye
+  44: yeo
+  45: yo
+  46: yu
   AP: 0
   ? ''
   : 0
-  <vocab_size>: 45
+  <vocab_size>: 47
