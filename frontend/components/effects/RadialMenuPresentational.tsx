@@ -50,7 +50,7 @@ export default function RadialMenuPresentational({
             exit={{ opacity: 0, y: 6 }}
             className="absolute -translate-x-1/2 -translate-y-1/2 top-9 text-[10px] tracking-wide text-white/70 whitespace-nowrap"
           >
-            스크롤로 전환
+            클릭으로 전환
           </motion.div>
 
           {activeTab === "emoji" &&

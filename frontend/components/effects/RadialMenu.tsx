@@ -46,6 +46,7 @@ export default function RadialMenu() {
   const activeTabRef = useRef<MenuTab>("emoji");
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const suppressMenuRef = useRef(false);
+  const lastTabSwitchRef = useRef(0);
 
   useEffect(() => {
     isOpenRef.current = isOpen;
@@ -78,18 +79,6 @@ export default function RadialMenu() {
     }
   }, []);
 
-  const handleMouseDown = useCallback((e: MouseEvent) => {
-    if (e.button === 2) {
-      const pos = { x: e.clientX, y: e.clientY };
-      timerRef.current = setTimeout(() => {
-        setMenuPos(pos);
-        setIsOpen(true);
-        setActiveIndex(null);
-        suppressMenuRef.current = true;
-      }, HOLD_DELAY);
-    }
-  }, []);
-
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isOpenRef.current) return;
     const currentPos = { x: e.clientX, y: e.clientY };
@@ -112,7 +101,39 @@ export default function RadialMenu() {
     if (activeIndexRef.current !== index) setActiveIndex(index);
   }, []);
 
+  const switchTab = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTabSwitchRef.current < 400) return;
+    lastTabSwitchRef.current = now;
+    setActiveIndex(null);
+    setActiveTab((prev) => {
+      const currentIndex = MENU_TABS.indexOf(prev);
+      const nextIndex = (currentIndex + 1) % MENU_TABS.length;
+      return MENU_TABS[nextIndex];
+    });
+  }, []);
+
+  const handleMouseDown = useCallback((e: MouseEvent) => {
+    if (e.button === 0 && isOpenRef.current) {
+      e.preventDefault();
+      switchTab();
+      return;
+    }
+    if (e.button === 2) {
+      const pos = { x: e.clientX, y: e.clientY };
+      timerRef.current = setTimeout(() => {
+        setMenuPos(pos);
+        setIsOpen(true);
+        setActiveIndex(null);
+        suppressMenuRef.current = true;
+      }, HOLD_DELAY);
+    }
+  }, [switchTab]);
+
   const handleMouseUp = useCallback((e: MouseEvent) => {
+    if (e.button === 0 && isOpenRef.current) {
+      return;
+    }
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
@@ -136,23 +157,11 @@ export default function RadialMenu() {
   }, [emitEmoji, emitSound, fireConfetti, playSound]);
 
   const handleWheel = useCallback((e: WheelEvent) => {
-    if (!isOpenRef.current) {
-      return;
-    }
-
-    if (e.deltaY === 0) {
-      return;
-    }
-
+    if (!isOpenRef.current) return;
+    if (e.deltaY === 0) return;
     e.preventDefault();
-    setActiveIndex(null);
-    setActiveTab((prev) => {
-      const currentIndex = MENU_TABS.indexOf(prev);
-      const direction = e.deltaY > 0 ? 1 : -1;
-      const nextIndex = (currentIndex + direction + MENU_TABS.length) % MENU_TABS.length;
-      return MENU_TABS[nextIndex];
-    });
-  }, []);
+    switchTab();
+  }, [switchTab]);
 
   const handleContextMenu = useCallback((e: MouseEvent) => {
     if (suppressMenuRef.current) {

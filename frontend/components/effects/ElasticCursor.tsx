@@ -54,7 +54,7 @@ function getRekt(el: HTMLElement) {
   return null;
 }
 
-const CURSOR_DIAMETER = 26;
+const CURSOR_DIAMETER = 34;
 
 export default function ElasticCursor() {
   const isMobile = useMediaQuery("(max-width: 768px)");
@@ -92,7 +92,7 @@ export default function ElasticCursor() {
     if (!isHovering) {
       set.x(pos.x);
       set.y(pos.y);
-      set.width(CURSOR_DIAMETER + scale * 120);
+      set.width(CURSOR_DIAMETER + scale * 150);
       set.r(rotation);
       set.sx(1 + scale);
       set.sy(1 - scale * 2);
