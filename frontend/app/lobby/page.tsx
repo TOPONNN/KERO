@@ -125,14 +125,7 @@ function LobbyContent() {
       return;
     }
 
-    const userStr = localStorage.getItem("user");
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        user.name = nickname.trim();
-        localStorage.setItem("user", JSON.stringify(user));
-      } catch {}
-    }
+    sessionStorage.setItem("roomNickname", nickname.trim());
 
     setCreating(true);
     try {

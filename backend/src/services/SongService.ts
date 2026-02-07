@@ -492,6 +492,7 @@ export class SongService {
 
      // 2. Generate TJ-based questions (no lyrics needed)
      const tjQuestions: any[] = [];
+     const lyricsQuestions: any[] = [];
      const shuffle = <T>(arr: T[]): T[] => {
        const a = [...arr];
        for (let i = a.length - 1; i > 0; i--) {
@@ -500,6 +501,7 @@ export class SongService {
        }
        return a;
      };
+     const pickRandom = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
      // Strip parenthesized content from titles: "봄날 (Spring Day)" → "봄날"
       const cleanTitle = (title: string): string => 
@@ -508,7 +510,7 @@ export class SongService {
     if (tjSongs.length >= 4) {
       const shuffledTJ = shuffle(tjSongs);
 
-         const titleCount = Math.ceil(count * 0.4);
+         const titleCount = Math.ceil(count * 0.25);
          for (let i = 0; i < Math.min(titleCount, shuffledTJ.length); i++) {
           const song = shuffledTJ[i];
           const otherTitles = shuffle(
@@ -526,7 +528,7 @@ export class SongService {
           });
         }
 
-         const artistCount = Math.ceil(count * 0.35);
+         const artistCount = Math.ceil(count * 0.20);
          for (let i = titleCount; i < Math.min(titleCount + artistCount, shuffledTJ.length); i++) {
           const song = shuffledTJ[i];
           const uniqueArtists = [...new Set(tjSongs.filter(s => s.artist !== song.artist).map(s => cleanTitle(s.artist)))];
@@ -543,7 +545,7 @@ export class SongService {
           });
         }
 
-         const initialCount = Math.ceil(count * 0.25);
+         const initialCount = Math.ceil(count * 0.15);
          const initialStart = titleCount + artistCount;
          for (let i = initialStart; i < Math.min(initialStart + initialCount, shuffledTJ.length); i++) {
           const song = shuffledTJ[i];
@@ -560,6 +562,97 @@ export class SongService {
             metadata: { source: "tj", tjNumber: song.number, hint: `${cleanTitle(song.artist)}의 노래, ${cleaned.length}글자` },
           });
          }
+     }
+
+     // 3. Generate lyrics-based questions from completed DB songs
+     const dbSongs = await songRepository.find({
+       where: { processingStatus: ProcessingStatus.COMPLETED },
+       relations: ["lyrics"],
+       take: 30,
+     });
+     const songsWithLyrics = dbSongs.filter((song) => (song.lyrics?.length || 0) > 0);
+
+     if (songsWithLyrics.length > 0) {
+       const lyricsFillCount = Math.ceil(count * 0.20);
+       for (let q = 0; q < lyricsFillCount; q++) {
+         const song = pickRandom(songsWithLyrics);
+         const lyrics = song.lyrics || [];
+         const validLines = lyrics.filter((l: LyricsLine) => l.text.split(" ").filter((w: string) => w.length > 0).length >= 3);
+         if (validLines.length === 0) continue;
+
+         const line = pickRandom(validLines);
+         const words = line.text.split(" ").filter((w: string) => w.length > 0);
+         const blankIdx = Math.floor(Math.random() * words.length);
+         const correct = words[blankIdx];
+         const qWords = [...words];
+         qWords[blankIdx] = "______";
+
+         lyricsQuestions.push({
+           songId: song.id,
+           type: "lyrics_fill",
+           questionText: qWords.join(" "),
+           correctAnswer: correct,
+           wrongAnswers: this.generateWrongAnswers(correct, lyrics),
+           startTime: line.startTime,
+           endTime: line.endTime,
+           timeLimit: 15,
+           points: 1000,
+           metadata: { audioUrl: song.instrumentalUrl || song.originalUrl },
+         });
+       }
+
+       const lyricsOrderCount = Math.ceil(count * 0.10);
+       for (let lo = 0; lo < lyricsOrderCount; lo++) {
+         const orderSong = pickRandom(songsWithLyrics);
+         const orderLyrics = orderSong.lyrics || [];
+         if (orderLyrics.length < 4) continue;
+
+         const startIdx = Math.floor(Math.random() * Math.max(1, orderLyrics.length - 3));
+         const lines = orderLyrics.slice(startIdx, startIdx + 4);
+         if (lines.length !== 4) continue;
+
+         lyricsQuestions.push({
+           songId: orderSong.id,
+           type: "lyrics_order",
+           questionText: "다음 가사를 올바른 순서로 배열하세요",
+           correctAnswer: JSON.stringify([0, 1, 2, 3]),
+           wrongAnswers: lines.map((l: LyricsLine) => l.text),
+           startTime: lines[0].startTime,
+           endTime: lines[3].endTime,
+           timeLimit: 25,
+           points: 1000,
+           metadata: {
+             lineTexts: lines.map((l: LyricsLine) => l.text),
+             audioUrl: orderSong.instrumentalUrl || orderSong.originalUrl,
+           },
+         });
+       }
+
+       const trueFalseCount = Math.ceil(count * 0.10);
+       for (let tf = 0; tf < trueFalseCount; tf++) {
+         const tfSong = pickRandom(songsWithLyrics);
+         const tfLyrics = tfSong.lyrics || [];
+         if (tfLyrics.length === 0) continue;
+
+         const line = pickRandom(tfLyrics);
+         const isTrue = Math.random() > 0.5;
+         const otherSongs = songsWithLyrics.filter((s: Song) => s.id !== tfSong.id);
+         if (!isTrue && otherSongs.length === 0) continue;
+
+         const displayTitle = isTrue ? tfSong.title : pickRandom(otherSongs).title;
+         lyricsQuestions.push({
+           songId: tfSong.id,
+           type: "true_false",
+           questionText: `이 가사는 '${displayTitle}'의 가사이다: "${line.text}"`,
+           correctAnswer: String(isTrue),
+           wrongAnswers: [],
+           startTime: line.startTime,
+           endTime: line.endTime,
+           timeLimit: 12,
+           points: 1000,
+           metadata: { audioUrl: tfSong.instrumentalUrl || tfSong.originalUrl },
+         });
+       }
      }
 
       const audioQuestions = tjQuestions.filter(q => q.type === "title_guess" || q.type === "artist_guess");
@@ -598,9 +691,9 @@ export class SongService {
       }
 
      // 3. Shuffle and return
-    const allQuestions = shuffle([...tjQuestions]);
-    return allQuestions.slice(0, count);
-  }
+     const allQuestions = shuffle([...tjQuestions, ...lyricsQuestions]);
+     return allQuestions.slice(0, count);
+   }
 
   async getSongPool(): Promise<Song[]> {
     return songRepository.find({

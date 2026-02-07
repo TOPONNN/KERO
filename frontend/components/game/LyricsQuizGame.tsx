@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Users, Check, X, AlertCircle, Send, RotateCcw, ArrowLeft } from "lucide-react";
+import { Trophy, Users, Check, X, AlertCircle, Send, RotateCcw, ArrowLeft, Mic, MicOff, Video, CameraOff } from "lucide-react";
 import type { RootState } from "@/store";
 import { selectAnswer, nextQuestion, revealAnswer, setGameStatus, updateStreak, resetQuiz, setQuizQuestions } from "@/store/slices/gameSlice";
 import { useSocket } from "@/hooks/useSocket";
@@ -46,7 +46,26 @@ const TimerCircle = ({ timeLeft, timeLimit }: { timeLeft: number; timeLimit: num
   );
 };
 
-export default function LyricsQuizGame() {
+interface LyricsQuizGameProps {
+  onBack?: () => void;
+  onMicToggle?: () => void;
+  onCameraToggle?: () => void;
+  mediaStatus?: {
+    isMicOn: boolean;
+    isCameraOn: boolean;
+  };
+  cameraElement?: ReactNode;
+  quizCount?: number;
+}
+
+export default function LyricsQuizGame({
+  onBack,
+  onMicToggle,
+  onCameraToggle,
+  mediaStatus,
+  cameraElement,
+  quizCount,
+}: LyricsQuizGameProps) {
   const dispatch = useDispatch();
   const { 
     quizQuestions, 
@@ -84,6 +103,21 @@ export default function LyricsQuizGame() {
    const [correctCount, setCorrectCount] = useState(0);
    const [wrongCount, setWrongCount] = useState(0);
    const [maxStreakLocal, setMaxStreakLocal] = useState(0);
+   const [localIdentity, setLocalIdentity] = useState<{ id: string; name: string }>({ id: "", name: "" });
+
+   useEffect(() => {
+     const userRaw = localStorage.getItem("user");
+     if (!userRaw) return;
+     try {
+       const user = JSON.parse(userRaw);
+       setLocalIdentity({
+         id: String(user?.id ?? ""),
+         name: String(user?.name ?? ""),
+       });
+     } catch {
+       setLocalIdentity({ id: "", name: "" });
+     }
+   }, []);
 
     const cleanDisplay = (s: string) => s?.replace(/\s*[\(（\[【].*?[\)）\]】]/g, '').replace(/[\(（\[【\)）\]】]/g, '').trim() || '';
 
@@ -387,7 +421,8 @@ export default function LyricsQuizGame() {
       dispatch(updateStreak(0));
       
       try {
-        const res = await fetch(`/api/songs/quiz/generate?count=50`);
+        const count = quizQuestions.length || quizCount || 30;
+        const res = await fetch(`/api/songs/quiz/generate?count=${count}`);
         const data = await res.json();
         
         if (!data.success || !data.data?.questions) {
@@ -700,10 +735,16 @@ export default function LyricsQuizGame() {
               </h3>
               <div className="space-y-2">
                  {[...participants].sort((a, b) => {
-                   const scoreA = scores.find(s => String(s.odId) === String(a.id))?.score || 0;
-                   const scoreB = scores.find(s => String(s.odId) === String(b.id))?.score || 0;
+                   const isLocalA = (localIdentity.id && String(a.id) === localIdentity.id) || (localIdentity.name && a.nickname === localIdentity.name);
+                   const isLocalB = (localIdentity.id && String(b.id) === localIdentity.id) || (localIdentity.name && b.nickname === localIdentity.name);
+                   const scoreA = isLocalA ? localScore : (scores.find(s => String(s.odId) === String(a.id))?.score || 0);
+                   const scoreB = isLocalB ? localScore : (scores.find(s => String(s.odId) === String(b.id))?.score || 0);
                    return scoreB - scoreA;
-                }).map((p, idx) => (
+                }).map((p, idx) => {
+                  const isLocalPlayer = (localIdentity.id && String(p.id) === localIdentity.id) || (localIdentity.name && p.nickname === localIdentity.name);
+                  const displayScore = isLocalPlayer ? localScore : (scores.find(s => String(s.odId) === String(p.id))?.score || 0);
+
+                  return (
                   <div key={p.id} className="flex items-center justify-between px-4 py-2 rounded-lg bg-white/5">
                     <div className="flex items-center gap-3">
                       <span className={`text-lg font-black ${idx === 0 ? 'text-[#FFD700]' : idx === 1 ? 'text-gray-300' : idx === 2 ? 'text-[#CD7F32]' : 'text-white/50'}`}>
@@ -712,9 +753,9 @@ export default function LyricsQuizGame() {
                       <span className="text-white font-bold">{p.nickname}</span>
                       {p.isHost && <span className="text-xs bg-[#FFD700]/20 text-[#FFD700] px-2 py-0.5 rounded-full">HOST</span>}
                     </div>
-                    <span className="text-white/70 font-mono">{scores.find(s => String(s.odId) === String(p.id))?.score || 0}점</span>
+                    <span className="text-white/70 font-mono">{displayScore}점</span>
                   </div>
-                ))}
+                )})}
               </div>
             </motion.div>
           )}
@@ -790,7 +831,7 @@ export default function LyricsQuizGame() {
        )}
       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 pointer-events-none"></div>
 
-      <div className="relative z-10 flex items-center justify-between h-auto sm:h-24 py-2 px-3 sm:px-8 border-b border-white/10">
+      <div className="relative z-10 flex items-start justify-between h-auto py-2 px-3 sm:px-8 border-b border-white/10 gap-3">
         <div className="flex items-center gap-3 sm:gap-6">
           <div className="flex flex-col">
             <span className="text-xs sm:text-sm font-bold text-white/60 uppercase tracking-widest">Question</span>
@@ -809,12 +850,54 @@ export default function LyricsQuizGame() {
           )}
         </div>
 
-        <div className="flex items-center gap-3 sm:gap-6">
-          <div className="flex flex-col items-end">
-             <span className="text-xs sm:text-sm font-bold text-white/60 uppercase tracking-widest">Score</span>
-             <span className="text-xl sm:text-2xl font-black text-white">{localScore.toLocaleString()}</span>
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex flex-col items-end">
+              <span className="text-xs sm:text-sm font-bold text-white/60 uppercase tracking-widest">Score</span>
+              <span className="text-xl sm:text-2xl font-black text-white">{localScore.toLocaleString()}</span>
+            </div>
+            <TimerCircle timeLeft={timeLeft} timeLimit={currentQuestion.timeLimit || 20} />
+            {onMicToggle && mediaStatus && (
+              <button
+                onClick={onMicToggle}
+                className={`p-2 rounded-full backdrop-blur-sm transition-all duration-200 ${
+                  mediaStatus.isMicOn
+                    ? "bg-black/30 hover:bg-black/50 text-white"
+                    : "bg-red-500/80 hover:bg-red-500 text-white"
+                }`}
+                title={mediaStatus.isMicOn ? "마이크 끄기" : "마이크 켜기"}
+              >
+                {mediaStatus.isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+              </button>
+            )}
+            {onCameraToggle && mediaStatus && (
+              <button
+                onClick={onCameraToggle}
+                className={`p-2 rounded-full backdrop-blur-sm transition-all duration-200 ${
+                  mediaStatus.isCameraOn
+                    ? "bg-black/30 hover:bg-black/50 text-white"
+                    : "bg-red-500/80 hover:bg-red-500 text-white"
+                }`}
+                title={mediaStatus.isCameraOn ? "카메라 끄기" : "카메라 켜기"}
+              >
+                {mediaStatus.isCameraOn ? <Video className="w-4 h-4" /> : <CameraOff className="w-4 h-4" />}
+              </button>
+            )}
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="p-2 rounded-full bg-black/30 backdrop-blur-sm text-white/70 hover:text-white hover:bg-black/50 transition-all"
+                title="대기실로 돌아가기"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            )}
           </div>
-          <TimerCircle timeLeft={timeLeft} timeLimit={currentQuestion.timeLimit || 20} />
+          {cameraElement && (
+            <div className="self-end rounded-lg overflow-hidden border border-white/15 bg-black/20 shadow-lg">
+              {cameraElement}
+            </div>
+          )}
         </div>
       </div>
 

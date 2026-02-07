@@ -67,12 +67,15 @@ export default function RoomPage() {
   const dispatch = useDispatch();
   const code = params.code as string;
   
+  const [userName, setUserName] = useState<string>("Guest");
+  const [visitorId, setVisitorId] = useState<string>("");
+  const [nicknameReady, setNicknameReady] = useState(false);
+  const [showNicknameModal, setShowNicknameModal] = useState(false);
+  const [nicknameInput, setNicknameInput] = useState("");
+
   const { status: gameStatus, currentSong, songQueue, currentTime } = useSelector((state: RootState) => state.game);
   const { participants } = useSelector((state: RootState) => state.room);
-  const { emitEvent } = useSocket(code);
-  
-   const [userName, setUserName] = useState<string>("Guest");
-   const [visitorId, setVisitorId] = useState<string>("");
+  const { emitEvent } = useSocket(nicknameReady ? code : null);
    
     const [bgVideoId, setBgVideoId] = useState<string | null>(null);
     const [bgVideoLoaded, setBgVideoLoaded] = useState(false);
@@ -158,10 +161,21 @@ export default function RoomPage() {
 
   useEffect(() => {
     const user = localStorage.getItem("user");
+    let profileName = "Guest";
     if (user) {
       const userData = JSON.parse(user);
-      setUserName(userData.name || "Guest");
+      profileName = userData.name || "Guest";
       setVisitorId(userData.id || "");
+    }
+
+    const savedNickname = sessionStorage.getItem("roomNickname");
+    if (savedNickname) {
+      setUserName(savedNickname);
+      setNicknameReady(true);
+    } else {
+      setNicknameInput(profileName);
+      setUserName(profileName);
+      setShowNicknameModal(true);
     }
   }, []);
 
@@ -511,6 +525,44 @@ export default function RoomPage() {
     setMediaStatus(prev => ({ ...prev, isMicOn: !prev.isMicOn }));
   };
 
+  const confirmNickname = () => {
+    const name = nicknameInput.trim() || "Guest";
+    sessionStorage.setItem("roomNickname", name);
+    setUserName(name);
+    setNicknameReady(true);
+    setShowNicknameModal(false);
+  };
+
+  if (showNicknameModal) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center p-4">
+        <div className="w-full max-w-sm bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl ring-1 ring-white/5 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center mx-auto mb-6">
+            <Users className="w-8 h-8 text-white/70" />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">닉네임 설정</h2>
+          <p className="text-sm text-gray-400 mb-6">이 방에서 사용할 닉네임을 입력하세요</p>
+          <input
+            type="text"
+            value={nicknameInput}
+            onChange={(e) => setNicknameInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") confirmNickname(); }}
+            placeholder="닉네임"
+            autoFocus
+            className="w-full px-4 py-3 mb-4 bg-white/5 border border-white/10 rounded-xl text-white text-center text-lg font-medium focus:outline-none focus:border-white/30 focus:bg-white/10 transition-colors placeholder:text-gray-500"
+          />
+          <button
+            onClick={confirmNickname}
+            disabled={!nicknameInput.trim()}
+            className="w-full py-3 rounded-xl font-bold text-black bg-white hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg"
+          >
+            입장
+          </button>
+        </div>
+      </div>
+    );
+  }
+
     const startQuiz = async () => {
       dispatch(resetQuiz());
       setIsQuizLoading(true);
@@ -559,53 +611,28 @@ export default function RoomPage() {
   if (gameStatus === "playing" && room?.gameMode === "lyrics_quiz") {
     return (
       <div className="fixed inset-0 bg-black text-white">
-        <GameComponent />
-
-        <div className="absolute top-3 right-3 z-50 flex items-center gap-2">
-          <button
-            onClick={handleMicToggle}
-            className={`p-2 rounded-full backdrop-blur-sm transition-all duration-200 ${
-              mediaStatus.isMicOn
-                ? "bg-black/40 hover:bg-black/60 text-white"
-                : "bg-red-500/80 hover:bg-red-500 text-white"
-            }`}
-            title={mediaStatus.isMicOn ? "마이크 끄기" : "마이크 켜기"}
-          >
-            {mediaStatus.isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-          </button>
-          <button
-            onClick={handleCameraToggle}
-            className={`p-2 rounded-full backdrop-blur-sm transition-all duration-200 ${
-              mediaStatus.isCameraOn
-                ? "bg-black/40 hover:bg-black/60 text-white"
-                : "bg-red-500/80 hover:bg-red-500 text-white"
-            }`}
-            title={mediaStatus.isCameraOn ? "카메라 끄기" : "카메라 켜기"}
-          >
-            {mediaStatus.isCameraOn ? <Video className="w-4 h-4" /> : <CameraOff className="w-4 h-4" />}
-          </button>
-          <button
-            onClick={() => {
-              dispatch(setGameStatus("waiting"));
-              dispatch(setCurrentSong(null));
-            }}
-            className="p-2 rounded-full bg-black/40 backdrop-blur-sm text-white/60 hover:text-white hover:bg-black/60 transition-all"
-            title="대기실로 돌아가기"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="absolute bottom-4 right-4 z-30 w-36 rounded-xl border border-white/20 overflow-hidden opacity-80 hover:opacity-100 transition-opacity">
-          <VideoRoom
-            roomCode={code}
-            participantName={userName}
-            participantId={visitorId}
-            hideControls={true}
-            layout="column"
-            onStatusChange={setMediaStatus}
-          />
-        </div>
+        <GameComponent
+          onBack={() => {
+            dispatch(setGameStatus("waiting"));
+            dispatch(setCurrentSong(null));
+          }}
+          onMicToggle={handleMicToggle}
+          onCameraToggle={handleCameraToggle}
+          mediaStatus={mediaStatus}
+          quizCount={quizCount}
+          cameraElement={
+            <div className="w-32 rounded-lg border border-white/20 overflow-hidden bg-black/20">
+              <VideoRoom
+                roomCode={code}
+                participantName={userName}
+                participantId={visitorId}
+                hideControls={true}
+                layout="column"
+                onStatusChange={setMediaStatus}
+              />
+            </div>
+          }
+        />
       </div>
     );
   }

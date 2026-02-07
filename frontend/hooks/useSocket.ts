@@ -41,7 +41,7 @@ export function useSocket(roomCode: string | null) {
         try {
           const user = JSON.parse(userStr);
           userId = user.id;
-          nickname = user.name;
+          nickname = sessionStorage.getItem("roomNickname") || user.name;
         } catch {}
       }
       
@@ -73,6 +73,7 @@ export function useSocket(roomCode: string | null) {
     socket.on("error", (data: { message: string }) => {
       console.error("[Socket Error]", data.message);
       alert(data.message);
+      window.location.href = "/lobby";
     });
 
     socket.on("game:started", (data) => {
