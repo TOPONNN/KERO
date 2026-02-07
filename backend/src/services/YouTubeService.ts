@@ -277,6 +277,38 @@ export class YouTubeService {
     return this.withTimeout(promise, 30000, "Audio duration probe timed out after 30 seconds").catch(() => 0);
   }
 
+  async getAudioStreamUrl(videoId: string): Promise<string | null> {
+    const cookiesArgs = await this.getCookiesArgs();
+    const promise = new Promise<string | null>((resolve) => {
+      const args = [
+        ...cookiesArgs,
+        `https://www.youtube.com/watch?v=${videoId}`,
+        "-f", "bestaudio",
+        "-g",
+        "--no-playlist",
+        "--no-warnings",
+      ];
+
+      const proc = spawn("yt-dlp", args);
+      let output = "";
+      let error = "";
+
+      proc.stdout.on("data", (data: Buffer) => { output += data.toString(); });
+      proc.stderr.on("data", (data: Buffer) => { error += data.toString(); });
+
+      proc.on("close", (code) => {
+        if (code !== 0 || !output.trim()) {
+          console.error("[yt-dlp] audio URL extraction failed:", error);
+          resolve(null);
+          return;
+        }
+        resolve(output.trim().split("\n")[0]);
+      });
+    });
+
+    return this.withTimeout(promise, 15000, "yt-dlp audio URL extraction timed out").catch(() => null);
+  }
+
   private formatDuration(seconds: number | null): string {
     if (!seconds) return "0:00";
     const mins = Math.floor(seconds / 60);
