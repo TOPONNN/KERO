@@ -54,13 +54,22 @@ function getRekt(el: HTMLElement) {
   return null;
 }
 
-const CURSOR_DIAMETER = 50;
+const CURSOR_DIAMETER = 26;
 
 export default function ElasticCursor() {
   const isMobile = useMediaQuery("(max-width: 768px)");
   const jellyRef = useRef<HTMLDivElement>(null);
   const [isHovering, setIsHovering] = useState(false);
+  const [hidden, setHidden] = useState(false);
   const { x, y } = useMouse();
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      setHidden((e as CustomEvent).detail.open);
+    };
+    window.addEventListener("radial-menu-toggle", handler);
+    return () => window.removeEventListener("radial-menu-toggle", handler);
+  }, []);
 
   const pos = useInstance(() => ({ x: 0, y: 0 }));
   const vel = useInstance(() => ({ x: 0, y: 0 }));
@@ -83,7 +92,7 @@ export default function ElasticCursor() {
     if (!isHovering) {
       set.x(pos.x);
       set.y(pos.y);
-      set.width(50 + scale * 300);
+      set.width(CURSOR_DIAMETER + scale * 120);
       set.r(rotation);
       set.sx(1 + scale);
       set.sy(1 - scale * 2);
@@ -107,8 +116,8 @@ export default function ElasticCursor() {
         setIsHovering(true);
         gsap.to(jellyRef.current, { rotate: 0, duration: 0 });
         gsap.to(jellyRef.current, {
-          width: el.offsetWidth + 20,
-          height: el.offsetHeight + 20,
+          width: el.offsetWidth + 12,
+          height: el.offsetHeight + 12,
           x: rect.left + rect.width / 2,
           y: rect.top + rect.height / 2,
           borderRadius: 10,
@@ -161,15 +170,17 @@ export default function ElasticCursor() {
         style={{
           zIndex: 10001,
           backdropFilter: "invert(100%)",
+          visibility: hidden ? "hidden" : "visible",
         }}
       />
       <div
-        className="w-3 h-3 rounded-full fixed translate-x-[-50%] translate-y-[-50%] pointer-events-none transition-none duration-300"
+        className="w-2 h-2 rounded-full fixed translate-x-[-50%] translate-y-[-50%] pointer-events-none transition-none duration-300"
         style={{
           top: y,
           left: x,
           zIndex: 10001,
           backdropFilter: "invert(100%)",
+          visibility: hidden ? "hidden" : "visible",
         }}
       />
     </>

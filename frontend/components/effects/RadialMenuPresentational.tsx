@@ -21,7 +21,7 @@ export default function RadialMenuPresentational({
   activeIndex,
   activeTab,
 }: RadialMenuPresentationalProps) {
-  const radius = 100;
+  const radius = 140;
   const centerIcon = activeTab === "emoji" ? "😀" : "🔊";
 
   return (

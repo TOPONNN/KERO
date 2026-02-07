@@ -175,6 +175,10 @@ export default function RadialMenu() {
   }, [handleMouseDown, handleMouseMove, handleMouseUp, handleContextMenu]);
 
   useEffect(() => {
+    window.dispatchEvent(new CustomEvent("radial-menu-toggle", { detail: { open: isOpen } }));
+  }, [isOpen]);
+
+  useEffect(() => {
     if (!isOpen) {
       return;
     }
