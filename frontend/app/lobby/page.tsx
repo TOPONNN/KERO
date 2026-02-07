@@ -59,6 +59,7 @@ function LobbyContent() {
   const [maxParticipants, setMaxParticipants] = useState(6);
   const [isPrivate, setIsPrivate] = useState(false);
   const [joinCode, setJoinCode] = useState("");
+  const [deleteTargetCode, setDeleteTargetCode] = useState<string | null>(null);
 
   useEffect(() => {
     if (mode) setSelectedMode(mode);
@@ -189,13 +190,19 @@ function LobbyContent() {
     }
   };
 
-  const deleteRoom = async (e: React.MouseEvent, code: string) => {
+  const requestDeleteRoom = (e: React.MouseEvent, code: string) => {
     e.stopPropagation();
     if (!userId) {
       toast.error("로그인이 필요합니다.");
       return;
     }
-    if (!confirm("정말 이 방을 삭제하시겠습니까?")) return;
+    setDeleteTargetCode(code);
+  };
+
+  const confirmDeleteRoom = async () => {
+    if (!deleteTargetCode || !userId) return;
+    const code = deleteTargetCode;
+    setDeleteTargetCode(null);
 
     try {
       const res = await fetch(`/api/rooms/${code}?userId=${userId}`, {
@@ -418,7 +425,7 @@ function LobbyContent() {
                         <div className="flex items-center gap-2">
                           {room.hostId === userId && (
                             <button
-                              onClick={(e) => deleteRoom(e, room.code)}
+                              onClick={(e) => requestDeleteRoom(e, room.code)}
                               className="p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -598,6 +605,45 @@ function LobbyContent() {
                   ) : (
                     "입장하기"
                   )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+        {deleteTargetCode && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+            onClick={() => setDeleteTargetCode(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-sm mx-4 sm:mx-auto bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl ring-1 ring-white/5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
+                  <Trash2 className="w-5 h-5 text-red-400" />
+                </div>
+                <h3 className="text-lg font-bold text-white">방 삭제</h3>
+              </div>
+              <p className="text-sm text-gray-400 mb-6">정말 이 방을 삭제하시겠습니까?<br />삭제된 방은 복구할 수 없습니다.</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteTargetCode(null)}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-white bg-white/10 hover:bg-white/20 transition-colors"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={confirmDeleteRoom}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-white bg-red-500 hover:bg-red-600 transition-colors"
+                >
+                  삭제
                 </button>
               </div>
             </motion.div>

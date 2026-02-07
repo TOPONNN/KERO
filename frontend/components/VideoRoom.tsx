@@ -275,8 +275,9 @@ function VideoGrid({ layout = "grid" }: { layout?: "grid" | "row" | "column" }) 
         </div>
 
         {expandedTrack && (
-          <div className="absolute inset-0 z-[50] bg-black/70 backdrop-blur-sm flex items-center justify-center rounded-xl" style={{ animation: 'fadeIn 0.2s ease-out' }} onClick={() => setExpandedTrackSid(null)}>
-            <div className="relative w-[90%] h-[90%] max-w-[400px] max-h-[320px]" onClick={e => e.stopPropagation()}>
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ animation: 'fadeIn 0.2s ease-out' }} onClick={() => setExpandedTrackSid(null)}>
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+            <div className="relative w-[480px] h-[360px] max-w-[70vw] max-h-[50vh]" onClick={e => e.stopPropagation()}>
               <div className="relative w-full h-full bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/20">
                 <VideoTrack
                   trackRef={expandedTrack}
