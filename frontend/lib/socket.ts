@@ -23,6 +23,7 @@ export const connectSocket = (token: string): Socket => {
 
 export const disconnectSocket = (): void => {
   if (socket) {
+    socket.removeAllListeners();
     socket.disconnect();
   }
 };

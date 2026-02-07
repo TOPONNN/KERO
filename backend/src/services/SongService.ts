@@ -519,7 +519,7 @@ export class SongService {
           if (otherTitles.length < 5) continue;
           tjQuestions.push({
             type: "title_guess",
-            questionText: `이 노래의 제목은? (가수: ${cleanTitle(song.artist)})`,
+            questionText: `이 노래의 제목은?`,
             correctAnswer: cleanTitle(song.title),
             wrongAnswers: otherTitles,
             timeLimit: 60,

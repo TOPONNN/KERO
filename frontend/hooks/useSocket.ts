@@ -65,15 +65,21 @@ export function useSocket(roomCode: string | null) {
     });
 
     socket.on("room:closed", (data: { reason: string }) => {
-      dispatch(leaveRoomAction());
-      alert(data.reason);
-      window.location.href = "/lobby";
+      // Only redirect if we're still on this room's page (not navigated away)
+      if (window.location.pathname.includes(roomCode)) {
+        dispatch(leaveRoomAction());
+        alert(data.reason);
+        window.location.href = "/lobby";
+      }
     });
 
     socket.on("error", (data: { message: string }) => {
       console.error("[Socket Error]", data.message);
-      alert(data.message);
-      window.location.href = "/lobby";
+      // Only redirect if we're still on this room's page
+      if (window.location.pathname.includes(roomCode)) {
+        alert(data.message);
+        window.location.href = "/lobby";
+      }
     });
 
     socket.on("game:started", (data) => {

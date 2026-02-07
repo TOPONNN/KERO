@@ -818,8 +818,7 @@ export default function LyricsQuizGame({
   };
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-[#46178F] to-[#1D0939] p-3 font-sans">
-      {/* Hidden YouTube audio player for TJ songs */}
+    <div className="fixed inset-0 bg-gradient-to-br from-[#46178F] to-[#1D0939] font-sans flex">
        {youtubeVideoId && (
          <iframe
            key={youtubeVideoId}
@@ -831,26 +830,26 @@ export default function LyricsQuizGame({
        )}
       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 pointer-events-none"></div>
 
-      <div className="relative z-10 flex items-start justify-between h-auto py-2 px-3 sm:px-8 border-b border-white/10 gap-3">
-        <div className="flex items-center gap-3 sm:gap-6">
-          <div className="flex flex-col">
-            <span className="text-xs sm:text-sm font-bold text-white/60 uppercase tracking-widest">Question</span>
-            <span className="text-xl sm:text-3xl font-black text-white">{currentQuestionIndex + 1} <span className="text-sm sm:text-lg text-white/40">/ {quizQuestions.length}</span></span>
+      <div className="relative z-10 flex-1 flex flex-col p-3 min-w-0">
+        <div className="flex items-center justify-between py-2 px-1 sm:px-5 border-b border-white/10 gap-3 shrink-0">
+          <div className="flex items-center gap-3 sm:gap-6">
+            <div className="flex flex-col">
+              <span className="text-xs sm:text-sm font-bold text-white/60 uppercase tracking-widest">Question</span>
+              <span className="text-xl sm:text-3xl font-black text-white">{currentQuestionIndex + 1} <span className="text-sm sm:text-lg text-white/40">/ {quizQuestions.length}</span></span>
+            </div>
+            
+            {streak >= 2 && (
+              <motion.div 
+                initial={{ scale: 0 }} 
+                animate={{ scale: 1 }}
+                className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1 bg-[#FF6B6B] rounded-full shadow-[0_0_15px_rgba(255,107,107,0.5)]"
+              >
+                <span className="text-base sm:text-xl">🔥</span>
+                <span className="text-sm sm:text-base font-bold text-white">{streak} <span className="hidden sm:inline">연속 정답!</span></span>
+              </motion.div>
+            )}
           </div>
-          
-          {streak >= 2 && (
-            <motion.div 
-              initial={{ scale: 0 }} 
-              animate={{ scale: 1 }}
-              className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1 bg-[#FF6B6B] rounded-full shadow-[0_0_15px_rgba(255,107,107,0.5)]"
-            >
-              <span className="text-base sm:text-xl">🔥</span>
-              <span className="text-sm sm:text-base font-bold text-white">{streak} <span className="hidden sm:inline">연속 정답!</span></span>
-            </motion.div>
-          )}
-        </div>
 
-        <div className="flex flex-col items-end gap-2">
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="flex flex-col items-end">
               <span className="text-xs sm:text-sm font-bold text-white/60 uppercase tracking-widest">Score</span>
@@ -893,15 +892,9 @@ export default function LyricsQuizGame({
               </button>
             )}
           </div>
-          {cameraElement && (
-            <div className="self-end rounded-lg overflow-hidden border border-white/15 bg-black/20 shadow-lg">
-              {cameraElement}
-            </div>
-          )}
         </div>
-      </div>
 
-      <div className="relative z-10 flex flex-col h-[calc(100vh-6rem)] p-3 gap-4 sm:p-8 sm:gap-8">
+        <div className="flex flex-col flex-1 p-1 gap-4 sm:p-5 sm:gap-8 min-h-0">
         
         <div className="h-1/3 w-full bg-white rounded-2xl shadow-2xl flex flex-col items-center justify-center p-4 sm:p-8 text-center relative overflow-hidden group">
           <div className="absolute top-0 left-0 w-full h-2 bg-[#46178F]"></div>
@@ -936,10 +929,19 @@ export default function LyricsQuizGame({
           </h1>
         </div>
 
-        <div className="flex-1 w-full relative">
+        <div className="flex-1 w-full relative min-h-0">
            {renderQuestionContent()}
         </div>
       </div>
+      </div>
+
+      {cameraElement && (
+        <div className="relative z-10 w-36 shrink-0 flex flex-col gap-2 p-2">
+          <div className="rounded-xl overflow-hidden border border-white/15 bg-black/30 shadow-lg">
+            {cameraElement}
+          </div>
+        </div>
+      )}
 
       <AnimatePresence>
         {showResults && (
