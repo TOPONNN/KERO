@@ -361,6 +361,82 @@ class SOFAAligner:
         return chunks
 
     # ------------------------------------------------------------------
+    # Intro silence detection
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _detect_and_trim_intro(
+        waveform: "np.ndarray",
+        min_intro_sec: float = 8.0,
+        preroll_sec: float = 0.5,
+        sustained_frames: int = 10,
+    ) -> float:
+        """Detect leading non-vocal silence and return trim offset in seconds.
+
+        Only trims if the detected intro silence is at least *min_intro_sec*
+        long, to avoid false-positives on songs that start immediately.
+
+        Args:
+            waveform: Mono float32 audio at 44100 Hz.
+            min_intro_sec: Minimum intro duration to trigger trimming.
+            preroll_sec: Keep this much audio before the first vocal onset.
+            sustained_frames: Number of consecutive above-threshold frames
+                required to confirm vocal onset (avoids noise spikes).
+
+        Returns:
+            Time offset in seconds to trim from the beginning.
+            Returns 0.0 if no significant intro was detected.
+        """
+        import numpy as np
+
+        # Compute short-hop RMS energy
+        hop = 2048  # ~46ms at 44100 Hz
+        frame_sec = hop / _SOFA_SAMPLE_RATE
+        num_frames = len(waveform) // hop
+        if num_frames < sustained_frames * 2:
+            return 0.0
+
+        rms = np.array([
+            np.sqrt(np.mean(waveform[i * hop:(i + 1) * hop] ** 2))
+            for i in range(num_frames)
+        ])
+
+        # Adaptive threshold: 5% of the 95th-percentile RMS
+        # (robust to occasional loud frames in silence)
+        rms_sorted = np.sort(rms)
+        p95 = float(rms_sorted[int(0.95 * len(rms_sorted))])
+        threshold = p95 * 0.05
+
+        # Find first frame where RMS stays above threshold for sustained_frames
+        consecutive = 0
+        onset_frame = 0
+        for i in range(num_frames):
+            if rms[i] > threshold:
+                consecutive += 1
+                if consecutive >= sustained_frames:
+                    onset_frame = i - sustained_frames + 1
+                    break
+            else:
+                consecutive = 0
+
+        onset_sec = onset_frame * frame_sec
+
+        if onset_sec < min_intro_sec:
+            logger.info(
+                "Intro silence: %.1fs (below %.1fs threshold — no trim)",
+                onset_sec, min_intro_sec,
+            )
+            return 0.0
+
+        # Keep a small preroll to avoid clipping the first syllable
+        trim_sec = max(0.0, onset_sec - preroll_sec)
+        logger.info(
+            "Detected %.1fs intro silence, trimming to %.1fs",
+            onset_sec, trim_sec,
+        )
+        return trim_sec
+
+    # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
@@ -405,12 +481,35 @@ class SOFAAligner:
                 "Audio loaded: %.1fs, %d samples", duration_sec, len(waveform)
             )
 
-            # 2. Decide whether to chunk
+            # 2. Trim leading silence to prevent Viterbi from wasting
+            #    phoneme assignments on non-vocal intro sections
+            time_offset = self._detect_and_trim_intro(waveform)
+            if time_offset > 0:
+                trim_sample = int(time_offset * _SOFA_SAMPLE_RATE)
+                waveform = waveform[trim_sample:]
+                trimmed_sec = len(waveform) / _SOFA_SAMPLE_RATE
+                logger.info(
+                    "Trimmed %.1fs intro silence → %.1fs audio remaining",
+                    time_offset, trimmed_sec,
+                )
+                duration_sec = trimmed_sec
+
+            # 3. Decide whether to chunk
             if duration_sec <= _CHUNK_DURATION_SEC + _CHUNK_OVERLAP_SEC:
-                # Short enough to process in one go
-                return self._align_single(waveform, text)
+                words = self._align_single(waveform, text)
             else:
-                return self._align_chunked(waveform, text, duration_sec)
+                words = self._align_chunked(waveform, text, duration_sec)
+
+            # 4. Offset timestamps to account for trimmed intro
+            if time_offset > 0 and words:
+                for w in words:
+                    w["start_time"] = round(w["start_time"] + time_offset, 3)
+                    w["end_time"] = round(w["end_time"] + time_offset, 3)
+                logger.info(
+                    "Applied +%.2fs offset to %d words", time_offset, len(words)
+                )
+
+            return words
 
         except FileNotFoundError:
             logger.error("File not found during SOFA alignment", exc_info=True)
