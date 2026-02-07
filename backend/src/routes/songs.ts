@@ -125,7 +125,8 @@ router.post("/:id/processing-callback", async (req: Request, res: Response) => {
 router.get("/quiz/generate", async (req: Request, res: Response) => {
   try {
     const count = parseInt(req.query.count as string) || 10;
-    const questions = await songService.generateTJEnhancedQuiz(count);
+    const category = (req.query.category as string) || "KOR";
+    const questions = await songService.generateTJEnhancedQuiz(count, category);
     
     if (questions.length === 0) {
       return res.status(400).json({ success: false, message: "퀴즈에 사용할 수 있는 데이터가 없습니다." });

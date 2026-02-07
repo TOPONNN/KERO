@@ -116,6 +116,7 @@ export default function RoomPage() {
    const [mediaStatus, setMediaStatus] = useState({ isCameraOn: true, isMicOn: true });
    const [isQuizLoading, setIsQuizLoading] = useState(false);
    const [quizCount, setQuizCount] = useState(30);
+   const [quizCategory, setQuizCategory] = useState<"KOR" | "JPN" | "ENG">("KOR");
    const [volume, setVolume] = useState(1.0);
    const [isPlaying, setIsPlaying] = useState(false);
 
@@ -567,7 +568,7 @@ export default function RoomPage() {
       dispatch(resetQuiz());
       setIsQuizLoading(true);
       try {
-         const res = await fetch(`/api/songs/quiz/generate?count=${quizCount}`);
+         const res = await fetch(`/api/songs/quiz/generate?count=${quizCount}&category=${quizCategory}`);
         const data = await res.json();
         
         if (!data.success || !data.data?.questions) {
@@ -599,8 +600,7 @@ export default function RoomPage() {
         dispatch(setQuizQuestions(questions));
         dispatch(setGameStatus("playing"));
         
-        // 다른 플레이어에게도 브로드캐스트
-        emitEvent("quiz:broadcast-questions", { roomCode: code, questions });
+        emitEvent("quiz:broadcast-questions", { roomCode: code, questions, category: quizCategory });
       } catch (error) {
         console.error("퀴즈 시작 오류:", error);
       } finally {
@@ -620,6 +620,7 @@ export default function RoomPage() {
           onCameraToggle={handleCameraToggle}
           mediaStatus={mediaStatus}
           quizCount={quizCount}
+          quizCategory={quizCategory}
           cameraElement={
             <div className="w-32 rounded-lg border border-white/20 overflow-hidden bg-black/20">
               <VideoRoom
@@ -963,7 +964,30 @@ export default function RoomPage() {
             <h2 className="text-3xl font-bold mb-3">노래 퀴즈</h2>
             <p className="text-gray-400 mb-8">6가지 퀴즈 유형으로 노래 실력을 겨뤄보세요!</p>
 
-            {/* Quiz count selector */}
+            <div className="mb-6">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">카테고리</p>
+              <div className="flex gap-3 justify-center">
+                {([
+                  { key: "KOR" as const, label: "한국곡", emoji: "🇰🇷" },
+                  { key: "JPN" as const, label: "일본곡", emoji: "🇯🇵" },
+                  { key: "ENG" as const, label: "팝송", emoji: "🌍" },
+                ]).map(({ key, label, emoji }) => (
+                  <button
+                    key={key}
+                    onClick={() => isHost && setQuizCategory(key)}
+                    disabled={!isHost}
+                    className={`px-4 py-2.5 sm:px-5 sm:py-3 rounded-xl font-bold text-sm sm:text-base whitespace-nowrap transition-all border ${
+                      quizCategory === key
+                        ? "bg-[#FF6B6B]/20 border-[#FF6B6B]/60 text-[#FF6B6B] shadow-[0_0_15px_-5px_rgba(255,107,107,0.4)]"
+                        : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-gray-300"
+                    } ${!isHost ? "opacity-50 cursor-not-allowed" : ""}`}
+                  >
+                    {emoji} {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="mb-6">
               <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">문제 수</p>
               <div className="flex gap-3 justify-center">

@@ -56,6 +56,7 @@ interface LyricsQuizGameProps {
   };
   cameraElement?: ReactNode;
   quizCount?: number;
+  quizCategory?: "KOR" | "JPN" | "ENG";
 }
 
 export default function LyricsQuizGame({
@@ -65,6 +66,7 @@ export default function LyricsQuizGame({
   mediaStatus,
   cameraElement,
   quizCount,
+  quizCategory = "KOR",
 }: LyricsQuizGameProps) {
   const dispatch = useDispatch();
   const { 
@@ -422,7 +424,7 @@ export default function LyricsQuizGame({
       
       try {
         const count = quizQuestions.length || quizCount || 30;
-        const res = await fetch(`/api/songs/quiz/generate?count=${count}`);
+        const res = await fetch(`/api/songs/quiz/generate?count=${count}&category=${quizCategory}`);
         const data = await res.json();
         
         if (!data.success || !data.data?.questions) {
@@ -454,8 +456,7 @@ export default function LyricsQuizGame({
         dispatch(setQuizQuestions(questions));
         dispatch(setGameStatus("playing"));
         
-        // 다른 플레이어에게도 브로드캐스트
-        emitEvent("quiz:broadcast-questions", { roomCode: code, questions });
+        emitEvent("quiz:broadcast-questions", { roomCode: code, questions, category: quizCategory });
       } catch (error) {
         console.error("퀴즈 재시작 오류:", error);
       } finally {
