@@ -242,11 +242,24 @@ function VideoGrid({ layout = "grid" }: { layout?: "grid" | "row" | "column" }) 
         <div className={`flex ${isColumn ? 'flex-col w-full h-auto py-3' : 'flex-row h-full px-3'} items-center ${isColumn ? 'justify-center' : 'justify-start'} gap-3`} style={{ overflow: 'visible' }}>
           {cameraTracks.map((trackRef) => {
             const hasTrack = trackRef.publication?.track !== undefined;
+            const isExpanded = hasTrack && expandedTrackSid === trackRef.publication?.track?.sid;
             return (
               <div
                 key={trackRef.participant.sid}
-                onClick={() => hasTrack ? setExpandedTrackSid(trackRef.publication.track?.sid || null) : undefined}
-                className={`relative ${isColumn ? 'w-44 h-36 md:w-48 md:h-40' : 'h-36 w-44 md:h-40 md:w-48'} bg-zinc-900/80 rounded-xl overflow-hidden border border-white/10 hover:border-white/30 shadow-xl shrink-0 ${hasTrack ? 'cursor-pointer' : ''} transition-all hover:scale-[1.03] active:scale-95 group backdrop-blur-sm`}
+                onClick={() => {
+                  if (!hasTrack) return;
+                  setExpandedTrackSid(isExpanded ? null : (trackRef.publication.track?.sid || null));
+                }}
+                className={`relative ${isColumn ? 'w-44 h-36 md:w-48 md:h-40' : 'h-36 w-44 md:h-40 md:w-48'} bg-zinc-900/80 rounded-xl overflow-hidden border shadow-xl shrink-0 ${hasTrack ? 'cursor-pointer' : ''} backdrop-blur-sm ${
+                  isExpanded 
+                    ? 'z-[100] border-white/40 shadow-[0_0_40px_rgba(0,0,0,0.8)] ring-2 ring-white/20' 
+                    : 'border-white/10 hover:border-white/30 hover:scale-[1.03] active:scale-95 group'
+                }`}
+                style={{
+                  transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease, border-color 0.2s ease',
+                  transform: isExpanded ? `scale(2) ${isColumn ? 'translateX(-35%)' : 'translateY(35%)'}` : 'scale(1)',
+                  transformOrigin: isColumn ? 'right center' : 'center bottom',
+                }}
               >
                 {hasTrack ? (
                   <VideoTrack
@@ -260,49 +273,29 @@ function VideoGrid({ layout = "grid" }: { layout?: "grid" | "row" | "column" }) 
                     </div>
                   </div>
                 )}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                  {hasTrack && <Maximize2 className="w-7 h-7 text-white drop-shadow-lg" />}
-                </div>
+                {!isExpanded && (
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                    {hasTrack && <Maximize2 className="w-7 h-7 text-white drop-shadow-lg" />}
+                  </div>
+                )}
                 <div className="absolute bottom-0 left-0 right-0 py-1.5 bg-gradient-to-t from-black/70 to-transparent text-[11px] font-bold text-white text-center truncate px-2">
                   {trackRef.participant.name || trackRef.participant.identity}
                 </div>
                 {trackRef.participant.isSpeaking && (
                   <div className="absolute inset-0 border-2 border-green-400 rounded-xl pointer-events-none shadow-[inset_0_0_12px_rgba(74,222,128,0.3)]" />
                 )}
+                {isExpanded && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setExpandedTrackSid(null); }}
+                    className="absolute top-1 right-1 p-1 rounded-full bg-black/60 hover:bg-white/20 text-white transition-colors backdrop-blur-md border border-white/10 z-10"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
               </div>
             );
           })}
         </div>
-
-        {expandedTrack && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-8" style={{ animation: 'fadeIn 0.2s ease-out' }} onClick={() => setExpandedTrackSid(null)}>
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-            <div className="relative w-full max-w-[560px] aspect-[4/3]" onClick={e => e.stopPropagation()}>
-              <div className="relative w-full h-full bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/20 ring-1 ring-white/10">
-                <VideoTrack
-                  trackRef={expandedTrack}
-                  className="w-full h-full object-cover"
-                />
-                
-                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent pt-12">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-3 h-3 rounded-full ${expandedTrack.participant.isSpeaking ? 'bg-green-500 shadow-[0_0_8px_rgba(74,222,128,0.8)]' : 'bg-white/20'}`} />
-                    <span className="text-lg font-bold text-white drop-shadow-md">
-                      {expandedTrack.participant.name || expandedTrack.participant.identity}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setExpandedTrackSid(null)}
-                  className="absolute top-3 right-3 p-2.5 rounded-full bg-black/50 hover:bg-white/20 text-white transition-colors backdrop-blur-md border border-white/10"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
