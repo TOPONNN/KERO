@@ -32,7 +32,9 @@ _SOFA_SAMPLE_RATE = 44100
 _SOFA_HOP_LENGTH = 512
 
 # Chunking parameters for long audio (memory management)
-_CHUNK_DURATION_SEC = 300  # 5 minutes per chunk
+# Most songs are under 7 minutes; single-pass alignment is far more accurate
+# than chunked alignment, so we set a generous threshold.
+_CHUNK_DURATION_SEC = 480  # 8 minutes per chunk
 _CHUNK_OVERLAP_SEC = 30    # 30s overlap between chunks
 
 
