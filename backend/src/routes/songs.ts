@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { Readable } from "node:stream";
 import multer from "multer";
 import { songService } from "../services/SongService";
 import { youtubeService } from "../services/YouTubeService";
@@ -153,30 +154,73 @@ router.post("/lyrics/pronunciation", async (req: Request, res: Response) => {
 });
 
 router.get("/audio-stream", async (req: Request, res: Response) => {
+  const videoId = String(req.query.videoId ?? "");
+  if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+    return res.status(400).json({ success: false, message: "유효한 videoId가 필요합니다." });
+  }
+
+  const cacheKey = `audio:url:${videoId}`;
+  const range = req.headers.range;
+  const abort = new AbortController();
+  req.on("close", () => abort.abort());
+
+  const resolveAudioUrl = async (forceRefresh: boolean) => {
+    if (!forceRefresh) {
+      const cached = await redis.get(cacheKey);
+      if (cached) return cached;
+    }
+    const url = await youtubeService.getAudioStreamUrl(videoId);
+    if (url) {
+      await redis.setex(cacheKey, 300, url);
+    }
+    return url;
+  };
+
+  const fetchAndPipe = async (forceRefresh: boolean): Promise<void> => {
+    const url = await resolveAudioUrl(forceRefresh);
+    if (!url) {
+      res.status(404).json({ success: false, message: "오디오 스트림을 가져올 수 없습니다." });
+      return;
+    }
+
+    const upstream = await fetch(url, {
+      method: "GET",
+      redirect: "follow",
+      signal: abort.signal,
+      headers: {
+        ...(range ? { range } : {}),
+        "user-agent": String(req.headers["user-agent"] ?? "Mozilla/5.0"),
+        accept: "*/*",
+      },
+    });
+
+    if ((upstream.status === 403 || upstream.status === 404) && !forceRefresh) {
+      return fetchAndPipe(true);
+    }
+
+    res.status(upstream.status);
+
+    const passHeaders = ["content-type", "content-length", "content-range", "accept-ranges", "etag", "last-modified"] as const;
+    for (const h of passHeaders) {
+      const v = upstream.headers.get(h);
+      if (v) res.setHeader(h, v);
+    }
+    res.setHeader("Accept-Ranges", "bytes");
+    res.setHeader("Cache-Control", "no-store");
+
+    if (!upstream.body) {
+      res.end();
+      return;
+    }
+
+    Readable.fromWeb(upstream.body as any).pipe(res);
+  };
+
   try {
-    const videoId = req.query.videoId as string;
-    if (!videoId || !/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
-      return res.status(400).json({ success: false, message: "유효한 videoId가 필요합니다." });
-    }
-
-    // Check Redis cache first (YouTube CDN URLs expire, so short TTL)
-    const cacheKey = `audio:url:${videoId}`;
-    const cached = await redis.get(cacheKey);
-    if (cached) {
-      return res.redirect(302, cached);
-    }
-
-    const audioUrl = await youtubeService.getAudioStreamUrl(videoId);
-    if (!audioUrl) {
-      return res.status(404).json({ success: false, message: "오디오 스트림을 가져올 수 없습니다." });
-    }
-
-    // Cache for 1 hour (YouTube CDN URLs typically expire in ~6 hours)
-    await redis.setex(cacheKey, 3600, audioUrl);
-    res.redirect(302, audioUrl);
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    res.status(500).json({ success: false, message });
+    await fetchAndPipe(false);
+  } catch {
+    if (!res.headersSent) res.status(502);
+    res.end();
   }
 });
 

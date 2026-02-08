@@ -402,7 +402,7 @@ function LoginForm() {
             <input type="checkbox" className="rounded bg-white/5 border-white/10" />
             <span>로그인 유지</span>
           </label>
-          <button onClick={() => setShowPasswordRecovery(true)} className="text-[#C0C0C0] hover:text-white transition-colors">
+          <button type="button" onClick={() => setShowPasswordRecovery(true)} className="text-[#C0C0C0] hover:text-white transition-colors">
             비밀번호 찾기
           </button>
         </div>

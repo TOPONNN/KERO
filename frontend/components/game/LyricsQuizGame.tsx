@@ -105,7 +105,7 @@ export default function LyricsQuizGame({
    const [wrongCount, setWrongCount] = useState(0);
    const [maxStreakLocal, setMaxStreakLocal] = useState(0);
    const [localIdentity, setLocalIdentity] = useState<{ id: string; name: string }>({ id: "", name: "" });
-   const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null);
+   const [audioLoading, setAudioLoading] = useState(false);
 
    useEffect(() => {
      const userRaw = localStorage.getItem("user");
@@ -179,7 +179,7 @@ export default function LyricsQuizGame({
         audioRef.current.pause();
         audioRef.current = null;
       }
-      setYoutubeVideoId(null);
+      setAudioLoading(false);
       return;
     }
     
@@ -187,7 +187,7 @@ export default function LyricsQuizGame({
     const ytVideoId = currentQuestion.metadata?.youtubeVideoId;
     
     if (audioUrl) {
-      setYoutubeVideoId(null);
+      setAudioLoading(false);
       const audio = new Audio(audioUrl);
       audioRef.current = audio;
       const startTime = currentQuestion.metadata?.audioStartTime || 0;
@@ -199,24 +199,37 @@ export default function LyricsQuizGame({
         audio.pause();
         audio.src = '';
         audioRef.current = null;
-        setYoutubeVideoId(null);
       };
     } else if (ytVideoId) {
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
-      setYoutubeVideoId(ytVideoId);
+      setAudioLoading(true);
+      const audio = new Audio(`/api/songs/audio-stream?videoId=${ytVideoId}`);
+      audioRef.current = audio;
+      audio.volume = 0.5;
+      audio.addEventListener("canplay", () => {
+        setAudioLoading(false);
+        audio.play().catch(() => {});
+      });
+      audio.addEventListener("error", () => {
+        setAudioLoading(false);
+      });
+      audio.load();
       
       return () => {
-        setYoutubeVideoId(null);
+        audio.pause();
+        audio.src = '';
+        audioRef.current = null;
+        setAudioLoading(false);
       };
     } else {
+      setAudioLoading(false);
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
-      setYoutubeVideoId(null);
     }
   }, [currentQuestionIndex, currentQuestion]);
 
@@ -270,7 +283,7 @@ export default function LyricsQuizGame({
           audioRef.current.pause();
           audioRef.current = null;
         }
-        setYoutubeVideoId(null);
+        
         dispatch(nextQuestion());
         advanceTimeoutRef.current = null;
       }, advanceDelay);
@@ -287,7 +300,7 @@ export default function LyricsQuizGame({
      if (audioRef.current) {
         audioRef.current.pause();
       }
-      setYoutubeVideoId(null);
+      
       dispatch(selectAnswer(index));
      
      let answerValue: any = "";
@@ -328,7 +341,7 @@ export default function LyricsQuizGame({
      if (audioRef.current) {
         audioRef.current.pause();
       }
-      setYoutubeVideoId(null);
+      
       
       const correctOrder = currentQuestion.correctOrder || [0, 1, 2, 3];
      const isCorrect = JSON.stringify(ordering) === JSON.stringify(correctOrder);
@@ -359,7 +372,7 @@ export default function LyricsQuizGame({
      if (audioRef.current) {
         audioRef.current.pause();
       }
-      setYoutubeVideoId(null);
+      
 
       const normalize = (s: string) => s.replace(/\s*[\(（\[【].*?[\)）\]】]/g, '').replace(/[\(（\[【\)）\]】]/g, '').replace(/\s/g, '').toLowerCase();
      const isCorrect = normalize(textAnswer.trim()) === normalize(currentQuestion.correctAnswer || "");
@@ -461,7 +474,7 @@ export default function LyricsQuizGame({
        audioRef.current.pause();
        audioRef.current = null;
      }
-      setYoutubeVideoId(null);
+      
       dispatch(resetQuiz());
      if (onBack) {
        onBack();
@@ -906,25 +919,20 @@ export default function LyricsQuizGame({
                 </div>
               )}
 
-              {isAudioQuestion && youtubeVideoId ? (
-                <div className="absolute inset-0 rounded-2xl overflow-hidden">
-                  <iframe
-                    key={`${youtubeVideoId}-${currentQuestionIndex}`}
-                    src={`https://www.youtube-nocookie.com/embed/${youtubeVideoId}?autoplay=1&start=30&controls=0&showinfo=0&rel=0&modestbranding=1`}
-                    allow="autoplay; encrypted-media"
-                    className="w-full h-full"
-                    title="quiz-video"
-                  />
-                  <div className="absolute top-0 left-0 right-0 z-10 p-4 bg-gradient-to-b from-black/60 to-transparent">
-                    <span className="px-3 py-1 bg-black/50 rounded-full text-white text-xs sm:text-sm font-bold">
-                      {getQuestionHeader()}
-                    </span>
-                  </div>
-                </div>
-              ) : isAudioQuestion ? (
+              {isAudioQuestion ? (
                 <div className="flex flex-col items-center justify-center gap-3">
-                  <Music className="w-16 h-16 text-[#46178F]" />
-                  <span className="text-lg sm:text-xl font-bold text-gray-500">노래를 듣고 맞춰보세요</span>
+                  <div className="relative">
+                    <Music className={`w-16 h-16 text-[#46178F] ${audioLoading ? "animate-pulse" : ""}`} />
+                    {audioLoading && (
+                      <div className="absolute -bottom-1 -right-1 w-5 h-5 border-2 border-[#46178F] border-t-transparent rounded-full animate-spin" />
+                    )}
+                  </div>
+                  <span className="px-4 py-1 bg-gray-100 rounded-full text-gray-600 text-xs sm:text-sm font-bold">
+                    {getQuestionHeader()}
+                  </span>
+                  <span className="text-base sm:text-lg font-bold text-gray-400">
+                    {audioLoading ? "로딩 중..." : "노래를 듣고 맞춰보세요"}
+                  </span>
                 </div>
               ) : (
                 <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-gray-800 leading-tight max-w-5xl">
