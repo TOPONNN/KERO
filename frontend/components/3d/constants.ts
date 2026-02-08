@@ -53,7 +53,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     name: "js",
     label: "WebRTC",
     shortDescription: "실시간 P2P 미디어 스트리밍의 핵심 — 초저지연 음성/영상 통신",
-    color: "#333333",
+    color: "#2FBF71",
     icon: "/assets/keycap-icons-hd/webrtc.png",
   },
   [SkillNames.TS]: {
@@ -77,7 +77,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     name: "css",
     label: "Socket.io",
     shortDescription: "양방향 실시간 통신 — 방 관리, 이벤트 브로드캐스트 담당",
-    color: "#AAAAAA",
+    color: "#C9B8A8",
     icon: "/assets/keycap-icons-hd/socketdotio.png",
   },
   [SkillNames.REACT]: {
@@ -85,7 +85,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     name: "react",
     label: "React",
     shortDescription: "컴포넌트 기반 UI 라이브러리 — KERO의 모든 화면을 그리는 핵심",
-    color: "#23272F",
+    color: "#61DAFB",
     icon: "/assets/keycap-icons-hd/react.png",
   },
   [SkillNames.VUE]: {
@@ -101,7 +101,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     name: "nextjs",
     label: "Next.js",
     shortDescription: "App Router + SSR로 빌드한 프론트엔드 프레임워크",
-    color: "#FFFFFF",
+    color: "#555555",
     icon: "/assets/keycap-icons-hd/nextdotjs.png",
   },
   [SkillNames.TAILWIND]: {
@@ -109,7 +109,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     name: "tailwind",
     label: "Tailwind CSS",
     shortDescription: "유틸리티 클래스로 빠르게 스타일링 — 다크 테마 UI의 비밀",
-    color: "#06B6D4",
+    color: "#38BDF8",
     icon: "/assets/keycap-icons-hd/tailwindcss.png",
   },
   [SkillNames.NODEJS]: {
@@ -125,7 +125,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     name: "express",
     label: "Express.js",
     shortDescription: "RESTful API + 미들웨어로 설계한 백엔드 서버",
-    color: "#888888",
+    color: "#7B7B7B",
     icon: "/assets/keycap-icons-hd/express.png",
   },
   [SkillNames.POSTGRES]: {
@@ -133,7 +133,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     name: "postgres",
     label: "MySQL",
     shortDescription: "관계형 데이터베이스 — 유저, 곡, 점수 데이터를 안정적으로 저장",
-    color: "#00303F",
+    color: "#4479A1",
     icon: "/assets/keycap-icons-hd/mysql.png",
   },
   [SkillNames.MONGODB]: {
@@ -141,7 +141,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     name: "mongodb",
     label: "Redis",
     shortDescription: "초고속 인메모리 캐시 — 세션 관리와 실시간 데이터 처리",
-    color: "#FF4438",
+    color: "#B91C1C",
     icon: "/assets/keycap-icons-hd/redis.png",
   },
   [SkillNames.GIT]: {
@@ -149,7 +149,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     name: "git",
     label: "RabbitMQ",
     shortDescription: "메시지 큐 — AI 작업 요청을 안정적으로 전달하는 중간 다리",
-    color: "#E0234E",
+    color: "#F76D07",
     icon: "/assets/keycap-icons-hd/rabbitmq.png",
   },
   [SkillNames.GITHUB]: {
@@ -165,7 +165,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     name: "prettier",
     label: "Jenkins",
     shortDescription: "CI/CD 파이프라인 — git push 한 번으로 자동 빌드·배포",
-    color: "#D24939",
+    color: "#CC6633",
     icon: "/assets/keycap-icons-hd/jenkins.png",
   },
   [SkillNames.NPM]: {
@@ -173,7 +173,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     name: "npm",
     label: "Framer Motion",
     shortDescription: "부드러운 애니메이션 라이브러리 — 페이지 전환과 인터랙션 담당",
-    color: "#0055FF",
+    color: "#0044CC",
     icon: "/assets/keycap-icons-hd/framer.png",
   },
   [SkillNames.FIREBASE]: {
@@ -181,7 +181,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     name: "firebase",
     label: "Flask",
     shortDescription: "Python 경량 웹 프레임워크 — AI Worker 서버를 간결하게 구현",
-    color: "#3BABC3",
+    color: "#1D1D1D",
     icon: "/assets/keycap-icons-hd/flask.png",
   },
   [SkillNames.WORDPRESS]: {
@@ -197,7 +197,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     name: "linux",
     label: "Linux",
     shortDescription: "Ubuntu 서버 — 모든 서비스가 돌아가는 안정적인 운영 체제",
-    color: "#C6538C",
+    color: "#FCC624",
     icon: "/assets/keycap-icons-hd/linux.png",
   },
   [SkillNames.DOCKER]: {
@@ -205,7 +205,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     name: "docker",
     label: "Docker",
     shortDescription: "컨테이너화로 환경 통일 — 10개 서비스를 한 번에 배포",
-    color: "#2496ED",
+    color: "#0DB7ED",
     icon: "/assets/keycap-icons-hd/docker.png",
   },
   [SkillNames.NGINX]: {
@@ -216,14 +216,14 @@ export const SKILLS: Record<SkillNames, Skill> = {
     color: "#009639",
     icon: "/assets/keycap-icons-hd/nginx.png",
   },
-   [SkillNames.AWS]: {
-     id: 22,
-     name: "aws",
-     label: "AWS S3",
-     shortDescription: "클라우드 스토리지 — 음원, MR, 보컬 파일을 안전하게 저장",
-     color: "#569A31",
-     icon: "/assets/keycap-icons-hd/amazons3.png",
-   },
+  [SkillNames.AWS]: {
+    id: 22,
+    name: "aws",
+    label: "AWS S3",
+    shortDescription: "클라우드 스토리지 — 음원, MR, 보컬 파일을 안전하게 저장",
+    color: "#8BC34A",
+    icon: "/assets/keycap-icons-hd/amazons3.png",
+  },
   [SkillNames.GCP]: {
     id: 23,
     name: "gcp",
@@ -237,7 +237,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     name: "vim",
     label: "Mel-band Roformer",
     shortDescription: "최신 음원 분리 AI — 노래에서 보컬과 MR을 고품질로 분리",
-    color: "#0467DF",
+    color: "#0C7BDC",
     icon: "/assets/keycap-icons-hd/meta.png",
   },
   [SkillNames.VERCEL]: {
@@ -269,7 +269,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     name: "ec2____",
     label: "AWS EC2",
     shortDescription: "클라우드 컴퓨팅 — 메인 서버와 GPU 스팟 인스턴스 운영",
-    color: "#FF9900",
+    color: "#F7931E",
     icon: "/assets/keycap-icons-hd/ec2.png",
   },
   [SkillNames.TYPEORM]: {
@@ -277,7 +277,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     name: "typeorm",
     label: "TypeORM",
     shortDescription: "TypeScript ORM — 엔티티 기반 데이터베이스 스키마 관리",
-    color: "#FE0902",
+    color: "#D4A017",
     icon: "/assets/keycap-icons-hd/typeorm.png",
   },
   [SkillNames.YTDLP]: {
@@ -301,7 +301,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     name: "kuroshi",
     label: "Kuroshiro",
     shortDescription: "일본어 가사 변환 — 한국어 발음 표기와 아티스트명 번역",
-    color: "#DC2626",
+    color: "#E91E63",
     icon: "/assets/keycap-icons-hd/kuroshiro.png",
   },
   [SkillNames.SPLINE]: {
@@ -309,7 +309,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     name: "spline_",
     label: "Spline",
     shortDescription: "3D 웹 시각화 도구 — 인터랙티브 키보드 씬 렌더링",
-    color: "#7B61FF",
+    color: "#C74FEB",
     icon: "/assets/keycap-icons-hd/spline.png",
   },
 };
