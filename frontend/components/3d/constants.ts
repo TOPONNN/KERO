@@ -1,6 +1,7 @@
 // Spline 키캡 이름은 3D 모델에 고정되어 있으므로 변경 불가
 // label과 shortDescription만 KERO 기술스택에 맞게 매핑
 // 브랜드 컬러: SimpleIcons v16.7 공식 HEX 코드 기준
+// 이름 뒤 ___ 패딩은 Spline 바이너리 msgpack fixstr 호환을 위한 것 (7자 고정)
 export enum SkillNames {
   JS = "js",           // → WebRTC
   TS = "ts",           // → TypeScript
@@ -27,6 +28,14 @@ export enum SkillNames {
   GCP = "gcp",         // → ELK Stack
   VIM = "vim",         // → Mel-band Roformer
   VERCEL = "vercel",   // → FCPE
+  GSAP = "gsap___",
+  PYTORCH = "pytorch",
+  EC2 = "ec2____",
+  TYPEORM = "typeorm",
+  YTDLP = "yt_dlp_",
+  LENIS = "lenis__",
+  KUROSHIRO = "kuroshi",
+  SPLINE = "spline_",
 }
 
 export type Skill = {
@@ -239,62 +248,68 @@ export const SKILLS: Record<SkillNames, Skill> = {
     color: "#8B5CF6",
     icon: "/assets/keycap-icons-hd/fcpe.png",
   },
-};
-
-export type ExtraSkill = {
-  label: string;
-  shortDescription: string;
-  color: string;
-  icon: string;
-};
-
-export const EXTRA_SKILLS: ExtraSkill[] = [
-  {
+  [SkillNames.GSAP]: {
+    id: 26,
+    name: "gsap___",
     label: "GSAP",
     shortDescription: "고성능 애니메이션 엔진 — 스크롤 트리거와 3D 카메라 전환",
     color: "#88CE02",
     icon: "/assets/keycap-icons-hd/gsap.png",
   },
-  {
+  [SkillNames.PYTORCH]: {
+    id: 27,
+    name: "pytorch",
     label: "PyTorch",
     shortDescription: "GPU AI 프레임워크 — 음원 분리·음정 분석·정렬 모델의 핵심 런타임",
     color: "#EE4C2C",
     icon: "/assets/keycap-icons-hd/pytorch.png",
   },
-  {
+  [SkillNames.EC2]: {
+    id: 28,
+    name: "ec2____",
     label: "AWS EC2",
     shortDescription: "클라우드 컴퓨팅 — 메인 서버와 GPU 스팟 인스턴스 운영",
     color: "#FF9900",
     icon: "/assets/keycap-icons-hd/ec2.png",
   },
-  {
+  [SkillNames.TYPEORM]: {
+    id: 29,
+    name: "typeorm",
     label: "TypeORM",
     shortDescription: "TypeScript ORM — 엔티티 기반 데이터베이스 스키마 관리",
     color: "#FE0902",
     icon: "/assets/keycap-icons-hd/typeorm.png",
   },
-  {
+  [SkillNames.YTDLP]: {
+    id: 30,
+    name: "yt_dlp_",
     label: "yt-dlp",
     shortDescription: "YouTube 오디오 추출 — 노래 검색 결과를 실시간 스트리밍",
     color: "#FF0000",
     icon: "/assets/keycap-icons-hd/ytdlp.png",
   },
-  {
+  [SkillNames.LENIS]: {
+    id: 31,
+    name: "lenis__",
     label: "Lenis",
     shortDescription: "부드러운 스크롤 라이브러리 — 자연스러운 페이지 전환 경험",
     color: "#4ADE80",
     icon: "/assets/keycap-icons-hd/lenis.png",
   },
-  {
+  [SkillNames.KUROSHIRO]: {
+    id: 32,
+    name: "kuroshi",
     label: "Kuroshiro",
     shortDescription: "일본어 가사 변환 — 한국어 발음 표기와 아티스트명 번역",
     color: "#DC2626",
     icon: "/assets/keycap-icons-hd/kuroshiro.png",
   },
-  {
+  [SkillNames.SPLINE]: {
+    id: 33,
+    name: "spline_",
     label: "Spline",
     shortDescription: "3D 웹 시각화 도구 — 인터랙티브 키보드 씬 렌더링",
     color: "#7B61FF",
     icon: "/assets/keycap-icons-hd/spline.png",
   },
-];
+};
