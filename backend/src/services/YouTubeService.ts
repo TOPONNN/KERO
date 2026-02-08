@@ -315,7 +315,6 @@ export class YouTubeService {
     onError: (err: string) => void,
     abortSignal?: AbortSignal,
   ): Promise<void> {
-    // cookies force tv/safari player clients which lack audio-only formats
     const args = [
       "--no-mark-watched",
       `https://www.youtube.com/watch?v=${videoId}`,

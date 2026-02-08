@@ -906,8 +906,15 @@ export default function LyricsQuizGame({
           </div>
         </div>
 
-        <div className="flex flex-1 min-h-0 pt-4 sm:pt-6 gap-4 sm:gap-6">
-          <div className="flex min-h-0 flex-1 flex-col gap-4 sm:gap-6">
+        <div className="flex flex-1 min-h-0 flex-col gap-4 sm:gap-6 pt-2">
+          {cameraElement && (
+            <div className="w-full h-[100px] sm:h-[140px] shrink-0 rounded-2xl overflow-hidden border border-white/20 bg-black/50 shadow-2xl">
+              <div className="h-full">{cameraElement}</div>
+            </div>
+          )}
+
+          <div className="flex min-h-0 flex-1 gap-4 sm:gap-6">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 sm:gap-6">
             <div className="w-full min-h-[170px] sm:min-h-[220px] bg-white rounded-2xl shadow-2xl flex flex-col items-center justify-center p-4 sm:p-8 text-center relative overflow-hidden group">
               <div className="absolute top-0 left-0 w-full h-2 bg-[#46178F]"></div>
 
@@ -959,15 +966,8 @@ export default function LyricsQuizGame({
             </div>
 
             <div className="flex-1 w-full relative min-h-0">{renderQuestionContent()}</div>
+            </div>
           </div>
-
-          {cameraElement && (
-            <aside className="hidden lg:flex w-[250px] xl:w-[280px] shrink-0">
-              <div className="w-full min-h-[300px] max-h-full rounded-2xl overflow-hidden border border-white/20 bg-black/50 shadow-2xl">
-                <div className="h-full min-h-[300px]">{cameraElement}</div>
-              </div>
-            </aside>
-          )}
         </div>
       </div>
 
@@ -978,7 +978,7 @@ export default function LyricsQuizGame({
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className={`fixed bottom-0 left-0 right-0 lg:right-[280px] h-auto py-6 sm:h-48 sm:py-0 z-40 flex items-center justify-center
+            className={`fixed bottom-0 left-0 right-0 h-auto py-6 sm:h-48 sm:py-0 z-40 flex items-center justify-center
               ${roundResults.find(r => r.odId === "local" || r.odName === "나")?.isCorrect ? "bg-[#26890C]" : "bg-[#E21B3C]"}
             `}
           >

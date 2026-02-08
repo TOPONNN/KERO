@@ -311,12 +311,10 @@ function VideoGrid({ layout = "grid" }: { layout?: "grid" | "row" | "column" }) 
     );
   }
 
-  const gridClass = cameraTracks.length === 1 ? "grid-cols-1" :
-                    cameraTracks.length === 2 ? "grid-cols-1" :
-                    "grid-cols-2";
+  const gridClass = "grid-flow-col auto-cols-fr";
 
   return (
-    <div className={`grid ${gridClass} gap-0.5 p-0.5 h-full`}>
+    <div className={`grid ${gridClass} gap-0.5 p-0.5 h-full w-full`}>
       {cameraTracks.map((trackRef) => {
         const hasTrack = trackRef.publication?.track !== undefined;
         return (
