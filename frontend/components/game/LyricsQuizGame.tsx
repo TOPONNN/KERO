@@ -3,45 +3,10 @@
 import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Users, Check, X, AlertCircle, Send, RotateCcw, ArrowLeft, Mic, MicOff, Video, CameraOff, Music, Loader2 } from "lucide-react";
+import { Trophy, Users, Check, X, AlertCircle, Send, RotateCcw, ArrowLeft, Mic, MicOff, Video, CameraOff, Music } from "lucide-react";
 import type { RootState } from "@/store";
 import { selectAnswer, nextQuestion, revealAnswer, setGameStatus, updateStreak, resetQuiz, setQuizQuestions } from "@/store/slices/gameSlice";
 import { useSocket } from "@/hooks/useSocket";
-
-declare global {
-  namespace YT {
-    interface PlayerOptions {
-      videoId?: string;
-      playerVars?: Record<string, number | string>;
-      events?: {
-        onReady?: (event: PlayerEvent) => void;
-        onError?: (event: PlayerEvent) => void;
-      };
-    }
-
-    interface PlayerEvent {
-      target: Player;
-      data?: number;
-    }
-
-    interface Player {
-      playVideo: () => void;
-      pauseVideo: () => void;
-      stopVideo: () => void;
-      destroy: () => void;
-      setVolume: (volume: number) => void;
-      seekTo: (seconds: number, allowSeekAhead?: boolean) => void;
-    }
-  }
-
-  interface Window {
-    YT?: {
-      Player: new (elementId: string | HTMLElement, options: YT.PlayerOptions) => YT.Player;
-    };
-    onYouTubeIframeAPIReady?: () => void;
-    __keroYouTubeIframeReadyPromise?: Promise<void>;
-  }
-}
 
 const KAHOOT_COLORS = [
   { bg: "#E21B3C", ring: "ring-[#E21B3C]", shape: "▲", name: "red" },
@@ -126,8 +91,6 @@ export default function LyricsQuizGame({
    const hasProcessedRevealRef = useRef(false);
    const streakRef = useRef(streak);
    const audioRef = useRef<HTMLAudioElement | null>(null);
-   const ytPlayerRef = useRef<YT.Player | null>(null);
-   const ytPlayerContainerIdRef = useRef(`kero-quiz-yt-player-${Math.random().toString(36).slice(2, 10)}`);
    const questionIndexRef = useRef(currentQuestionIndex);
    const advanceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
    const roundResultsRef = useRef(roundResults);
@@ -138,7 +101,7 @@ export default function LyricsQuizGame({
    
    const [ordering, setOrdering] = useState<number[]>([]);
    const [textAnswer, setTextAnswer] = useState("");
-   const [audioLoading, setAudioLoading] = useState(false);
+   const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null);
    const [correctCount, setCorrectCount] = useState(0);
    const [wrongCount, setWrongCount] = useState(0);
    const [maxStreakLocal, setMaxStreakLocal] = useState(0);
@@ -159,46 +122,6 @@ export default function LyricsQuizGame({
    }, []);
 
     const cleanDisplay = (s: string) => s?.replace(/\s*[\(（\[【].*?[\)）\]】]/g, '').replace(/[\(（\[【\)）\]】]/g, '').trim() || '';
-
-   const destroyYouTubePlayer = useCallback(() => {
-     if (!ytPlayerRef.current) return;
-     ytPlayerRef.current.destroy();
-     ytPlayerRef.current = null;
-   }, []);
-
-   const pauseCurrentPlayback = useCallback(() => {
-     if (audioRef.current) {
-       audioRef.current.pause();
-     }
-     if (ytPlayerRef.current) {
-       ytPlayerRef.current.pauseVideo();
-     }
-   }, []);
-
-   const ensureYouTubeIframeApi = useCallback(() => {
-     if (window.YT?.Player) {
-       return Promise.resolve();
-     }
-
-     if (!window.__keroYouTubeIframeReadyPromise) {
-       window.__keroYouTubeIframeReadyPromise = new Promise<void>((resolve) => {
-         const previousReady = window.onYouTubeIframeAPIReady;
-         window.onYouTubeIframeAPIReady = () => {
-           if (previousReady) previousReady();
-           resolve();
-         };
-
-         const hasScript = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
-         if (!hasScript) {
-           const tag = document.createElement("script");
-           tag.src = "https://www.youtube.com/iframe_api";
-           document.head.appendChild(tag);
-         }
-       });
-     }
-
-     return window.__keroYouTubeIframeReadyPromise;
-   }, []);
 
    const currentQuestion = quizQuestions[currentQuestionIndex];
 
@@ -251,17 +174,12 @@ export default function LyricsQuizGame({
   }, [currentQuestion, isAnswerRevealed, submitted, handleTimeUp]);
 
   useEffect(() => {
-    ensureYouTubeIframeApi().catch(() => {});
-  }, [ensureYouTubeIframeApi]);
-
-  useEffect(() => {
     if (!currentQuestion) {
-      setAudioLoading(false);
+      setYoutubeVideoId(null);
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
-      destroyYouTubePlayer();
       return;
     }
     
@@ -269,8 +187,7 @@ export default function LyricsQuizGame({
     const ytVideoId = currentQuestion.metadata?.youtubeVideoId;
     
     if (audioUrl) {
-      destroyYouTubePlayer();
-      setAudioLoading(false);
+      setYoutubeVideoId(null);
       const audio = new Audio(audioUrl);
       audioRef.current = audio;
       const startTime = currentQuestion.metadata?.audioStartTime || 0;
@@ -288,75 +205,19 @@ export default function LyricsQuizGame({
         audioRef.current.pause();
         audioRef.current = null;
       }
-      setAudioLoading(true);
-      const startTime = currentQuestion.metadata?.audioStartTime || 0;
-      let cancelled = false;
-
-      const createPlayer = () => {
-        if (cancelled || !window.YT?.Player) {
-          setAudioLoading(false);
-          return;
-        }
-
-        destroyYouTubePlayer();
-
-        ytPlayerRef.current = new window.YT.Player(ytPlayerContainerIdRef.current, {
-          videoId: ytVideoId,
-          playerVars: {
-            autoplay: 1,
-            controls: 0,
-            disablekb: 1,
-            fs: 0,
-            modestbranding: 1,
-            rel: 0,
-            playsinline: 1,
-            start: Math.floor(startTime),
-          },
-          events: {
-            onReady: (event) => {
-              if (cancelled) return;
-              event.target.setVolume(50);
-              if (startTime > 0) {
-                event.target.seekTo(startTime, true);
-              }
-              setAudioLoading(false);
-              event.target.playVideo();
-            },
-            onError: () => {
-              if (!cancelled) {
-                setAudioLoading(false);
-              }
-            },
-          },
-        });
-      };
-
-      ensureYouTubeIframeApi()
-        .then(() => {
-          if (!cancelled) {
-            createPlayer();
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setAudioLoading(false);
-          }
-        });
+      setYoutubeVideoId(ytVideoId);
       
       return () => {
-        cancelled = true;
-        destroyYouTubePlayer();
-        setAudioLoading(false);
+        setYoutubeVideoId(null);
       };
     } else {
-      setAudioLoading(false);
+      setYoutubeVideoId(null);
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
-      destroyYouTubePlayer();
     }
-  }, [currentQuestionIndex, currentQuestion, destroyYouTubePlayer, ensureYouTubeIframeApi]);
+  }, [currentQuestionIndex, currentQuestion]);
 
   useEffect(() => {
     streakRef.current = streak;
@@ -404,7 +265,10 @@ export default function LyricsQuizGame({
         // If socket already advanced us past this question, skip
         if (questionIndexRef.current !== capturedIndex) return;
         setShowResults(false);
-        pauseCurrentPlayback();
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+        setYoutubeVideoId(null);
         if (audioRef.current) {
           audioRef.current = null;
         }
@@ -416,12 +280,15 @@ export default function LyricsQuizGame({
     if (!isAnswerRevealed) {
       hasProcessedRevealRef.current = false;
     }
-  }, [isAnswerRevealed, currentQuestionIndex, dispatch, pauseCurrentPlayback]);
+  }, [isAnswerRevealed, currentQuestionIndex, dispatch]);
 
    const handleSelectAnswer = (index: number) => {
      if (submitted || isAnswerRevealed) return;
      setSubmitted(true);
-      pauseCurrentPlayback();
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      setYoutubeVideoId(null);
       dispatch(selectAnswer(index));
      
      let answerValue: any = "";
@@ -459,7 +326,10 @@ export default function LyricsQuizGame({
    const handleOrderSubmit = () => {
      if (submitted || isAnswerRevealed || ordering.length !== 4) return;
      setSubmitted(true);
-      pauseCurrentPlayback();
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      setYoutubeVideoId(null);
       
       const correctOrder = currentQuestion.correctOrder || [0, 1, 2, 3];
      const isCorrect = JSON.stringify(ordering) === JSON.stringify(correctOrder);
@@ -487,7 +357,10 @@ export default function LyricsQuizGame({
      e?.preventDefault();
      if (submitted || isAnswerRevealed || !textAnswer.trim()) return;
      setSubmitted(true);
-      pauseCurrentPlayback();
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      setYoutubeVideoId(null);
 
       const normalize = (s: string) => s.replace(/\s*[\(（\[【].*?[\)）\]】]/g, '').replace(/[\(（\[【\)）\]】]/g, '').replace(/\s/g, '').toLowerCase();
      const isCorrect = normalize(textAnswer.trim()) === normalize(currentQuestion.correctAnswer || "");
@@ -585,6 +458,16 @@ export default function LyricsQuizGame({
     };
 
    const goToWaitingRoom = () => {
+     if (audioRef.current) {
+       audioRef.current.pause();
+       audioRef.current = null;
+     }
+     setYoutubeVideoId(null);
+     dispatch(resetQuiz());
+     if (onBack) {
+       onBack();
+       return;
+     }
      dispatch(setGameStatus("waiting"));
    };
 
@@ -942,11 +825,15 @@ export default function LyricsQuizGame({
 
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-[#46178F] to-[#1D0939] font-sans flex flex-col">
-      <div
-        id={ytPlayerContainerIdRef.current}
-        className="absolute -left-[9999px] -top-[9999px] h-px w-px opacity-0 pointer-events-none"
-        aria-hidden="true"
-      />
+      {youtubeVideoId && (
+        <iframe
+          key={youtubeVideoId}
+          src={`https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&start=30&controls=0&showinfo=0&rel=0&modestbranding=1`}
+          allow="autoplay"
+          className="absolute w-1 h-1 opacity-0 pointer-events-none"
+          title="quiz-audio"
+        />
+      )}
       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 pointer-events-none"></div>
 
       <div className="relative z-10 flex-1 flex flex-col p-3 min-w-0 min-h-0">
@@ -978,61 +865,62 @@ export default function LyricsQuizGame({
           </div>
         </div>
 
-        <div className="flex flex-col flex-1 p-1 gap-4 sm:p-5 sm:gap-8 min-h-0">
-        
-        <div className="h-1/3 w-full bg-white rounded-2xl shadow-2xl flex flex-col items-center justify-center p-4 sm:p-8 text-center relative overflow-hidden group">
-          <div className="absolute top-0 left-0 w-full h-2 bg-[#46178F]"></div>
-          
-          {getQuestionHeader() && (
-            <div className="absolute top-4 left-0 w-full text-center z-10 pointer-events-none">
-               <span className="px-3 py-0.5 sm:px-4 sm:py-1 bg-gray-100 rounded-full text-gray-600 text-xs sm:text-sm font-bold uppercase tracking-wide">
-                 {getQuestionHeader()}
-               </span>
-            </div>
-          )}
+        <div className="flex flex-1 min-h-0 pt-4 sm:pt-6 gap-4 sm:gap-6">
+          <div className="flex min-h-0 flex-1 flex-col gap-4 sm:gap-6">
+            <div className="w-full min-h-[170px] sm:min-h-[220px] bg-white rounded-2xl shadow-2xl flex flex-col items-center justify-center p-4 sm:p-8 text-center relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-full h-2 bg-[#46178F]"></div>
 
-          {isAudioQuestion ? (
-            <div className="flex flex-col items-center justify-center gap-3">
-              {audioLoading ? (
-                <Loader2 className="w-16 h-16 text-[#46178F] animate-spin" />
-              ) : (
-                <Music className="w-16 h-16 text-[#46178F]" />
+              {getQuestionHeader() && (
+                <div className="absolute top-4 left-0 w-full text-center z-10 pointer-events-none">
+                  <span className="px-3 py-0.5 sm:px-4 sm:py-1 bg-gray-100 rounded-full text-gray-600 text-xs sm:text-sm font-bold uppercase tracking-wide">
+                    {getQuestionHeader()}
+                  </span>
+                </div>
               )}
-              <span className="text-lg sm:text-xl font-bold text-gray-500">
-                {audioLoading ? "로딩 중..." : "노래를 듣고 맞춰보세요"}
-              </span>
-            </div>
-          ) : (
-            <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-gray-800 leading-tight max-w-5xl">
-              {currentQuestion.type === "lyrics_fill" ? (
-               <span className="leading-normal">
-                 {currentQuestion.questionText.split("___").map((part, i, arr) => (
-                    <span key={i}>
-                      {part}
-                      {i < arr.length - 1 && (
-                        <span className="inline-block mx-2 px-6 py-1 rounded-lg bg-[#46178F]/10 text-[#46178F] border-b-4 border-[#46178F]/20 align-middle">
-                          ?
+
+              {isAudioQuestion ? (
+                <div className="flex flex-col items-center justify-center gap-3">
+                  <Music className="w-16 h-16 text-[#46178F]" />
+                  <span className="text-lg sm:text-xl font-bold text-gray-500">노래를 듣고 맞춰보세요</span>
+                </div>
+              ) : (
+                <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-gray-800 leading-tight max-w-5xl">
+                  {currentQuestion.type === "lyrics_fill" ? (
+                    <span className="leading-normal">
+                      {currentQuestion.questionText.split("___").map((part, i, arr) => (
+                        <span key={i}>
+                          {part}
+                          {i < arr.length - 1 && (
+                            <span className="inline-block mx-2 px-6 py-1 rounded-lg bg-[#46178F]/10 text-[#46178F] border-b-4 border-[#46178F]/20 align-middle">
+                              ?
+                            </span>
+                          )}
                         </span>
-                      )}
+                      ))}
                     </span>
-                 ))}
-               </span>
-              ) : currentQuestion.type === "initial_guess" ? (
-               <span className="text-gray-500 text-2xl">아래 초성에 해당하는 단어는?</span>
-              ) : (
-               currentQuestion.questionText
+                  ) : currentQuestion.type === "initial_guess" ? (
+                    <span className="text-gray-500 text-2xl">아래 초성에 해당하는 단어는?</span>
+                  ) : (
+                    currentQuestion.questionText
+                  )}
+                </h1>
               )}
-            </h1>
+            </div>
+
+            <div className="flex-1 w-full relative min-h-0">{renderQuestionContent()}</div>
+          </div>
+
+          {cameraElement && (
+            <aside className="hidden lg:flex w-[250px] xl:w-[280px] shrink-0">
+              <div className="w-full min-h-[300px] max-h-full rounded-2xl overflow-hidden border border-white/20 bg-black/50 shadow-2xl">
+                <div className="h-full min-h-[300px]">{cameraElement}</div>
+              </div>
+            </aside>
           )}
         </div>
-
-        <div className="flex-1 w-full relative min-h-0">
-           {renderQuestionContent()}
-        </div>
-      </div>
       </div>
 
-      <div className="relative z-10 shrink-0 h-20 bg-black/30 backdrop-blur-md border-t border-white/10 flex items-center px-4 gap-4">
+      <div className="relative z-10 shrink-0 h-20 bg-black/30 backdrop-blur-md border-t border-white/10 flex items-center px-4">
         <div className="flex items-center gap-2">
           {onBack && (
             <button
@@ -1070,11 +958,6 @@ export default function LyricsQuizGame({
             </button>
           )}
         </div>
-        {cameraElement && (
-          <div className="ml-auto h-16 aspect-video rounded-lg overflow-hidden border border-white/20 bg-black/40">
-            {cameraElement}
-          </div>
-        )}
       </div>
 
       <AnimatePresence>

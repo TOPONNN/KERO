@@ -81,9 +81,10 @@ export function useSocket(roomCode: string | null) {
     socket.on("room:closed", (data: { reason: string }) => {
       // Only redirect if we're still on this room's page (not navigated away)
       if (window.location.pathname.includes(roomCode)) {
+        const redirectUrl = getModeRedirectUrl();
         dispatch(leaveRoomAction());
         alert(data.reason);
-        window.location.href = getModeRedirectUrl();
+        window.location.href = redirectUrl;
       }
     });
 
@@ -91,9 +92,10 @@ export function useSocket(roomCode: string | null) {
       console.error("[Socket Error]", data.message);
       // Only redirect if we're still on this room's page
       if (window.location.pathname.includes(roomCode)) {
+        const redirectUrl = getModeRedirectUrl();
         dispatch(leaveRoomAction());
         alert(data.message);
-        window.location.href = getModeRedirectUrl();
+        window.location.href = redirectUrl;
       }
     });
 

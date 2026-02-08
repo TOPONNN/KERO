@@ -628,6 +628,7 @@ export default function RoomPage() {
       <div className="fixed inset-0 bg-black text-white">
         <GameComponent
           onBack={() => {
+            dispatch(resetQuiz());
             dispatch(setGameStatus("waiting"));
             dispatch(setCurrentSong(null));
           }}
