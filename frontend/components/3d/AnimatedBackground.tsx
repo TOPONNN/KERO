@@ -502,6 +502,13 @@ const AnimatedBackground = () => {
           onLoad={(app: Application) => {
             setSplineApp(app);
             bypassLoading();
+            // GPU 최적화: pixel ratio cap (고해상도 디스플레이에서 GPU 부하 감소)
+            try {
+              const renderer = (app as unknown as { _renderer?: { setPixelRatio: (r: number) => void } })._renderer;
+              if (renderer?.setPixelRatio) {
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+              }
+            } catch (_) { /* noop */ }
             setTimeout(() => {
               applyBrandColors(app);
             }, 1000);

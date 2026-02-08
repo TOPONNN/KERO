@@ -76,7 +76,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     name: "react",
     label: "React",
     shortDescription: "컴포넌트 기반 UI 라이브러리 — KERO의 모든 화면을 그리는 핵심",
-    color: "#61DAFB",
+    color: "#23272F",
     icon: "/assets/keycap-icons-hd/react.png",
   },
   [SkillNames.VUE]: {
@@ -124,7 +124,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     name: "postgres",
     label: "MySQL",
     shortDescription: "관계형 데이터베이스 — 유저, 곡, 점수 데이터를 안정적으로 저장",
-    color: "#4479A1",
+    color: "#00303F",
     icon: "/assets/keycap-icons-hd/mysql.png",
   },
   [SkillNames.MONGODB]: {
@@ -178,10 +178,10 @@ export const SKILLS: Record<SkillNames, Skill> = {
   [SkillNames.WORDPRESS]: {
     id: 18,
     name: "wordpress",
-    label: "WhisperX + SOFA",
-    shortDescription: "음성 인식 + 강제 정렬 — 가사 추출 후 음절 단위 싱크 생성",
+    label: "SOFA",
+    shortDescription: "강제 정렬 모델 — 음소 단위 가사 타이밍을 정밀하게 생성",
     color: "#412991",
-    icon: "/assets/keycap-icons-hd/openai.png",
+    icon: "/assets/keycap-icons-hd/sofa.png",
   },
   [SkillNames.LINUX]: {
     id: 19,
@@ -240,3 +240,61 @@ export const SKILLS: Record<SkillNames, Skill> = {
     icon: "/assets/keycap-icons-hd/fcpe.png",
   },
 };
+
+export type ExtraSkill = {
+  label: string;
+  shortDescription: string;
+  color: string;
+  icon: string;
+};
+
+export const EXTRA_SKILLS: ExtraSkill[] = [
+  {
+    label: "GSAP",
+    shortDescription: "고성능 애니메이션 엔진 — 스크롤 트리거와 3D 카메라 전환",
+    color: "#88CE02",
+    icon: "/assets/keycap-icons-hd/gsap.png",
+  },
+  {
+    label: "PyTorch",
+    shortDescription: "GPU AI 프레임워크 — 음원 분리·음정 분석·정렬 모델의 핵심 런타임",
+    color: "#EE4C2C",
+    icon: "/assets/keycap-icons-hd/pytorch.png",
+  },
+  {
+    label: "AWS EC2",
+    shortDescription: "클라우드 컴퓨팅 — 메인 서버와 GPU 스팟 인스턴스 운영",
+    color: "#FF9900",
+    icon: "/assets/keycap-icons-hd/ec2.png",
+  },
+  {
+    label: "TypeORM",
+    shortDescription: "TypeScript ORM — 엔티티 기반 데이터베이스 스키마 관리",
+    color: "#FE0902",
+    icon: "/assets/keycap-icons-hd/typeorm.png",
+  },
+  {
+    label: "yt-dlp",
+    shortDescription: "YouTube 오디오 추출 — 노래 검색 결과를 실시간 스트리밍",
+    color: "#FF0000",
+    icon: "/assets/keycap-icons-hd/ytdlp.png",
+  },
+  {
+    label: "Lenis",
+    shortDescription: "부드러운 스크롤 라이브러리 — 자연스러운 페이지 전환 경험",
+    color: "#4ADE80",
+    icon: "/assets/keycap-icons-hd/lenis.png",
+  },
+  {
+    label: "Kuroshiro",
+    shortDescription: "일본어 가사 변환 — 한국어 발음 표기와 아티스트명 번역",
+    color: "#DC2626",
+    icon: "/assets/keycap-icons-hd/kuroshiro.png",
+  },
+  {
+    label: "Spline",
+    shortDescription: "3D 웹 시각화 도구 — 인터랙티브 키보드 씬 렌더링",
+    color: "#7B61FF",
+    icon: "/assets/keycap-icons-hd/spline.png",
+  },
+];

@@ -1,6 +1,7 @@
 "use client";
 
 import RevealAnimation from "@/components/animations/RevealAnimation";
+import ExtraTechGrid from "./ExtraTechGrid";
 
 const SkillsSection = () => {
   return (
@@ -19,6 +20,9 @@ const SkillsSection = () => {
               (hint: press a key)
             </p>
          </RevealAnimation>
+       </div>
+       <div className="sticky bottom-0 left-0 right-0 pointer-events-auto pb-4 md:pb-8 px-4 md:px-8">
+         <ExtraTechGrid />
        </div>
     </section>
   );
