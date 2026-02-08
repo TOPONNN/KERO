@@ -494,6 +494,23 @@ const AnimatedBackground = () => {
     revealKeyboard();
   }, [splineApp, keyboardRevealed, isMobile, isLoading]);
 
+  useEffect(() => {
+    const handleExtraSkillHover = (e: CustomEvent) => {
+      if (e.detail) {
+        playPressSound();
+        setSelectedSkill(e.detail);
+      } else {
+        playReleaseSound();
+        setSelectedSkill(null);
+      }
+    };
+
+    window.addEventListener('extra-skill-hover', handleExtraSkillHover as EventListener);
+    return () => {
+      window.removeEventListener('extra-skill-hover', handleExtraSkillHover as EventListener);
+    };
+  }, [playPressSound, playReleaseSound]);
+
   return (
     <>
       <Suspense fallback={<div>Loading...</div>}>
