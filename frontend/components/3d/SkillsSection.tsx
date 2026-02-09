@@ -8,7 +8,7 @@ const SkillsSection = () => {
       id="skills"
       className="relative w-full h-screen pointer-events-none"
     >
-       <div className="sticky top-[70px] z-10">
+       <div className="sticky top-[70px]">
          <RevealAnimation>
             <h2 className="font-display text-4xl text-center md:text-7xl font-bold text-white">
               Tech Stack

@@ -500,7 +500,7 @@ const AnimatedBackground = () => {
     <>
       <Suspense fallback={<div>Loading...</div>}>
         <Spline
-          className="w-full h-full fixed inset-0 z-0"
+          className="w-full h-full fixed"
           onLoad={(app: Application) => {
             setSplineApp(app);
             bypassLoading();

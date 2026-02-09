@@ -26,12 +26,12 @@ export default function Home() {
         </div>
         <AnimatedBackground />
         <Preloader />
-        <main className="relative min-h-screen text-white selection:bg-[#C0C0C0] selection:text-black canvas-overlay-mode">
+        <main className="min-h-screen text-white selection:bg-[#C0C0C0] selection:text-black canvas-overlay-mode">
           <Header />
           <section id="hero">
             <HeroSection />
           </section>
-           <section id="team" className="relative h-screen flex items-end pb-[8vh]">
+           <section id="team" className="relative h-screen flex items-end pb-[4vh]">
              <div className="w-full">
                <TeamMarquee />
              </div>
