@@ -117,7 +117,13 @@ const AnimatedBackground = () => {
      if (!splineApp || selectedSkillRef.current?.name === e.target.name) return;
 
      if (e.target.name === "body" || e.target.name === "platform") {
-       if (selectedSkillRef.current) playReleaseSound();
+       if (selectedSkillRef.current) {
+         const prevKeycap = splineApp.findObjectByName(selectedSkillRef.current.name);
+         if (prevKeycap) {
+           gsap.to(prevKeycap.position, { y: 0, duration: 0.3, ease: "elastic.out(1, 0.5)" });
+         }
+         playReleaseSound();
+       }
        setSelectedSkill(null);
        selectedSkillRef.current = null;
        if (splineApp.getVariable("heading") && splineApp.getVariable("desc")) {
@@ -128,7 +134,17 @@ const AnimatedBackground = () => {
        if (!selectedSkillRef.current || selectedSkillRef.current.name !== e.target.name) {
          const skill = SKILLS[e.target.name as SkillNames];
          if (skill) {
-           if (selectedSkillRef.current) playReleaseSound();
+           if (selectedSkillRef.current) {
+             const prevKeycap = splineApp.findObjectByName(selectedSkillRef.current.name);
+             if (prevKeycap) {
+               gsap.to(prevKeycap.position, { y: 0, duration: 0.2, ease: "power2.out" });
+             }
+             playReleaseSound();
+           }
+           const newKeycap = splineApp.findObjectByName(skill.name);
+           if (newKeycap) {
+             gsap.to(newKeycap.position, { y: -40, duration: 0.1, ease: "power2.in" });
+           }
            playPressSound();
            setSelectedSkill(skill);
            selectedSkillRef.current = skill;
@@ -154,6 +170,12 @@ const AnimatedBackground = () => {
 
      splineApp.addEventListener("keyUp", () => {
        if (!splineApp || isInputFocused()) return;
+       if (selectedSkillRef.current) {
+         const keycap = splineApp.findObjectByName(selectedSkillRef.current.name);
+         if (keycap) {
+           gsap.to(keycap.position, { y: 0, duration: 0.3, ease: "elastic.out(1, 0.5)" });
+         }
+       }
        playReleaseSound();
        splineApp.setVariable("heading", "");
        splineApp.setVariable("desc", "");
@@ -163,6 +185,10 @@ const AnimatedBackground = () => {
        if (!splineApp || isInputFocused()) return;
        const skill = SKILLS[e.target.name as SkillNames];
       if (skill) {
+        const keycap = splineApp.findObjectByName(skill.name);
+        if (keycap) {
+          gsap.to(keycap.position, { y: -40, duration: 0.1, ease: "power2.in" });
+        }
         playPressSound();
         setSelectedSkill(skill);
         selectedSkillRef.current = skill;
@@ -446,6 +472,12 @@ const AnimatedBackground = () => {
 
     const manageAnimations = async () => {
       if (activeSection !== "skills") {
+        if (selectedSkillRef.current) {
+          const keycap = splineApp.findObjectByName(selectedSkillRef.current.name);
+          if (keycap) {
+            gsap.to(keycap.position, { y: 0, duration: 0.3, ease: "elastic.out(1, 0.5)" });
+          }
+        }
         splineApp.setVariable("heading", "");
         splineApp.setVariable("desc", "");
         setSelectedSkill(null);
