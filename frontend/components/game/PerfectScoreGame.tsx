@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Mic, MicOff, Pause, Play, RotateCcw, SkipForward, Volume2, AlertCircle } from "lucide-react";
@@ -79,11 +79,11 @@ const getGrade = (scorePercent: number) => {
 };
 
 const JUDGMENT_SEGMENTS: { key: JudgmentLabel; label: string; color: string }[] = [
-  { key: "PERFECT", label: "PERFECT", color: "#10b981" },
-  { key: "GREAT", label: "GREAT", color: "#4ecdc4" },
-  { key: "GOOD", label: "GOOD", color: "#93c5fd" },
-  { key: "NORMAL", label: "NORMAL", color: "#f0c040" },
-  { key: "BAD", label: "BAD", color: "#f28b82" },
+  { key: "PERFECT", label: "PERFECT", color: "#22c55e" },
+  { key: "GREAT", label: "GREAT", color: "#06b6d4" },
+  { key: "GOOD", label: "GOOD", color: "#3b82f6" },
+  { key: "NORMAL", label: "NORMAL", color: "#eab308" },
+  { key: "BAD", label: "BAD", color: "#ef4444" },
 ];
 
 const RADAR_LABELS = ["음정", "박자", "바이브레이션", "표현력", "안정도"];
@@ -99,7 +99,12 @@ const midiToNoteLabel = (midi: number) => {
   return `${note}${octave}`;
 };
 
-export default function PerfectScoreGame() {
+interface PerfectScoreGameProps {
+  onBackAction?: () => void;
+  cameraElement?: ReactNode;
+}
+
+export default function PerfectScoreGame({ onBackAction, cameraElement }: PerfectScoreGameProps) {
   const dispatch = useDispatch();
   const { currentSong, status, songQueue, scores } = useSelector((state: RootState) => state.game);
   const { participants, code: roomCode } = useSelector((state: RootState) => state.room);
@@ -145,6 +150,7 @@ export default function PerfectScoreGame() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [snapIndicatorActive, setSnapIndicatorActive] = useState(false);
   const [snapNoteLabel, setSnapNoteLabel] = useState("");
+  const [currentJudgment, setCurrentJudgment] = useState<JudgmentLabel>("BAD");
   const [turnScores, setTurnScores] = useState<Record<string, number>>({});
 
   const lyrics: LyricsLine[] = currentSong?.lyrics || [];
@@ -152,6 +158,7 @@ export default function PerfectScoreGame() {
   const progress = duration ? (localTime / duration) * 100 : 0;
 
   const myNickname = useMemo(() => {
+    if (typeof window === "undefined") return "";
     const fromSession = sessionStorage.getItem("roomNickname");
     if (fromSession) return fromSession;
     const userString = localStorage.getItem("user");
@@ -595,6 +602,7 @@ export default function PerfectScoreGame() {
         : "BAD";
 
       lastJudgmentRef.current = judgment;
+      setCurrentJudgment(judgment);
       statsRef.current.scoredWords += 1;
       if (judgment === "PERFECT") statsRef.current.perfectCount += 1;
       if (judgment === "GREAT") statsRef.current.greatCount += 1;
@@ -1175,8 +1183,68 @@ export default function PerfectScoreGame() {
           </div>
         </div>
 
-        <div className="relative flex min-h-0 flex-1 gap-3">
-          <div className="relative flex min-h-0 flex-1 flex-col">
+        {/* Judgment Score Bar — TJ parallelogram style */}
+        <div className="mb-2 flex h-7 w-full items-center gap-[2px]" data-testid="perfect-judgment-bar">
+          {JUDGMENT_SEGMENTS.map((seg) => {
+            const isActive = currentJudgment === seg.key;
+            return (
+              <div
+                key={seg.key}
+                className="flex h-full flex-1 items-center justify-center transition-all duration-200"
+                style={{
+                  transform: "skewX(-20deg)",
+                  backgroundColor: isActive ? seg.color : "rgba(0,0,0,0.6)",
+                  border: isActive ? `1px solid ${seg.color}` : "1px solid rgba(255,255,255,0.1)",
+                  boxShadow: isActive ? `0 0 12px ${seg.color}80` : "none",
+                }}
+              >
+                <span
+                  className={`text-[9px] font-bold uppercase tracking-wider transition-all sm:text-[10px] ${isActive ? "text-white" : "text-white/30"}`}
+                  style={{ transform: "skewX(20deg)" }}
+                >
+                  {seg.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="relative flex min-h-0 flex-1 flex-col gap-3 lg:flex-row" data-testid="perfect-layout-shell">
+          {/* Turn sidebar - moved to LEFT */}
+          <aside className={`${isSidebarCollapsed ? "w-12" : "w-[250px]"} order-first hidden h-full shrink-0 flex-col rounded-2xl border border-white/15 bg-white/[0.05] p-3 backdrop-blur-xl transition-all duration-300 lg:flex`} data-testid="perfect-turn-sidebar">
+            <button
+              className="mb-3 flex h-8 w-8 items-center justify-center self-end rounded-full border border-white/20 bg-white/10 text-white/75 hover:bg-white/20"
+              onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+            >
+              {isSidebarCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </button>
+
+            {!isSidebarCollapsed && (
+              <>
+                <p className="mb-2 text-[11px] uppercase tracking-[0.3em] text-white/55">Turn Order</p>
+                <div className="space-y-2">
+                  {participants.map((participant, index) => {
+                    const isActive = String(participant.id) === String(currentSingerId);
+                    const scoreValue = turnScores[String(participant.id)] ?? 0;
+                    return (
+                      <div key={String(participant.id)} className={`rounded-xl border px-3 py-2 ${isActive ? "border-[#f0c040]/55 bg-[#f0c040]/10" : "border-white/10 bg-white/[0.03]"}`}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-white/65">{index + 1}</span>
+                          <span className="text-sm font-medium text-white">{participant.nickname}</span>
+                        </div>
+                        <div className="mt-1 text-right text-xs text-white/55" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
+                          {scoreValue.toFixed(0)} pts
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </aside>
+
+          {/* Main content (canvas + lyrics) */}
+          <div className="relative flex min-h-0 flex-1 flex-col" data-testid="perfect-main-content">
             <div className="relative min-h-0 flex-1 overflow-hidden rounded-3xl border border-white/15 bg-white/[0.03] backdrop-blur-lg">
               <div ref={containerRef} className="h-full w-full">
                 <canvas ref={canvasRef} className="h-full w-full" />
@@ -1219,10 +1287,34 @@ export default function PerfectScoreGame() {
                   ))}
                 </AnimatePresence>
               </div>
+
+              {/* Add pitch band overlay inside the canvas container */}
+              <div className="pointer-events-none absolute inset-0 flex flex-col justify-between px-4 py-2" style={{ background: "linear-gradient(180deg, rgba(6,182,212,0.06) 0%, transparent 30%, transparent 70%, rgba(6,182,212,0.06) 100%)" }}>
+                <div className="h-px w-full bg-cyan-400/25" />
+                <div className="h-px w-full bg-cyan-400/15" />
+                <div className="h-px w-full bg-cyan-400/25" />
+                <div className="h-px w-full bg-cyan-400/15" />
+                <div className="h-px w-full bg-cyan-400/25" />
+              </div>
             </div>
 
+            {/* Back button */}
+            {onBackAction && (
+              <button
+                onClick={onBackAction}
+                className="absolute top-3 left-3 z-40 p-2 rounded-full bg-black/50 backdrop-blur-sm text-white/60 hover:text-white hover:bg-black/70 transition-all"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+            )}
+
             <div className="mt-3 rounded-2xl border border-white/15 bg-white/[0.04] px-4 py-4 text-center backdrop-blur-xl sm:px-6">
-              <div className="flex min-h-[56px] flex-wrap justify-center gap-x-[0.32em] text-3xl font-extrabold sm:text-4xl">
+              <div className="flex min-h-[56px] flex-wrap justify-center gap-x-[0.32em] text-3xl font-extrabold sm:text-4xl"
+                   style={{
+                     WebkitTextStroke: "4px #3b82f6",
+                     paintOrder: "stroke fill",
+                     textShadow: "4px 4px 0px rgba(0,0,0,0.5), 0 0 12px rgba(59,130,246,0.6), 0 0 24px rgba(59,130,246,0.3)",
+                   }}>
                 {currentLine ? (
                   currentLine.words && currentLine.words.length > 0 ? (
                     currentLine.words.map((word, idx) => {
@@ -1255,41 +1347,16 @@ export default function PerfectScoreGame() {
                 )}
               </div>
 
-              <p className="mt-2 min-h-[24px] text-lg font-semibold text-white/50 sm:text-xl">{nextLine?.text || "\u00A0"}</p>
+              <p className="mt-2 min-h-[24px] text-lg font-semibold sm:text-xl" style={{ color: "rgba(255,255,255,0.55)", WebkitTextStroke: "0.5px rgba(0,0,0,0.4)", paintOrder: "stroke fill" }}>{nextLine?.text || "\u00A0"}</p>
             </div>
           </div>
 
-          <aside className={`${isSidebarCollapsed ? "w-12" : "w-[250px]"} hidden h-full shrink-0 flex-col rounded-2xl border border-white/15 bg-white/[0.05] p-3 backdrop-blur-xl transition-all duration-300 lg:flex`}>
-            <button
-              className="mb-3 flex h-8 w-8 items-center justify-center self-end rounded-full border border-white/20 bg-white/10 text-white/75 hover:bg-white/20"
-              onClick={() => setIsSidebarCollapsed((prev) => !prev)}
-            >
-              {isSidebarCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            </button>
-
-            {!isSidebarCollapsed && (
-              <>
-                <p className="mb-2 text-[11px] uppercase tracking-[0.3em] text-white/55">Turn Order</p>
-                <div className="space-y-2">
-                  {participants.map((participant, index) => {
-                    const isActive = String(participant.id) === String(currentSingerId);
-                    const scoreValue = turnScores[String(participant.id)] ?? 0;
-                    return (
-                      <div key={String(participant.id)} className={`rounded-xl border px-3 py-2 ${isActive ? "border-[#f0c040]/55 bg-[#f0c040]/10" : "border-white/10 bg-white/[0.03]"}`}>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-white/65">{index + 1}</span>
-                          <span className="text-sm font-medium text-white">{participant.nickname}</span>
-                        </div>
-                        <div className="mt-1 text-right text-xs text-white/55" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
-                          {scoreValue.toFixed(0)} pts
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-          </aside>
+          {/* Camera aside - RIGHT side */}
+          {cameraElement && (
+            <aside className="h-[180px] w-full shrink-0 rounded-2xl overflow-hidden border border-white/15 bg-black/50 shadow-2xl sm:h-[200px] lg:h-full lg:w-[280px] xl:w-[320px]" data-testid="perfect-camera-panel">
+              <div className="h-full w-full">{cameraElement}</div>
+            </aside>
+          )}
         </div>
 
         <div className="pointer-events-none absolute inset-x-0 bottom-3 z-30 flex justify-center px-3 sm:px-6">
