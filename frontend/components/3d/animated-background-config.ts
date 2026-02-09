@@ -28,7 +28,7 @@ export const STATES = {
   skills: {
     desktop: {
       scale: { x: 0.15, y: 0.15, z: 0.15 },
-      position: { x: 420, y: -20, z: 0 },
+      position: { x: 600, y: -20, z: 0 },
       rotation: { x: 0, y: Math.PI / 12, z: 0 },
     },
     mobile: {
