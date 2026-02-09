@@ -27,6 +27,24 @@ pipeline {
             steps {
                 sh '''
                     cd /home/ubuntu/project
+
+                    # LiveKit requires LIVEKIT_KEYS ("key: secret")
+                    # Derive it from backend/.env without leaking to logs.
+                    set +x
+                    if [ -f backend/.env ]; then
+                        LK_API_KEY="$(grep -E '^LIVEKIT_API_KEY=' backend/.env | head -n 1 | cut -d= -f2-)"
+                        LK_API_SECRET="$(grep -E '^LIVEKIT_API_SECRET=' backend/.env | head -n 1 | cut -d= -f2-)"
+                        if [ -n "${LK_API_KEY}" ] && [ -n "${LK_API_SECRET}" ]; then
+                            export LIVEKIT_KEYS="${LK_API_KEY}: ${LK_API_SECRET}"
+                        fi
+                    fi
+                    set -x
+
+                    if [ -z "${LIVEKIT_KEYS}" ]; then
+                        echo "LIVEKIT_KEYS is not set. Ensure LIVEKIT_API_KEY and LIVEKIT_API_SECRET exist in backend/.env"
+                        exit 1
+                    fi
+
                     docker compose up -d --build frontend backend nginx
                 '''
             }
