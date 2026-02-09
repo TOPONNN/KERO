@@ -4,7 +4,7 @@ export const STATES = {
   hero: {
     desktop: {
       scale: { x: 0.14, y: 0.14, z: 0.14 },
-      position: { x: 650, y: -100, z: 0 },
+      position: { x: 500, y: -100, z: 0 },
       rotation: { x: 0, y: 0, z: 0 },
     },
     mobile: {
@@ -64,7 +64,7 @@ export const STATES = {
   cta: {
     desktop: {
       scale: { x: 0.14, y: 0.14, z: 0.14 },
-      position: { x: 700, y: -250, z: 0 },
+      position: { x: 500, y: -250, z: 0 },
       rotation: { x: 0, y: 0, z: 0 },
     },
     mobile: {
@@ -76,7 +76,7 @@ export const STATES = {
   faq: {
     desktop: {
       scale: { x: 0.10, y: 0.10, z: 0.10 },
-      position: { x: 700, y: -250, z: 0 },
+      position: { x: 500, y: -250, z: 0 },
       rotation: { x: 0, y: 0, z: 0 },
     },
     mobile: {
