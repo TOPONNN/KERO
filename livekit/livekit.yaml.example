@@ -9,10 +9,24 @@ rtc:
   tcp_port: 7881
   # Set to the server's public IP address
   node_ip: CHANGE_ME_SERVER_PUBLIC_IP
+  use_external_ip: true
 
-keys:
-  # Format: API_KEY: API_SECRET
-  CHANGE_ME_API_KEY: CHANGE_ME_API_SECRET
+# TURN fallback for restrictive networks (school/corporate)
+# If you enable TURN/TLS, open/mapping these ports in infra/firewall:
+# - 3478/udp (TURN UDP)
+# - 443/tcp (TURN TLS)
+# turn:
+#   enabled: true
+#   domain: turn.example.com
+#   udp_port: 3478
+#   tls_port: 443
+#   cert_file: /etc/letsencrypt/live/turn.example.com/fullchain.pem
+#   key_file: /etc/letsencrypt/live/turn.example.com/privkey.pem
+
+# API keys are provided via LIVEKIT_KEYS env var (recommended to avoid committing secrets)
+# Format must be exactly: "key: secret" (colon + space)
+# Example:
+#   LIVEKIT_KEYS=CHANGE_ME_API_KEY: CHANGE_ME_API_SECRET
 
 logging:
   level: info

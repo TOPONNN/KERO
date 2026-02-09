@@ -3,11 +3,15 @@ rtc:
   port_range_start: 7882
   port_range_end: 7892
   tcp_port: 7881
-  node_ip: 52.78.220.83
   use_external_ip: true
 
-keys:
-  APIkeroLiveKit: kero-livekit-secret-key-2026-kero-ooo-secure
+turn:
+  enabled: true
+  udp_port: 3478
+  tls_port: 443
+  domain: kero.ooo
+  cert_file: /etc/letsencrypt/live/kero.ooo/fullchain.pem
+  key_file: /etc/letsencrypt/live/kero.ooo/privkey.pem
 
 logging:
   level: info

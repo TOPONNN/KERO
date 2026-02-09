@@ -119,6 +119,7 @@ services:
     depends_on:
       - frontend
       - backend
+      - livekit
     networks:
       - kero-network
     logging:
@@ -132,12 +133,16 @@ services:
     image: livekit/livekit-server:latest
     restart: unless-stopped
     command: --config /etc/livekit.yaml
+    environment:
+      - LIVEKIT_KEYS
     ports:
       - "7880:7880"
       - "7881:7881"
+      - "3478:3478/udp"
       - "7882-7892:7882-7892/udp"
     volumes:
       - ./livekit/livekit.yaml:/etc/livekit.yaml:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     networks:
       - kero-network
     logging:
