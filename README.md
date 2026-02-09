@@ -146,7 +146,6 @@ flowchart LR
 | <img src="https://img.shields.io/badge/MelBand%20Roformer-7C3AED?style=flat-square" alt="MelBand Roformer"/> | Mel-Band Roformer | 보컬 분리 |
 | <img src="https://img.shields.io/badge/SOFA-4F46E5?style=flat-square" alt="SOFA"/> | SOFA | 가사 정렬 |
 | <img src="https://img.shields.io/badge/FCPE-DB2777?style=flat-square" alt="FCPE"/> | FCPE | 음정 추출 |
-| <img src="https://img.shields.io/badge/WhisperX%20%2F%20FasterWhisper-111827?style=flat-square" alt="WhisperX"/> | WhisperX / Faster-Whisper | 음성 인식 보조 |
 | <img src="https://img.shields.io/badge/yt--dlp-FF0000?style=flat-square" alt="yt-dlp"/> | yt-dlp | 음원 수집 파이프라인 보조 |
 
 ### Infra
