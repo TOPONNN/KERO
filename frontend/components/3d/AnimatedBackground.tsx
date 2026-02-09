@@ -511,25 +511,7 @@ const AnimatedBackground = () => {
               }
             } catch (_) { /* noop */ }
 
-            try {
-              const allObjects = app.getAllObjects();
-              const rows = allObjects.filter((o: SPEObject) =>
-                o.name.startsWith("row ")
-              );
-              const avgRowX =
-                rows.reduce((sum: number, r: SPEObject) => sum + r.position.x, 0) /
-                (rows.length || 1);
-              const shift = -avgRowX;
-              rows.forEach((r: SPEObject) => {
-                r.position.x += shift;
-              });
-              const body = allObjects.find((o: SPEObject) => o.name === "body");
-              if (body) body.position.x += shift;
-              const bongo = allObjects.find((o: SPEObject) => o.name === "bongo-cat");
-              if (bongo) bongo.position.x += shift;
-              const texts = allObjects.find((o: SPEObject) => o.name === "texts");
-              if (texts) texts.position.x += shift;
-            } catch (_) { /* noop */ }
+
           }}
           scene="/assets/skills-keyboard.spline"
         />
