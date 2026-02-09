@@ -27,10 +27,16 @@ export default function VideoRoom({ roomCode, participantName, participantId, hi
   const [error, setError] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(true);
 
+  // LiveKit SDK appends /rtc automatically — serverUrl must NOT include it.
   const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL
     || (typeof window !== "undefined"
-      ? `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/rtc`
+      ? `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`
       : "");
+
+  const forceRelay =
+    process.env.NEXT_PUBLIC_LIVEKIT_FORCE_RELAY === "1"
+    || process.env.NEXT_PUBLIC_LIVEKIT_FORCE_RELAY === "true"
+    || (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("relay") === "1");
 
   useEffect(() => {
     const getToken = async () => {
@@ -102,6 +108,7 @@ export default function VideoRoom({ roomCode, participantName, participantId, hi
       connect={true}
       video={true}
       audio={true}
+      connectOptions={forceRelay ? { rtcConfig: { iceTransportPolicy: "relay" } } : undefined}
       style={{ height: "100%", background: "transparent" }}
     >
       <RoomContent hideControls={hideControls} layout={layout} onStatusChange={onStatusChange} />
