@@ -3,85 +3,85 @@ export type Section = "hero" | "team" | "skills" | "architecture" | "features" |
 export const STATES = {
   hero: {
     desktop: {
-      scale: { x: 0.16, y: 0.16, z: 0.16 },
-      position: { x: 225, y: -100, z: 0 },
+      scale: { x: 0.14, y: 0.14, z: 0.14 },
+      position: { x: 475, y: -100, z: 0 },
       rotation: { x: 0, y: 0, z: 0 },
     },
     mobile: {
-      scale: { x: 0.24, y: 0.24, z: 0.24 },
-      position: { x: 0, y: -200, z: 0 },
+      scale: { x: 0.20, y: 0.20, z: 0.20 },
+      position: { x: 200, y: -200, z: 0 },
       rotation: { x: 0, y: 0, z: 0 },
     },
   },
   team: {
     desktop: {
-      scale: { x: 0.26, y: 0.26, z: 0.26 },
-      position: { x: 0, y: -40, z: 0 },
+      scale: { x: 0.22, y: 0.22, z: 0.22 },
+      position: { x: 420, y: -40, z: 0 },
       rotation: { x: 0, y: Math.PI / 12, z: 0 },
     },
     mobile: {
-      scale: { x: 0.26, y: 0.26, z: 0.26 },
-      position: { x: 0, y: -40, z: 0 },
+      scale: { x: 0.22, y: 0.22, z: 0.22 },
+      position: { x: 210, y: -40, z: 0 },
       rotation: { x: 0, y: Math.PI / 6, z: 0 },
     },
   },
   skills: {
     desktop: {
-      scale: { x: 0.15, y: 0.15, z: 0.15 },
-      position: { x: 400, y: 20, z: 0 },
+      scale: { x: 0.16, y: 0.16, z: 0.16 },
+      position: { x: 420, y: 20, z: 0 },
       rotation: { x: 0, y: Math.PI / 12, z: 0 },
     },
     mobile: {
-      scale: { x: 0.17, y: 0.17, z: 0.17 },
-      position: { x: 200, y: 10, z: 0 },
+      scale: { x: 0.18, y: 0.18, z: 0.18 },
+      position: { x: 210, y: 10, z: 0 },
       rotation: { x: 0, y: Math.PI / 6, z: 0 },
     },
   },
   architecture: {
     desktop: {
-      scale: { x: 0.15, y: 0.15, z: 0.15 },
-      position: { x: 400, y: -40, z: 0 },
+      scale: { x: 0.16, y: 0.16, z: 0.16 },
+      position: { x: 420, y: -40, z: 0 },
       rotation: { x: Math.PI / 12, y: -Math.PI / 4, z: 0 },
     },
     mobile: {
-      scale: { x: 0.17, y: 0.17, z: 0.17 },
-      position: { x: 200, y: -40, z: 0 },
+      scale: { x: 0.18, y: 0.18, z: 0.18 },
+      position: { x: 210, y: -40, z: 0 },
       rotation: { x: Math.PI / 6, y: -Math.PI / 6, z: 0 },
     },
   },
   features: {
     desktop: {
-      scale: { x: 0.15, y: 0.15, z: 0.15 },
-      position: { x: 400, y: -40, z: 0 },
+      scale: { x: 0.16, y: 0.16, z: 0.16 },
+      position: { x: 420, y: -40, z: 0 },
       rotation: { x: Math.PI, y: Math.PI / 3, z: Math.PI },
     },
     mobile: {
       scale: { x: 0.20, y: 0.20, z: 0.20 },
-      position: { x: 200, y: 150, z: 0 },
+      position: { x: 210, y: 150, z: 0 },
       rotation: { x: Math.PI, y: Math.PI / 3, z: Math.PI },
     },
   },
   cta: {
     desktop: {
-      scale: { x: 0.16, y: 0.16, z: 0.16 },
-      position: { x: 350, y: -250, z: 0 },
+      scale: { x: 0.14, y: 0.14, z: 0.14 },
+      position: { x: 550, y: -250, z: 0 },
       rotation: { x: 0, y: 0, z: 0 },
     },
     mobile: {
-      scale: { x: 0.20, y: 0.20, z: 0.20 },
-      position: { x: 0, y: 150, z: 0 },
+      scale: { x: 0.18, y: 0.18, z: 0.18 },
+      position: { x: 200, y: 150, z: 0 },
       rotation: { x: Math.PI, y: Math.PI / 3, z: Math.PI },
     },
   },
   faq: {
     desktop: {
-      scale: { x: 0.12, y: 0.12, z: 0.12 },
-      position: { x: 350, y: -250, z: 0 },
+      scale: { x: 0.10, y: 0.10, z: 0.10 },
+      position: { x: 550, y: -250, z: 0 },
       rotation: { x: 0, y: 0, z: 0 },
     },
     mobile: {
-      scale: { x: 0.16, y: 0.16, z: 0.16 },
-      position: { x: 0, y: 150, z: 0 },
+      scale: { x: 0.14, y: 0.14, z: 0.14 },
+      position: { x: 200, y: 150, z: 0 },
       rotation: { x: Math.PI, y: Math.PI / 3, z: Math.PI },
     },
   },
