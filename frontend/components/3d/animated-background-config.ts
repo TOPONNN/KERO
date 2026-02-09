@@ -27,37 +27,37 @@ export const STATES = {
   },
   skills: {
     desktop: {
-      scale: { x: 0.13, y: 0.13, z: 0.13 },
-      position: { x: 350, y: 20, z: 0 },
+      scale: { x: 0.15, y: 0.15, z: 0.15 },
+      position: { x: 400, y: 20, z: 0 },
       rotation: { x: 0, y: Math.PI / 12, z: 0 },
     },
     mobile: {
-      scale: { x: 0.15, y: 0.15, z: 0.15 },
-      position: { x: 175, y: 10, z: 0 },
+      scale: { x: 0.17, y: 0.17, z: 0.17 },
+      position: { x: 200, y: 10, z: 0 },
       rotation: { x: 0, y: Math.PI / 6, z: 0 },
     },
   },
   architecture: {
     desktop: {
-      scale: { x: 0.17, y: 0.17, z: 0.17 },
-      position: { x: 0, y: -40, z: 0 },
+      scale: { x: 0.15, y: 0.15, z: 0.15 },
+      position: { x: 400, y: -40, z: 0 },
       rotation: { x: Math.PI / 12, y: -Math.PI / 4, z: 0 },
     },
     mobile: {
-      scale: { x: 0.20, y: 0.20, z: 0.20 },
-      position: { x: 0, y: -40, z: 0 },
+      scale: { x: 0.17, y: 0.17, z: 0.17 },
+      position: { x: 200, y: -40, z: 0 },
       rotation: { x: Math.PI / 6, y: -Math.PI / 6, z: 0 },
     },
   },
   features: {
     desktop: {
-      scale: { x: 0.17, y: 0.17, z: 0.17 },
-      position: { x: 0, y: -40, z: 0 },
+      scale: { x: 0.15, y: 0.15, z: 0.15 },
+      position: { x: 400, y: -40, z: 0 },
       rotation: { x: Math.PI, y: Math.PI / 3, z: Math.PI },
     },
     mobile: {
-      scale: { x: 0.24, y: 0.24, z: 0.24 },
-      position: { x: 0, y: 150, z: 0 },
+      scale: { x: 0.20, y: 0.20, z: 0.20 },
+      position: { x: 200, y: 150, z: 0 },
       rotation: { x: Math.PI, y: Math.PI / 3, z: Math.PI },
     },
   },
