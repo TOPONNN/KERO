@@ -1427,21 +1427,7 @@ export default function PerfectScoreGame({ onBackAction, cameraElement }: Perfec
                 <canvas ref={canvasRef} className="h-full w-full" />
               </div>
 
-              {!isMyTurn && (
-                <div className="pointer-events-none absolute bottom-3 left-3 z-20">
-                  <div className="rounded-lg border border-white/15 bg-black/50 px-3 py-1.5 backdrop-blur-sm">
-                    <p className="text-[10px] font-medium text-white/70">
-                      <span className="uppercase tracking-[0.2em] text-white/50">Now: </span>
-                      {currentSingerNickname || "next singer"}
-                    </p>
-                  </div>
-                </div>
-              )}
-
               <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2">
-                <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.2em] ${isMyTurn ? "bg-[#10b981]/25 text-[#b8ffe0]" : "bg-white/10 text-white/70"}`}>
-                  {isMyTurn ? "Your turn" : "Spectating"}
-                </span>
                 {snapIndicatorActive && (
                   <span className="rounded-full bg-[#10b981]/25 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-[#b8ffe0]">
                     Snap {snapNoteLabel}

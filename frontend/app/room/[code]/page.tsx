@@ -112,6 +112,7 @@ export default function RoomPage() {
    const [error, setError] = useState("");
    const [copied, setCopied] = useState(false);
    const [showAddSong, setShowAddSong] = useState(false);
+  const [showQueueModal, setShowQueueModal] = useState(false);
    const [searching, setSearching] = useState(false);
    const [mediaStatus, setMediaStatus] = useState({ isCameraOn: true, isMicOn: true });
    const [isQuizLoading, setIsQuizLoading] = useState(false);
@@ -199,11 +200,14 @@ export default function RoomPage() {
   useEffect(() => {
     const handleSkipForward = () => skipToNext();
     const handleOpenAddSong = () => setShowAddSong(true);
+    const handleOpenQueue = () => setShowQueueModal(true);
     window.addEventListener("kero:skipForward", handleSkipForward);
     window.addEventListener("kero:openAddSong", handleOpenAddSong);
+    window.addEventListener("kero:openQueue", handleOpenQueue);
     return () => {
       window.removeEventListener("kero:skipForward", handleSkipForward);
       window.removeEventListener("kero:openAddSong", handleOpenAddSong);
+      window.removeEventListener("kero:openQueue", handleOpenQueue);
     };
   }, []);
 
@@ -710,6 +714,116 @@ export default function RoomPage() {
                       isLoading={searching}
                       accentColor={config.color}
                     />
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <AnimatePresence>
+            {showQueueModal && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+                onClick={() => setShowQueueModal(false)}
+              >
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  className="w-full max-w-2xl bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between p-4 border-b border-white/10">
+                    <div className="flex items-center gap-3">
+                      <ListMusic className="w-5 h-5" style={{ color: config.color }} />
+                      <h2 className="text-lg font-bold text-white">대기열</h2>
+                      <span className="text-xs text-white/60 bg-white/10 px-2 py-0.5 rounded-full">{songQueue.length}곡</span>
+                    </div>
+                    <button
+                      onClick={() => setShowQueueModal(false)}
+                      className="p-2 rounded-full hover:bg-white/10 transition-colors text-white"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <div className="p-4 max-h-[60vh] overflow-y-auto">
+                    {songQueue.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 text-center">
+                        <ListMusic className="w-12 h-12 text-white/20 mb-4" />
+                        <p className="text-sm text-white/40">대기열이 비었습니다</p>
+                        <button
+                          onClick={() => { setShowQueueModal(false); setShowAddSong(true); }}
+                          className="mt-4 flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-black hover:opacity-90 transition-opacity"
+                          style={{ backgroundColor: config.color }}
+                        >
+                          <Plus className="w-4 h-4" />
+                          곡 추가
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {songQueue.map((song, idx) => (
+                          <div
+                            key={song.id}
+                            className="group flex items-center gap-3 p-3 bg-black/40 hover:bg-white/10 border border-white/5 hover:border-white/20 rounded-xl transition-all"
+                          >
+                            <div
+                              className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold shrink-0"
+                              style={{ backgroundColor: `${config.color}20`, color: config.color }}
+                            >
+                              {idx + 1}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-sm truncate text-white/90">{song.title}</p>
+                              <p className="text-xs text-white/40 truncate">{song.artist} · 예약: {song.addedBy}</p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {song.status === "processing" && (
+                                <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                                  <Loader2 className="w-3 h-3 animate-spin text-yellow-400" />
+                                  <span className="text-[10px] font-bold text-yellow-400">
+                                    {song.processingStep === "download" ? "다운로드" : song.processingStep === "separation" ? "음원 분리" : song.processingStep === "lyrics" ? "자막" : song.processingStep === "fcpe" ? "음정 분석" : "준비 중"}
+                                  </span>
+                                </div>
+                              )}
+                              {song.status === "ready" && (
+                                <span className="px-2 py-0.5 rounded-full bg-green-500/15 text-[10px] font-bold text-green-400 border border-green-500/20">READY</span>
+                              )}
+                              {song.status === "failed" && (
+                                <span className="px-2 py-0.5 rounded-full bg-red-500/15 text-[10px] font-bold text-red-400 border border-red-500/20">실패</span>
+                              )}
+                              <button
+                                onClick={() => {
+                                  dispatch(removeFromQueue(song.id));
+                                  emitEvent("queue:remove", { roomCode: code, songId: song.id });
+                                }}
+                                className="p-1.5 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between p-3 border-t border-white/10">
+                    <button
+                      onClick={() => { setShowQueueModal(false); setShowAddSong(true); }}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium text-black hover:opacity-90 transition-opacity"
+                      style={{ backgroundColor: config.color }}
+                    >
+                      <Plus className="w-4 h-4" />
+                      곡 추가
+                    </button>
+                    <button
+                      onClick={() => setShowQueueModal(false)}
+                      className="px-4 py-2 rounded-xl text-xs font-medium text-white/60 hover:bg-white/10 transition-colors"
+                    >
+                      닫기
+                    </button>
                   </div>
                 </motion.div>
               </motion.div>
