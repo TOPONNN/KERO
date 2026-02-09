@@ -1,63 +1,63 @@
-<p align="center">
-  <h1 align="center">KERO</h1>
-  <p align="center">
-    AI 기반 실시간 온라인 노래방 플랫폼
-    <br />
-    <a href="https://kero.ooo"><strong>kero.ooo</strong></a>
-  </p>
-</p>
+# KERO
 
-## 소개
+AI 기반 실시간 온라인 노래방 플랫폼입니다.  
+실시간 통신(WebRTC/LiveKit)과 AI 음원 처리 파이프라인을 결합해, 온라인에서도 함께 노래하고 경쟁할 수 있는 몰입형 경험을 제공합니다.
 
-KERO는 WebRTC 기반의 실시간 온라인 노래방 플랫폼입니다.  
-저지연 음성/영상 통신과 AI 음악 분석 기술을 결합하여, 친구들과 함께 노래하고 점수를 겨루는 경험을 제공합니다.
+- 서비스: [https://kero.ooo](https://kero.ooo)
+- 팀: JSFLUX-2
 
-## 주요 기능
+## 프로젝트 배경
 
-### 실시간 노래방
-- WebRTC(LiveKit) + Socket.io 기반 저지연 음성/영상 통신
-- 최대 6명이 함께 참여하는 멀티 유저 방
-- 호스트 중심의 곡 대기열 관리 및 게임 상태 동기화
+온라인 노래방 서비스는 보통 "함께 부르는 실시간성"과 "게임처럼 즐기는 상호작용"이 약합니다.  
+KERO는 아래 3가지를 핵심 목표로 설계되었습니다.
 
-### AI 음원 처리 파이프라인
-- **보컬 분리** - Mel-Band Roformer로 원곡에서 보컬/MR 고품질 분리
-- **가사 자동 싱크** - SOFA(Singing-Oriented Forced Aligner)로 음소 단위 가사 정렬
-- **음정 분석** - FCPE 모델로 실시간 음정 추출 및 점수 산출
-- RabbitMQ 기반 비동기 처리 워커
+1. 오프라인 노래방에 가까운 몰입형 실시간 경험 구현
+2. 실시간 통신과 AI 분석(보컬 분리, 가사 싱크, 음정 점수화) 결합
+3. 퀴즈/점수 모드를 통한 참여형 콘텐츠 확장
 
-### 게임 모드
-| 모드 | 설명 |
-|------|------|
-| **일반** | 자유롭게 노래를 즐기는 기본 모드 |
-| **퍼펙트 스코어** | AI 음정 분석으로 실시간 점수를 겨루는 모드 |
-| **노래 퀴즈** | 가사 빈칸, 제목/가수 맞추기, 초성 퀴즈, 가사 순서, O/X 등 6종 퀴즈 |
+## 차별화 포인트
 
-### 곡 검색 및 지원
-- TJ 노래방 차트 연동 (한국곡/일본곡/팝송)
-- YouTube 기반 곡 검색 및 자동 처리
-- 일본곡 한국어 발음 가사 자동 변환 (Kuroshiro)
+- **AI 보컬 분리**: Mel-Band Roformer 기반으로 원곡에서 보컬/MR 분리
+- **AI 음정 점수화**: FCPE 기반 Pitch Contour 분석으로 실시간 점수 산출
+- **실시간 가사 싱크**: SOFA 기반 정렬 데이터로 단어 단위 하이라이트
+- **게임화 모드**: 일반/퍼펙트 스코어/노래 퀴즈 3개 모드 제공
 
-## 아키텍처
+## 핵심 기능
 
-```
-┌─────────────┐    ┌─────────────────┐    ┌──────────────┐
-│  Frontend    │    │    Backend       │    │  AI Worker   │
-│  Next.js 15  │◄──►│  Express.js     │◄──►│  Python      │
-│  React 19    │    │  Socket.io      │    │  PyTorch     │
-│  TypeScript  │    │  TypeORM        │    │  WhisperX    │
-└──────┬───────┘    └───────┬─────────┘    └──────┬───────┘
-       │                    │                      │
-       │              ┌─────┴─────┐                │
-       │              │           │                │
-  ┌────▼────┐   ┌─────▼───┐ ┌────▼────┐    ┌──────▼──────┐
-  │ LiveKit │   │  MySQL  │ │  Redis  │    │  RabbitMQ   │
-  │ (WebRTC)│   │         │ │ Pub/Sub │    │  Task Queue │
-  └─────────┘   └─────────┘ └─────────┘    └─────────────┘
-                      │
-              ┌───────┴────────┐
-              │   AWS S3       │
-              │  Audio Storage │
-              └────────────────┘
+### 1) 실시간 온라인 노래방
+- LiveKit(WebRTC SFU) + Socket.io로 저지연 동기화
+- 최대 6명 동시 참여
+- 호스트 중심 재생 제어(큐/상태 동기화)
+
+### 2) AI 음정 분석 (Perfect Score)
+- FCPE 모델로 사용자 음정 추출
+- 기준 음정 대비 정확도 계산 및 점수화
+
+### 3) 보컬/반주 분리
+- Mel-Band Roformer 기반 고품질 분리
+- 노래방용 MR 환경 구성
+
+### 4) 가사 자동 정렬 및 싱크
+- SOFA(Singing-Oriented Forced Aligner) 활용
+- 단어/구간 단위 타임스탬프 정렬
+
+### 5) 노래 퀴즈 모드
+- 제목/가수/가사/초성 등 다양한 문제 유형
+- 실시간 정답 경쟁 + 점수 집계
+
+## 시스템 아키텍처
+
+```mermaid
+flowchart LR
+  U[User Browser] --> FE[Frontend\nNext.js + React]
+  FE <--> BE[Backend\nExpress + Socket.io]
+  FE --> LK[LiveKit SFU\nWebRTC Media]
+  BE --> DB[(MySQL)]
+  BE --> RD[(Redis)]
+  BE --> MQ[(RabbitMQ)]
+  MQ --> AI[AI Worker\nPython + PyTorch]
+  AI --> S3[(AWS S3)]
+  AI --> BE
 ```
 
 ## 기술 스택
@@ -65,122 +65,131 @@ KERO는 WebRTC 기반의 실시간 온라인 노래방 플랫폼입니다.
 ### Frontend
 | 기술 | 용도 |
 |------|------|
-| Next.js 15 | App Router + SSR |
-| React 19 | UI 컴포넌트 |
+| Next.js 15 / React 19 | 웹 애플리케이션 UI |
 | TypeScript | 타입 안전성 |
 | Tailwind CSS | 스타일링 |
 | Redux Toolkit | 상태 관리 |
-| Framer Motion / GSAP | 애니메이션 |
-| Spline | 3D 인터랙티브 키보드 |
-| LiveKit Client | WebRTC 미디어 |
+| Socket.io Client | 실시간 이벤트 수신 |
+| LiveKit Client | WebRTC 미디어 송수신 |
+| Framer Motion / GSAP / Spline | 인터랙션 및 3D 표현 |
 
 ### Backend
 | 기술 | 용도 |
 |------|------|
 | Express.js | REST API |
-| Socket.io | 실시간 이벤트 |
+| Socket.io | 실시간 게임/방 상태 동기화 |
 | TypeORM + MySQL | 데이터 영속화 |
-| Redis | Pub/Sub, 캐시, 온라인 상태 |
-| RabbitMQ | 비동기 작업 큐 |
-| LiveKit Server SDK | 미디어 토큰 발급 |
+| Redis | 캐시/온라인 상태/실시간 보조 |
+| RabbitMQ | AI 작업 큐 |
+| LiveKit Server SDK | 토큰 발급 및 세션 연동 |
 | AWS S3 | 오디오 파일 저장 |
-| Kuroshiro | 일본어 음성학 변환 |
-| yt-dlp | YouTube 오디오 추출 |
 
 ### AI Worker
 | 기술 | 용도 |
 |------|------|
 | Python 3.12 | 런타임 |
-| PyTorch (CUDA) | GPU 추론 |
-| Mel-Band Roformer | 보컬/MR 분리 |
-| WhisperX | 음성 인식 |
-| SOFA | 가사 강제 정렬 |
+| PyTorch + CUDA | GPU 추론 |
+| Mel-Band Roformer | 보컬 분리 |
+| SOFA | 가사 정렬 |
 | FCPE | 음정 추출 |
-| yt-dlp | YouTube 다운로드 |
+| WhisperX / Faster-Whisper | 음성 인식 보조 |
+| yt-dlp | 음원 수집 파이프라인 보조 |
 
-### 인프라
+### Infra
 | 기술 | 용도 |
 |------|------|
-| Docker Compose | 컨테이너 오케스트레이션 |
-| Nginx | 리버스 프록시 + SSL |
-| Jenkins | CI/CD 파이프라인 |
-| AWS EC2 + S3 | 컴퓨팅 + 스토리지 |
-| ELK Stack | 로깅 + 모니터링 |
+| Docker Compose | 서비스 오케스트레이션 |
+| Nginx | 리버스 프록시 / HTTPS |
+| LiveKit Server | 실시간 미디어 서버 |
+| Jenkins | CI/CD 자동화 |
+| AWS EC2 + S3 | 배포/스토리지 |
+| ELK Stack | 로그 수집/관측 |
 
 ## 프로젝트 구조
 
-```
+```text
 .
-├── frontend/          # Next.js 애플리케이션
-├── backend/           # Express API + Socket 서버
-├── ai-worker/         # Python AI 처리 워커
-├── docker-compose.yml # 코어 서비스 오케스트레이션
-├── nginx/             # Nginx 설정
-├── livekit/           # LiveKit 서버 설정
-├── elk/               # Elasticsearch + Logstash + Kibana
-├── rabbitmq/          # RabbitMQ 설정
-└── Jenkinsfile        # CI/CD 파이프라인 정의
+├── frontend/            # Next.js 클라이언트
+├── backend/             # Express + Socket.io 서버
+├── ai-worker/           # Python AI 비동기 처리 워커
+├── docker-compose.yml   # 코어 인프라/앱 구성
+├── livekit/             # LiveKit 설정
+├── nginx/               # Nginx 설정
+├── rabbitmq/            # RabbitMQ 설정
+├── elk/                 # Elasticsearch/Logstash/Kibana
+└── Jenkinsfile          # CI/CD 파이프라인
 ```
 
-## 환경 설정
+## 개발 기간
 
-각 서비스별 `.env.example`을 참고하여 `.env` 파일을 생성합니다.
+- 총 4주 스프린트 기반 개발
+- 1주차: 요구사항/화면/DB 설계
+- 2주차: 룸 생성/참여, WebRTC 다중 접속 구현
+- 3주차: 노래방 핵심 기능 + 실시간 안정화
+- 4주차: 통합 테스트, UX 개선, 배포 및 발표 준비
 
-| 위치 | 파일 |
-|------|------|
-| 루트 | `.env.example` |
-| 백엔드 | `backend/.env.example` |
-| AI 워커 | `ai-worker/.env.example` |
+## 실행 가이드
 
-필수 설정 항목:
-- MySQL / Redis / RabbitMQ 접속 정보
-- JWT 시크릿
-- AWS S3 인증 정보 및 버킷
-- LiveKit API Key / Secret
-- AI Worker 콜백 시크릿
-
-## 실행 방법
-
-### Docker (권장)
+### 1) 환경변수 준비
 
 ```bash
-# 1. 환경변수 설정
 cp .env.example .env
 cp backend/.env.example backend/.env
+cp ai-worker/.env.example ai-worker/.env
+```
 
-# 2. 코어 서비스 실행
+### 2) Docker 실행 (권장)
+
+```bash
+# 루트 서비스 실행
 docker compose up -d --build
 
-# 3. AI 워커 실행 (GPU 필요)
+# AI 워커 실행 (GPU 환경)
 cd ai-worker
 docker compose up -d --build
 ```
 
-### 로컬 개발
+### 3) 로컬 개발 실행
 
 ```bash
-# Backend
-cd backend && npm install && npm run dev
+# backend
+cd backend
+npm install
+npm run dev
 
-# Frontend
-cd frontend && npm install && npm run dev
+# frontend
+cd frontend
+npm install
+npm run dev
 ```
 
-> AI Worker는 GPU 및 시스템 의존성이 많아 Docker 사용을 권장합니다.
+> AI 워커는 CUDA/GPU 의존성이 있어 Docker 환경에서 실행을 권장합니다.
 
-## API 엔드포인트
+## 주요 API
 
 | 경로 | 설명 |
 |------|------|
-| `/api/auth` | 회원가입, 로그인, 카카오 소셜 로그인, 프로필 관리 |
+| `/api/auth` | 회원가입/로그인/프로필 관련 |
 | `/api/rooms` | 방 생성/조회/참여/삭제 |
-| `/api/songs` | 곡 업로드, 처리 상태 조회, 퀴즈 생성 |
-| `/api/search` | TJ 차트 검색, YouTube 검색 |
-| `/api/livekit/token` | WebRTC 미디어 토큰 발급 |
-| `/api/health` | 서버 상태 확인 |
+| `/api/songs` | 곡 처리/상태 조회/퀴즈 관련 |
+| `/api/search` | TJ/YouTube 기반 검색 |
+| `/api/livekit/token` | LiveKit 접속 토큰 발급 |
+| `/api/health` | 서버 헬스체크 |
 
-## 팀
+## 트러블슈팅 하이라이트
 
-**Team KERO**
+- STT/가사 정렬 품질 개선: Whisper -> Faster-Whisper -> SOFA 중심 파이프라인으로 고도화
+- 보컬 분리 모델 개선: Demucs/기존 모델 비교 후 Mel-Band Roformer 채택
+- 음정 분석 최적화: CREPE 대비 FCPE로 속도/성능 개선
+- 배포 이슈 대응: Jenkins/GPU/RabbitMQ 설정 이슈를 파이프라인과 환경 변수 정비로 해결
 
-윤희준 &middot; 정훈호 &middot; 김관익 &middot; 김성민 &middot; 박찬진 &middot; 윤희망
+## 팀 구성
+
+| 이름 | 역할 |
+|------|------|
+| 윤희준 | Full-stack / 시스템 총괄 |
+| 김관익 | Backend / 사용자 관리 |
+| 김성민 | Frontend / 이벤트 처리 |
+| 박찬진 | Backend / 데이터 및 서버 관리 |
+| 윤희망 | Frontend / 실시간 기능 |
+| 정훈호 | Backend / 실시간 처리 |
