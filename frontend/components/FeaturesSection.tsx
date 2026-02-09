@@ -50,7 +50,7 @@ const FeaturesSection = () => {
       id="features"
       className="md:h-[130vh] py-16 sm:py-24 md:py-32 px-6 md:px-20 relative z-10"
     >
-      <div className="max-w-6xl mx-auto relative z-10 bg-[#020817]/80 backdrop-blur-md rounded-3xl p-8 md:p-12">
+      <div className="max-w-6xl mx-auto relative z-10 rounded-3xl p-8 md:p-12">
         {/* Header */}
         <RevealAnimation>
           <div className="mb-8 md:mb-12">

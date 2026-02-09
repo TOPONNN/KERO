@@ -113,48 +113,50 @@ const AnimatedBackground = () => {
 
   // --- Event Handlers ---
 
-   const handleMouseHover = (e: SplineEvent) => {
-     if (!splineApp || selectedSkillRef.current?.name === e.target.name) return;
-     if (activeSectionRef.current === "hero" || activeSectionRef.current === "team") return;
+  const isSoundEnabled = () => 
+    activeSectionRef.current !== "hero" && activeSectionRef.current !== "team";
 
-     if (e.target.name === "body" || e.target.name === "platform") {
-       if (selectedSkillRef.current) {
-         const prevKeycap = splineApp.findObjectByName(selectedSkillRef.current.name);
-         if (prevKeycap) {
-           gsap.to(prevKeycap.position, { y: 0, duration: 0.3, ease: "elastic.out(1, 0.5)" });
-         }
-         playReleaseSound();
-       }
-       setSelectedSkill(null);
-       selectedSkillRef.current = null;
-       if (splineApp.getVariable("heading") && splineApp.getVariable("desc")) {
-         splineApp.setVariable("heading", "");
-         splineApp.setVariable("desc", "");
-       }
-     } else {
-       if (!selectedSkillRef.current || selectedSkillRef.current.name !== e.target.name) {
-         const skill = SKILLS[e.target.name as SkillNames];
-         if (skill) {
-           if (selectedSkillRef.current) {
-             const prevKeycap = splineApp.findObjectByName(selectedSkillRef.current.name);
-             if (prevKeycap) {
-               gsap.to(prevKeycap.position, { y: 0, duration: 0.2, ease: "power2.out" });
-             }
-             playReleaseSound();
-           }
-           const newKeycap = splineApp.findObjectByName(skill.name);
-           if (newKeycap) {
-             gsap.to(newKeycap.position, { y: -40, duration: 0.1, ease: "power2.in" });
-           }
-           playPressSound();
-           setSelectedSkill(skill);
-           selectedSkillRef.current = skill;
-           splineApp.setVariable("heading", skill.label);
-           splineApp.setVariable("desc", skill.shortDescription);
-         }
-       }
-     }
-   };
+  const handleMouseHover = (e: SplineEvent) => {
+    if (!splineApp || selectedSkillRef.current?.name === e.target.name) return;
+
+    if (e.target.name === "body" || e.target.name === "platform") {
+      if (selectedSkillRef.current) {
+        const prevKeycap = splineApp.findObjectByName(selectedSkillRef.current.name);
+        if (prevKeycap) {
+          gsap.to(prevKeycap.position, { y: 0, duration: 0.3, ease: "elastic.out(1, 0.5)" });
+        }
+        if (isSoundEnabled()) playReleaseSound();
+      }
+      setSelectedSkill(null);
+      selectedSkillRef.current = null;
+      if (splineApp.getVariable("heading") && splineApp.getVariable("desc")) {
+        splineApp.setVariable("heading", "");
+        splineApp.setVariable("desc", "");
+      }
+    } else {
+      if (!selectedSkillRef.current || selectedSkillRef.current.name !== e.target.name) {
+        const skill = SKILLS[e.target.name as SkillNames];
+        if (skill) {
+          if (selectedSkillRef.current) {
+            const prevKeycap = splineApp.findObjectByName(selectedSkillRef.current.name);
+            if (prevKeycap) {
+              gsap.to(prevKeycap.position, { y: 0, duration: 0.2, ease: "power2.out" });
+            }
+            if (isSoundEnabled()) playReleaseSound();
+          }
+          const newKeycap = splineApp.findObjectByName(skill.name);
+          if (newKeycap) {
+            gsap.to(newKeycap.position, { y: -40, duration: 0.1, ease: "power2.in" });
+          }
+          if (isSoundEnabled()) playPressSound();
+          setSelectedSkill(skill);
+          selectedSkillRef.current = skill;
+          splineApp.setVariable("heading", skill.label);
+          splineApp.setVariable("desc", skill.shortDescription);
+        }
+      }
+    }
+  };
 
   const handleSplineInteractions = () => {
     if (!splineApp) return;
@@ -171,34 +173,32 @@ const AnimatedBackground = () => {
 
      splineApp.addEventListener("keyUp", () => {
        if (!splineApp || isInputFocused()) return;
-       if (activeSectionRef.current === "hero" || activeSectionRef.current === "team") return;
        if (selectedSkillRef.current) {
          const keycap = splineApp.findObjectByName(selectedSkillRef.current.name);
          if (keycap) {
            gsap.to(keycap.position, { y: 0, duration: 0.3, ease: "elastic.out(1, 0.5)" });
          }
        }
-       playReleaseSound();
+       if (isSoundEnabled()) playReleaseSound();
        splineApp.setVariable("heading", "");
        splineApp.setVariable("desc", "");
      });
 
      splineApp.addEventListener("keyDown", (e) => {
        if (!splineApp || isInputFocused()) return;
-       if (activeSectionRef.current === "hero" || activeSectionRef.current === "team") return;
        const skill = SKILLS[e.target.name as SkillNames];
-      if (skill) {
-        const keycap = splineApp.findObjectByName(skill.name);
-        if (keycap) {
-          gsap.to(keycap.position, { y: -40, duration: 0.1, ease: "power2.in" });
-        }
-        playPressSound();
-        setSelectedSkill(skill);
-        selectedSkillRef.current = skill;
-        splineApp.setVariable("heading", skill.label);
-        splineApp.setVariable("desc", skill.shortDescription);
-      }
-    });
+       if (skill) {
+         const keycap = splineApp.findObjectByName(skill.name);
+         if (keycap) {
+           gsap.to(keycap.position, { y: -40, duration: 0.1, ease: "power2.in" });
+         }
+         if (isSoundEnabled()) playPressSound();
+         setSelectedSkill(skill);
+         selectedSkillRef.current = skill;
+         splineApp.setVariable("heading", skill.label);
+         splineApp.setVariable("desc", skill.shortDescription);
+       }
+     });
 
      splineApp.addEventListener("mouseHover", handleMouseHover);
    };
@@ -538,6 +538,7 @@ const AnimatedBackground = () => {
           className="w-full h-full fixed"
           onLoad={(app: Application) => {
             setSplineApp(app);
+            applyBrandColors(app);
             bypassLoading();
           }}
           scene="/assets/skills-keyboard.spline"
