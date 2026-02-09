@@ -63,3 +63,13 @@ verification_report.md
 
 # SOFA models (too large for git, deploy via SCP/S3)
 *.onnx
+
+# UI analysis snapshots (video/image files)
+ui-analysis/
+
+# Stale external clones
+temp_clone/
+
+# Playwright test artifacts
+frontend/test-results/
+frontend/playwright-report/
