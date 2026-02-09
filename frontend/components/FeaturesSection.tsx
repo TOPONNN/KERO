@@ -68,7 +68,7 @@ const FeaturesSection = () => {
           {FEATURES.map((feature, i) => (
             <RevealAnimation key={i} delay={i * 0.1}>
               <div 
-                className="group relative h-full rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-6 md:p-8 transition-all duration-500 hover:border-white/20 hover:bg-white/[0.08] hover:-translate-y-2 overflow-hidden"
+                className="group relative h-full rounded-2xl border border-white/10 bg-[#020817]/80 backdrop-blur-sm p-6 md:p-8 transition-all duration-500 hover:border-white/20 hover:bg-[#020817]/90 hover:-translate-y-2 overflow-hidden"
               >
                 {/* Glow Effect on Hover */}
                 <div 

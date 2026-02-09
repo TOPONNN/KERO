@@ -39,44 +39,26 @@ const applyBrandColors = async (app: Application) => {
   try {
     const allObjects = app.getAllObjects();
     let applied = 0;
-    const colored = new Set<number>();
 
-    // Build skill position map
-    const skillEntries: { skill: typeof SKILLS[SkillNames]; idx: number }[] = [];
-    allObjects.forEach((obj, idx) => {
-      const skill = SKILLS[obj.name as SkillNames];
-      if (skill) skillEntries.push({ skill, idx });
-    });
-
-    const applyColor = (obj: any, skill: typeof SKILLS[SkillNames], objIdx: number) => {
-      if (colored.has(objIdx)) return false;
-      try { obj.color = skill.color; } catch (_) {}
-      try { if (obj.material) obj.material.alpha = 1; } catch (_) {}
-      colored.add(objIdx);
-      applied++;
-      return true;
-    };
-
-    for (const { skill, idx } of skillEntries) {
-      let found = false;
-      // Look forward for nearest keycap-desktop
-      for (let i = idx + 1; i < allObjects.length; i++) {
-        if (SKILLS[allObjects[i].name as SkillNames]) break;
-        if (allObjects[i].name === 'keycap-desktop') {
-          found = applyColor(allObjects[i], skill, i);
-          break;
+    for (const skill of Object.values(SKILLS)) {
+      const keycapObj = allObjects.find(obj => obj.name === skill.name);
+      if (!keycapObj) continue;
+      
+      try {
+        const color = skill.color.replace('#', '');
+        const r = parseInt(color.substring(0, 2), 16) / 255;
+        const g = parseInt(color.substring(2, 4), 16) / 255;
+        const b = parseInt(color.substring(4, 6), 16) / 255;
+        
+        if ((keycapObj as any).material) {
+          (keycapObj as any).material.color = { r, g, b };
+          applied++;
         }
-      }
-      // Fallback: look backward
-      if (!found) {
-        for (let i = idx - 1; i >= 0; i--) {
-          if (SKILLS[allObjects[i].name as SkillNames]) break;
-          if (allObjects[i].name === 'keycap-desktop') {
-            found = applyColor(allObjects[i], skill, i);
-            break;
-          }
+        if ((keycapObj as any).color) {
+          (keycapObj as any).color = skill.color;
+          applied++;
         }
-      }
+      } catch (_) {}
     }
     console.log(`[applyBrandColors] Applied to ${applied} keycaps`);
   } catch (e) {
@@ -113,8 +95,7 @@ const AnimatedBackground = () => {
 
   // --- Event Handlers ---
 
-  const isSoundEnabled = () => 
-    activeSectionRef.current !== "hero" && activeSectionRef.current !== "team";
+  const isSoundEnabled = () => activeSectionRef.current !== "hero";
 
   const handleMouseHover = (e: SplineEvent) => {
     if (!splineApp || selectedSkillRef.current?.name === e.target.name) return;
@@ -272,7 +253,7 @@ const AnimatedBackground = () => {
     const start = () => {
       let i = 0;
       framesParent.visible = true;
-      framesParent.position.x = 0;
+      framesParent.position.x = 50;
       framesParent.position.z = 0;
       interval = setInterval(() => {
         if (i % 2) {

@@ -110,7 +110,7 @@ const ArchitectureSection = () => {
             <React.Fragment key={layer.id}>
               {/* Layer Section */}
               <RevealAnimation delay={0.1 + layerIndex * 0.15}>
-                <div className="relative rounded-3xl border border-white/5 bg-white/[0.02] p-6 backdrop-blur-sm transition-colors duration-500 hover:bg-white/[0.04] md:p-10">
+                <div className="relative rounded-3xl border border-white/5 bg-[#020817]/80 backdrop-blur-sm p-6 transition-colors duration-500 hover:bg-[#020817]/90 md:p-10">
                   {/* Layer Header */}
                   <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
                     <div className="flex items-center gap-3">
