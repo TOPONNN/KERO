@@ -1,5 +1,12 @@
 "use client";
 
+declare global {
+  interface Window {
+    YT?: { Player: new (...args: unknown[]) => unknown };
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+
 import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
@@ -75,7 +82,9 @@ export default function LyricsQuizGame({
     selectedAnswer, 
     isAnswerRevealed, 
     roundResults, 
+    myScore, 
     scores, 
+    currentSong,
     streak
   } = useSelector((state: RootState) => state.game);
   const { code, participants } = useSelector((state: RootState) => state.room);
@@ -87,9 +96,11 @@ export default function LyricsQuizGame({
    const [submitted, setSubmitted] = useState(false);
    const [isRestarting, setIsRestarting] = useState(false);
    const hasProcessedRevealRef = useRef(false);
-    const streakRef = useRef(streak);
-    const audioRef = useRef<HTMLAudioElement | null>(null);
-     const skipTimerRef = useRef<NodeJS.Timeout | null>(null);
+   const streakRef = useRef(streak);
+   const audioRef = useRef<HTMLAudioElement | null>(null);
+    const ytPlayerRef = useRef<any>(null);
+    const ytApiReady = useRef(false);
+    const skipTimerRef = useRef<NodeJS.Timeout | null>(null);
    const questionIndexRef = useRef(currentQuestionIndex);
    const advanceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
    const roundResultsRef = useRef(roundResults);
@@ -121,7 +132,30 @@ export default function LyricsQuizGame({
      }
     }, []);
 
-     const cleanDisplay = (s: string) => s?.replace(/\s*[\(（\[【].*?[\)）\]】]/g, '').replace(/[\(（\[【\)）\]】]/g, '').trim() || '';
+    useEffect(() => {
+      if (typeof window === "undefined") return;
+      const w = window as any;
+      if (w.YT && w.YT.Player) {
+        ytApiReady.current = true;
+        return;
+      }
+      const existingScript = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
+      if (existingScript) {
+        const check = setInterval(() => {
+          if (w.YT && w.YT.Player) {
+            ytApiReady.current = true;
+            clearInterval(check);
+          }
+        }, 100);
+        return () => clearInterval(check);
+      }
+      w.onYouTubeIframeAPIReady = () => { ytApiReady.current = true; };
+      const tag = document.createElement("script");
+      tag.src = "https://www.youtube.com/iframe_api";
+      document.head.appendChild(tag);
+    }, []);
+
+    const cleanDisplay = (s: string) => s?.replace(/\s*[\(（\[【].*?[\)）\]】]/g, '').replace(/[\(（\[【\)）\]】]/g, '').trim() || '';
 
    const currentQuestion = quizQuestions[currentQuestionIndex];
 
@@ -191,6 +225,10 @@ export default function LyricsQuizGame({
         audioRef.current.pause();
         audioRef.current = null;
       }
+      if (ytPlayerRef.current) {
+        try { ytPlayerRef.current.destroy(); } catch {}
+        ytPlayerRef.current = null;
+      }
       if (skipTimerRef.current) {
         clearTimeout(skipTimerRef.current);
         skipTimerRef.current = null;
@@ -225,154 +263,100 @@ export default function LyricsQuizGame({
         audioRef.current.pause();
         audioRef.current = null;
       }
+      if (ytPlayerRef.current) {
+        try { ytPlayerRef.current.destroy(); } catch {}
+        ytPlayerRef.current = null;
+      }
       setAudioLoading(true);
 
-      const audio = new Audio();
-      audioRef.current = audio;
-      audio.volume = 0.5;
-      audio.preload = "auto";
-
-      const clearSkipTimer = () => {
-        if (skipTimerRef.current) {
-          clearTimeout(skipTimerRef.current);
-          skipTimerRef.current = null;
+      const createPlayer = () => {
+        let containerEl = document.getElementById("yt-audio-player-container");
+        if (!containerEl) {
+          containerEl = document.createElement("div");
+          containerEl.id = "yt-audio-player-container";
+          containerEl.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;overflow:hidden;pointer-events:none;";
+          document.body.appendChild(containerEl);
         }
-      };
+        const playerDiv = document.createElement("div");
+        playerDiv.id = `yt-player-${Date.now()}`;
+        containerEl.innerHTML = "";
+        containerEl.appendChild(playerDiv);
 
-      const abortController = new AbortController();
+        // 5s safety net: auto-skip if YT player hasn't started playing
+        skipTimerRef.current = setTimeout(() => {
+          setAudioLoading(false);
+          setAudioPlayFailed(true);
+          skipTimerRef.current = setTimeout(() => autoSkip(), 2000);
+        }, 5000);
 
-      const maxAttempts = 3;
-      const triedVideoIds = new Set<string>();
-      let failureCount = 0;
-      let failureInFlight = false;
-      let alternativesCache: string[] | null = null;
-      let startupTimeout: ReturnType<typeof setTimeout> | null = null;
-
-      const clearStartupTimeout = () => {
-        if (startupTimeout) {
-          clearTimeout(startupTimeout);
-          startupTimeout = null;
-        }
-      };
-
-      const failAndAutoSkip = () => {
-        clearSkipTimer();
-        clearStartupTimeout();
-        audio.pause();
-        setAudioLoading(false);
-        setAudioPlayFailed(true);
-        skipTimerRef.current = setTimeout(() => autoSkip(), 2000);
-      };
-
-      const parseAlternativeVideoIds = (payload: unknown): string[] => {
-        if (!payload || typeof payload !== "object") return [];
-        const obj = payload as Record<string, unknown>;
-        if (obj.success !== true) return [];
-        const data = obj.data;
-        if (!Array.isArray(data)) return [];
-        const ids: string[] = [];
-        for (const item of data) {
-          if (!item || typeof item !== "object") continue;
-          const rec = item as Record<string, unknown>;
-          const videoIdValue = rec.videoId;
-          if (typeof videoIdValue === "string" && videoIdValue.trim()) ids.push(videoIdValue);
-        }
-        return ids;
-      };
-
-      const getAlternatives = async (): Promise<string[]> => {
-        if (alternativesCache) return alternativesCache;
-
-        const songTitle = String(currentQuestion.metadata?.songTitle ?? "").trim();
-        const songArtist = String(currentQuestion.metadata?.songArtist ?? "").trim();
-        const query = `${songTitle} ${songArtist}`.trim();
-        if (!query) {
-          alternativesCache = [];
-          return alternativesCache;
-        }
-
-        try {
-          const res = await fetch(`/api/songs/search/youtube?query=${encodeURIComponent(query)}`,
-            { signal: abortController.signal }
-          );
-          const json: unknown = await res.json();
-          alternativesCache = parseAlternativeVideoIds(json);
-          return alternativesCache;
-        } catch {
-          alternativesCache = [];
-          return alternativesCache;
-        }
-      };
-
-      const startAttempt = (videoId: string) => {
-        triedVideoIds.add(videoId);
-        clearSkipTimer();
-        clearStartupTimeout();
-        setAudioPlayFailed(false);
-        setAudioLoading(true);
-        audio.pause();
-        audio.src = `/api/songs/audio-stream?videoId=${encodeURIComponent(videoId)}`;
-        audio.load();
-
-        startupTimeout = setTimeout(() => {
-          void handleFailure();
-        }, 8000);
-      };
-
-      const handleFailure = async () => {
-        if (failureInFlight) return;
-        failureInFlight = true;
-
-        clearStartupTimeout();
-        setAudioLoading(false);
-
-        failureCount += 1;
-        if (failureCount >= maxAttempts) {
-          failAndAutoSkip();
-          failureInFlight = false;
-          return;
-        }
-
-        const alternatives = await getAlternatives();
-        const nextVideoId = alternatives.find((id) => typeof id === "string" && id.trim() && !triedVideoIds.has(id));
-        if (!nextVideoId) {
-          failAndAutoSkip();
-          failureInFlight = false;
-          return;
-        }
-
-        startAttempt(nextVideoId);
-        failureInFlight = false;
-      };
-
-      const onCanPlay = () => {
-        clearStartupTimeout();
-        clearSkipTimer();
-        setAudioLoading(false);
-        setAudioPlayFailed(false);
-        audio.play().catch(() => {
-          void handleFailure();
+        ytPlayerRef.current = new (window as any).YT.Player(playerDiv.id, {
+          videoId: ytVideoId,
+          playerVars: {
+            autoplay: 1,
+            controls: 0,
+            playsinline: 1,
+            enablejsapi: 1,
+            fs: 0,
+            disablekb: 1,
+            rel: 0,
+            modestbranding: 1,
+          },
+          events: {
+            onReady: (event: any) => {
+              event.target.setVolume(50);
+              event.target.playVideo();
+              setAudioLoading(false);
+            },
+            onStateChange: (event: any) => {
+              if (event.data === 1) {
+                if (skipTimerRef.current) { clearTimeout(skipTimerRef.current); skipTimerRef.current = null; }
+                setAudioLoading(false);
+                setAudioPlayFailed(false);
+              }
+            },
+            onError: () => {
+              if (skipTimerRef.current) { clearTimeout(skipTimerRef.current); skipTimerRef.current = null; }
+              setAudioLoading(false);
+              setAudioPlayFailed(true);
+              skipTimerRef.current = setTimeout(() => autoSkip(), 2000);
+            },
+          },
         });
       };
 
-      const onError = () => {
-        void handleFailure();
-      };
-
-      audio.addEventListener("canplay", onCanPlay);
-      audio.addEventListener("error", onError);
-
-      startAttempt(String(ytVideoId));
-
+      if (ytApiReady.current && (window as any).YT?.Player) {
+        createPlayer();
+      } else {
+        const waitForApi = setInterval(() => {
+          if ((window as any).YT?.Player) {
+            ytApiReady.current = true;
+            clearInterval(waitForApi);
+            createPlayer();
+          }
+        }, 200);
+        const timeout = setTimeout(() => {
+          clearInterval(waitForApi);
+          setAudioLoading(false);
+          setAudioPlayFailed(true);
+          skipTimerRef.current = setTimeout(() => autoSkip(), 2000);
+        }, 10000);
+        return () => {
+          clearInterval(waitForApi);
+          clearTimeout(timeout);
+          if (skipTimerRef.current) { clearTimeout(skipTimerRef.current); skipTimerRef.current = null; }
+          if (ytPlayerRef.current) {
+            try { ytPlayerRef.current.destroy(); } catch {}
+            ytPlayerRef.current = null;
+          }
+        };
+      }
+      
       return () => {
-        abortController.abort();
-        clearStartupTimeout();
-        clearSkipTimer();
-        audio.removeEventListener("canplay", onCanPlay);
-        audio.removeEventListener("error", onError);
-        audio.pause();
-        audio.src = "";
-        if (audioRef.current === audio) audioRef.current = null;
+        if (skipTimerRef.current) { clearTimeout(skipTimerRef.current); skipTimerRef.current = null; }
+        if (ytPlayerRef.current) {
+          try { ytPlayerRef.current.destroy(); } catch {}
+          ytPlayerRef.current = null;
+        }
         setAudioLoading(false);
       };
     } else {
@@ -1089,7 +1073,10 @@ export default function LyricsQuizGame({
                   {audioPlayFailed && (
                     <button
                       onClick={() => {
-                        if (audioRef.current) {
+                        if (ytPlayerRef.current && typeof ytPlayerRef.current.playVideo === 'function') {
+                          ytPlayerRef.current.playVideo();
+                          setAudioPlayFailed(false);
+                        } else if (audioRef.current) {
                           audioRef.current.play().then(() => setAudioPlayFailed(false)).catch(() => {});
                         }
                       }}

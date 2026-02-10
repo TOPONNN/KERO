@@ -2,7 +2,7 @@
 
 // Animated Spline background controller
 
-import React, { Suspense, useEffect, useRef, useState } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import { Application, SPEObject, SplineEvent } from "@splinetool/runtime";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -18,6 +18,17 @@ import { usePreloader } from "@/hooks/use-preloader";
 import { Section, getKeyboardState } from "./animated-background-config";
 
 gsap.registerPlugin(ScrollTrigger);
+
+// Helper: traverse parent chain to find a matching skill
+const findSkillFromObject = (obj: { name: string; id: string } | null): Skill | null => {
+  let current: any = obj;
+  while (current) {
+    const skill = SKILLS[current.name as SkillNames];
+    if (skill) return skill;
+    current = current.parent || null;
+  }
+  return null;
+};
 
 /*
  * getAllObjects() returns a flat list. Each skill (e.g. "react") is an Empty
@@ -79,56 +90,17 @@ const applyBrandColors = async (app: Application) => {
   }
 };
 
-// Intercept native keyboard events BEFORE Spline to prevent grouped key animations.
-// Spline scene has shortcut bindings that fire 3 keycaps per key — we animate only one.
-// Key→Skill mapping: 4 rows (numbers, QWERTY, ASDF, ZXCV) matching physical keyboard layout.
-const KEY_TO_SKILL: Record<string, SkillNames> = {
-  '1': SkillNames.JS,
-  '2': SkillNames.TS,
-  '3': SkillNames.HTML,
-  '4': SkillNames.CSS,
-  '5': SkillNames.REACT,
-  '6': SkillNames.VUE,
-  '7': SkillNames.NEXTJS,
-  '8': SkillNames.TAILWIND,
-  '9': SkillNames.NODEJS,
-  '0': SkillNames.EXPRESS,
-  '-': SkillNames.POSTGRES,
-  'q': SkillNames.MONGODB,
-  'w': SkillNames.GIT,
-  'e': SkillNames.GITHUB,
-  'r': SkillNames.PRETTIER,
-  't': SkillNames.NPM,
-  'y': SkillNames.FIREBASE,
-  'u': SkillNames.WORDPRESS,
-  'i': SkillNames.LINUX,
-  'o': SkillNames.DOCKER,
-  'p': SkillNames.NGINX,
-  'a': SkillNames.AWS,
-  's': SkillNames.GCP,
-  'd': SkillNames.VIM,
-  'f': SkillNames.VERCEL,
-  'g': SkillNames.GSAP,
-  'h': SkillNames.PYTORCH,
-  'j': SkillNames.EC2,
-  'k': SkillNames.TYPEORM,
-  'z': SkillNames.YTDLP,
-  'x': SkillNames.LENIS,
-  'c': SkillNames.KUROSHIRO,
-  'v': SkillNames.SPLINE,
-};
-
 const AnimatedBackground = () => {
   const isMobile = useMediaQuery("(max-width: 767px)");
   const [splineApp, setSplineApp] = useState<Application>();
-  const selectedSkillRef = useRef<Skill | null>(null);
+  const selectedSkillRef = React.useRef<Skill | null>(null);
 
   const { playPressSound, playReleaseSound } = useSounds();
   const { isLoading, bypassLoading } = usePreloader();
 
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
   const [activeSection, setActiveSection] = useState<Section>("hero");
-  const activeSectionRef = useRef<Section>("hero");
+  const activeSectionRef = React.useRef<Section>("hero");
 
   const [bongoAnimation, setBongoAnimation] = useState({
     start: () => {},
@@ -140,12 +112,6 @@ const AnimatedBackground = () => {
   });
 
   const [keyboardRevealed, setKeyboardRevealed] = useState(false);
-
-  const splineAppRef = useRef<Application | undefined>(undefined);
-
-  useEffect(() => {
-    splineAppRef.current = splineApp;
-  }, [splineApp]);
 
   useEffect(() => {
     activeSectionRef.current = activeSection;
@@ -199,8 +165,48 @@ const AnimatedBackground = () => {
 
   const handleSplineInteractions = () => {
     if (!splineApp) return;
-    splineApp.addEventListener("mouseHover", handleMouseHover);
-  };
+
+    const isInputFocused = () => {
+      const el = document.activeElement;
+      return (
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          (el as HTMLElement).isContentEditable)
+      );
+    };
+
+     splineApp.addEventListener("keyUp", () => {
+       if (!splineApp || isInputFocused()) return;
+       if (selectedSkillRef.current) {
+         const keycap = splineApp.findObjectByName(selectedSkillRef.current.name);
+         if (keycap) {
+           gsap.to(keycap.position, { y: 0, duration: 0.3, ease: "elastic.out(1, 0.5)" });
+         }
+       }
+       if (isSoundEnabled()) playReleaseSound();
+       splineApp.setVariable("heading", "");
+       splineApp.setVariable("desc", "");
+     });
+
+     splineApp.addEventListener("keyDown", (e) => {
+       if (!splineApp || isInputFocused()) return;
+       const skill = SKILLS[e.target.name as SkillNames];
+       if (skill) {
+         const keycap = splineApp.findObjectByName(skill.name);
+         if (keycap) {
+           gsap.to(keycap.position, { y: -40, duration: 0.1, ease: "power2.in" });
+         }
+         if (isSoundEnabled()) playPressSound();
+         setSelectedSkill(skill);
+         selectedSkillRef.current = skill;
+         splineApp.setVariable("heading", skill.label);
+         splineApp.setVariable("desc", skill.shortDescription);
+       }
+     });
+
+     splineApp.addEventListener("mouseHover", handleMouseHover);
+   };
 
   // --- Animation Setup Helpers ---
 
@@ -399,88 +405,7 @@ const AnimatedBackground = () => {
     handleSplineInteractions();
     setBongoAnimation(getBongoAnimation());
     setKeycapAnimations(getKeycapsAnimation());
-
-    // Disable ALL Spline internal keyboard event bindings to prevent grouped animations
-    try {
-      const em = (splineApp as any).eventManager;
-      const basicHandler = em?.handlers?.Basic;
-      if (basicHandler?.objectsPerTypes) {
-        const keyDownEvents = basicHandler.objectsPerTypes.KeyDown;
-        const keyUpEvents = basicHandler.objectsPerTypes.KeyUp;
-        if (keyDownEvents) {
-          keyDownEvents.forEach((evt: any) => { if (evt?.data) evt.data.disabled = true; });
-        }
-        if (keyUpEvents) {
-          keyUpEvents.forEach((evt: any) => { if (evt?.data) evt.data.disabled = true; });
-        }
-      }
-    } catch (_) {}
   }, [splineApp]);
-
-  useEffect(() => {
-    const isInputFocused = () => {
-      const el = document.activeElement;
-      return el && (
-        el.tagName === "INPUT" ||
-        el.tagName === "TEXTAREA" ||
-        (el as HTMLElement).isContentEditable
-      );
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const app = splineAppRef.current;
-      if (!app || isInputFocused()) return;
-
-      const key = e.key.toLowerCase();
-      const skillName = KEY_TO_SKILL[key];
-      if (!skillName) return;
-
-      e.stopImmediatePropagation();
-
-      const skill = SKILLS[skillName];
-      if (!skill) return;
-
-      const keycap = app.findObjectByName(skill.name);
-      if (keycap) {
-        gsap.to(keycap.position, { y: -40, duration: 0.1, ease: "power2.in" });
-      }
-      if (activeSectionRef.current !== "hero") playPressSound();
-      setSelectedSkill(skill);
-      selectedSkillRef.current = skill;
-      app.setVariable("heading", skill.label);
-      app.setVariable("desc", skill.shortDescription);
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      const app = splineAppRef.current;
-      if (!app || isInputFocused()) return;
-
-      const key = e.key.toLowerCase();
-      if (KEY_TO_SKILL[key]) {
-        e.stopImmediatePropagation();
-      }
-
-      if (selectedSkillRef.current) {
-        const keycap = app.findObjectByName(selectedSkillRef.current.name);
-        if (keycap) {
-          gsap.to(keycap.position, { y: 0, duration: 0.3, ease: "elastic.out(1, 0.5)" });
-        }
-      }
-      if (activeSectionRef.current !== "hero") playReleaseSound();
-      app.setVariable("heading", "");
-      app.setVariable("desc", "");
-      setSelectedSkill(null);
-      selectedSkillRef.current = null;
-    };
-
-    window.addEventListener("keydown", handleKeyDown, true);
-    window.addEventListener("keyup", handleKeyUp, true);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown, true);
-      window.removeEventListener("keyup", handleKeyUp, true);
-    };
-  }, [playPressSound, playReleaseSound]);
 
   useEffect(() => {
     return () => {
@@ -609,24 +534,7 @@ const AnimatedBackground = () => {
     revealKeyboard();
   }, [splineApp, keyboardRevealed, isMobile, isLoading]);
 
-  useEffect(() => {
-    if (!splineApp) return;
 
-    const handleVisibility = () => {
-      if (document.hidden) {
-        try { splineApp.stop(); } catch (_) {}
-        gsap.globalTimeline.pause();
-      } else {
-        try { splineApp.play(); } catch (_) {}
-        gsap.globalTimeline.resume();
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibility);
-    };
-  }, [splineApp]);
 
   return (
     <>
@@ -634,12 +542,6 @@ const AnimatedBackground = () => {
         <Spline
           className="w-full h-full fixed"
           onLoad={(app: Application) => {
-            try {
-              const renderer = (app as any)._renderer;
-              if (renderer?.setPixelRatio) {
-                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-              }
-            } catch (_) {}
             setSplineApp(app);
             applyBrandColors(app);
             bypassLoading();
