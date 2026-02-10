@@ -100,6 +100,7 @@ export default function LyricsQuizGame({
    const audioRef = useRef<HTMLAudioElement | null>(null);
     const ytPlayerRef = useRef<any>(null);
     const ytApiReady = useRef(false);
+    const skipTimerRef = useRef<NodeJS.Timeout | null>(null);
    const questionIndexRef = useRef(currentQuestionIndex);
    const advanceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
    const roundResultsRef = useRef(roundResults);
@@ -207,6 +208,17 @@ export default function LyricsQuizGame({
     return () => clearInterval(timer);
   }, [currentQuestion, isAnswerRevealed, submitted, handleTimeUp]);
 
+  const autoSkip = useCallback(() => {
+    if (!isRevealedRef.current) {
+      dispatch(revealAnswer([{
+        odId: "local",
+        odName: "나",
+        isCorrect: false,
+        points: 0,
+      }]));
+    }
+  }, [dispatch]);
+
   useEffect(() => {
     if (!currentQuestion) {
       if (audioRef.current) {
@@ -216,6 +228,10 @@ export default function LyricsQuizGame({
       if (ytPlayerRef.current) {
         try { ytPlayerRef.current.destroy(); } catch {}
         ytPlayerRef.current = null;
+      }
+      if (skipTimerRef.current) {
+        clearTimeout(skipTimerRef.current);
+        skipTimerRef.current = null;
       }
       setAudioLoading(false);
       return;
@@ -231,12 +247,16 @@ export default function LyricsQuizGame({
       const startTime = currentQuestion.metadata?.audioStartTime || 0;
       audio.currentTime = startTime;
       audio.volume = 0.5;
-      audio.play().catch(() => setAudioPlayFailed(true));
+      audio.play().catch(() => {
+        setAudioPlayFailed(true);
+        skipTimerRef.current = setTimeout(() => autoSkip(), 2000);
+      });
       
       return () => {
         audio.pause();
         audio.src = '';
         audioRef.current = null;
+        if (skipTimerRef.current) { clearTimeout(skipTimerRef.current); skipTimerRef.current = null; }
       };
     } else if (ytVideoId) {
       if (audioRef.current) {
@@ -262,6 +282,13 @@ export default function LyricsQuizGame({
         containerEl.innerHTML = "";
         containerEl.appendChild(playerDiv);
 
+        // 5s safety net: auto-skip if YT player hasn't started playing
+        skipTimerRef.current = setTimeout(() => {
+          setAudioLoading(false);
+          setAudioPlayFailed(true);
+          skipTimerRef.current = setTimeout(() => autoSkip(), 2000);
+        }, 5000);
+
         ytPlayerRef.current = new (window as any).YT.Player(playerDiv.id, {
           videoId: ytVideoId,
           playerVars: {
@@ -282,13 +309,16 @@ export default function LyricsQuizGame({
             },
             onStateChange: (event: any) => {
               if (event.data === 1) {
+                if (skipTimerRef.current) { clearTimeout(skipTimerRef.current); skipTimerRef.current = null; }
                 setAudioLoading(false);
                 setAudioPlayFailed(false);
               }
             },
             onError: () => {
+              if (skipTimerRef.current) { clearTimeout(skipTimerRef.current); skipTimerRef.current = null; }
               setAudioLoading(false);
               setAudioPlayFailed(true);
+              skipTimerRef.current = setTimeout(() => autoSkip(), 2000);
             },
           },
         });
@@ -308,10 +338,12 @@ export default function LyricsQuizGame({
           clearInterval(waitForApi);
           setAudioLoading(false);
           setAudioPlayFailed(true);
+          skipTimerRef.current = setTimeout(() => autoSkip(), 2000);
         }, 10000);
         return () => {
           clearInterval(waitForApi);
           clearTimeout(timeout);
+          if (skipTimerRef.current) { clearTimeout(skipTimerRef.current); skipTimerRef.current = null; }
           if (ytPlayerRef.current) {
             try { ytPlayerRef.current.destroy(); } catch {}
             ytPlayerRef.current = null;
@@ -320,6 +352,7 @@ export default function LyricsQuizGame({
       }
       
       return () => {
+        if (skipTimerRef.current) { clearTimeout(skipTimerRef.current); skipTimerRef.current = null; }
         if (ytPlayerRef.current) {
           try { ytPlayerRef.current.destroy(); } catch {}
           ytPlayerRef.current = null;
@@ -333,7 +366,7 @@ export default function LyricsQuizGame({
         audioRef.current = null;
       }
     }
-  }, [currentQuestionIndex, currentQuestion]);
+  }, [currentQuestionIndex, currentQuestion, autoSkip]);
 
   useEffect(() => {
     streakRef.current = streak;
