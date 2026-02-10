@@ -71,7 +71,7 @@ const applyBrandColors = async (app: Application) => {
 
       for (const mesh of colorMeshes) {
         try {
-          (mesh.material!.layers[0] as any).color = skill.color;
+          (mesh.material!.layers[0] as any).color = skill.keycapColor ?? skill.color;
           applied++;
         } catch (_) {}
       }

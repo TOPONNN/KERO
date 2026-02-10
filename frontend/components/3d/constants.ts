@@ -44,6 +44,8 @@ export type Skill = {
   label: string;
   shortDescription: string;
   color: string;
+  /** Optional override for 3D keycap color when brand color clashes with icon */
+  keycapColor?: string;
   icon: string;
 };
 
@@ -62,6 +64,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     label: "TypeScript",
     shortDescription: "프론트엔드와 백엔드 모두 타입 안전하게 — 버그를 미리 잡는 조력자",
     color: "#3178C6",
+    keycapColor: "#1B2838",
     icon: "/assets/keycap-icons-hd/typescript.png",
   },
   [SkillNames.HTML]: {
@@ -86,6 +89,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     label: "React",
     shortDescription: "컴포넌트 기반 UI 라이브러리 — KERO의 모든 화면을 그리는 핵심",
     color: "#61DAFB",
+    keycapColor: "#20232A",
     icon: "/assets/keycap-icons-hd/react.png",
   },
   [SkillNames.VUE]: {
@@ -254,6 +258,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     label: "GSAP",
     shortDescription: "고성능 애니메이션 엔진 — 스크롤 트리거와 3D 카메라 전환",
     color: "#0AE448",
+    keycapColor: "#132B1A",
     icon: "/assets/keycap-icons-hd/gsap.png",
   },
   [SkillNames.PYTORCH]: {
