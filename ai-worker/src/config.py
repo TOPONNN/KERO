@@ -17,7 +17,7 @@ AWS_REGION = os.getenv("AWS_REGION", "ap-northeast-2")
 S3_BUCKET = os.getenv("S3_BUCKET", "kero-audio")
 
 # Backend API URL for callbacks (use public nginx endpoint)
-BACKEND_API_URL = os.getenv("BACKEND_API_URL", "https://kero.ooo")
+BACKEND_API_URL = os.getenv("BACKEND_API_URL", "https://kero.topon.dev")
 
 # YouTube Lyrics API URL
 LYRICS_API_URL = os.getenv("LYRICS_API_URL", "https://lyrics.lewdhutao.my.eu.org")

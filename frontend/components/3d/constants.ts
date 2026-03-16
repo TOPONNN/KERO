@@ -220,7 +220,7 @@ export const SKILLS: Record<SkillNames, Skill> = {
     id: 21,
     name: "nginx",
     label: "Nginx",
-    shortDescription: "리버스 프록시 + SSL — kero.ooo로 들어오는 모든 트래픽을 관리",
+    shortDescription: "리버스 프록시 + SSL — kero.topon.dev로 들어오는 모든 트래픽을 관리",
     color: "#009639",
     icon: "/assets/keycap-icons-hd/nginx.png",
   },

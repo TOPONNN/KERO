@@ -110,15 +110,15 @@ pipeline {
             steps {
                 sh '''
                     for i in $(seq 1 30); do
-                        if curl -fsS https://kero.ooo >/dev/null; then
+                        if curl -fsS https://kero.topon.dev >/dev/null; then
                             break
                         fi
-                        echo "Waiting for https://kero.ooo... (${i}/30)"
+                        echo "Waiting for https://kero.topon.dev... (${i}/30)"
                         sleep 2
                     done
 
-                    curl -f https://kero.ooo || exit 1
-                    curl -f https://kero.ooo/api/health || echo "Backend health check skipped"
+                    curl -f https://kero.topon.dev || exit 1
+                    curl -f https://kero.topon.dev/api/health || echo "Backend health check skipped"
                     echo "Main server health check passed!"
                 '''
             }
